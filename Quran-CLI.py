@@ -302,12 +302,16 @@ class AudioManager:
                         
                         print(Fore.CYAN + "\nConnected to server, starting download...")
                         
+                        # Convert sizes to MB for display
+                        total_mb = total_size / (1024 * 1024)
+                        downloaded_mb = start_pos / (1024 * 1024)
+                        
                         with tqdm.tqdm(
-                            total=total_size/(1024*1024),  # Convert to MB
-                            initial=start_pos/(1024*1024),
+                            total=total_mb,
+                            initial=downloaded_mb,
                             desc=f"{Fore.RED}Downloading (Attempt {attempt + 1}/{max_retries})",
                             unit='MB',
-                            bar_format='{desc}: {percentage:3.0f}%|{bar:30}| {n:.1f}/{total:.1f}MB [{elapsed}<{remaining}]',
+                            bar_format='{desc}: {percentage:3.0f}%|{bar:30}| {n:.1f}/{total:.1f} MB',
                             colour='red'
                         ) as pbar:
                             try:
@@ -315,11 +319,30 @@ class AudioManager:
                                 async with aiofiles.open(temp_file, mode) as f:
                                     downloaded_size = start_pos
                                     chunk_size = 8192
+                                    start_time = time.time()
                                     
                                     async for chunk in response.content.iter_chunked(chunk_size):
                                         await f.write(chunk)
                                         downloaded_size += len(chunk)
-                                        pbar.update(len(chunk)/(1024*1024))  # Update in MB
+                                        chunk_mb = len(chunk) / (1024 * 1024)
+                                        pbar.update(chunk_mb)
+                                        
+                                        # Calculate speed and ETA
+                                        elapsed = time.time() - start_time
+                                        speed = (downloaded_size / (1024 * 1024)) / elapsed if elapsed > 0 else 0
+                                        remaining = (total_size - downloaded_size) / (speed * 1024 * 1024) if speed > 0 else 0
+                                        
+                                        # Format time remaining
+                                        mins = int(remaining // 60)
+                                        secs = int(remaining % 60)
+                                        
+                                        # Update progress bar postfix
+                                        pbar.set_postfix_str(
+                                            f"Speed: {speed:.1f} MB/s | ETA: {mins:02d}:{secs:02d}"
+                                        )
+                                        
+                                        # Small sleep to prevent high CPU usage
+                                        await asyncio.sleep(0.0001)
                                 
                                 if downloaded_size != total_size:
                                     raise ValueError(f"Download incomplete: {downloaded_size}/{total_size} bytes")
