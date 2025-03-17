@@ -311,8 +311,12 @@ class AudioManager:
                             initial=downloaded_mb,
                             desc=f"{Fore.RED}Downloading (Attempt {attempt + 1}/{max_retries})",
                             unit='MB',
-                            bar_format='{desc}: {percentage:3.0f}%|{bar:30}| {n:.1f}/{total:.1f} MB',
-                            colour='red'
+                            bar_format='{desc}: {percentage:3.0f}%|{bar:30}| {n:.1f}/{total:.1f} MB • {rate_fmt} • ETA: {remaining_s:.0f}s',
+                            colour='red',
+                            mininterval=0.1,
+                            smoothing=0.1,
+                            unit_scale=True,
+                            unit_divisor=1
                         ) as pbar:
                             try:
                                 mode = 'ab' if start_pos > 0 else 'wb'
@@ -326,20 +330,6 @@ class AudioManager:
                                         downloaded_size += len(chunk)
                                         chunk_mb = len(chunk) / (1024 * 1024)
                                         pbar.update(chunk_mb)
-                                        
-                                        # Calculate speed and ETA
-                                        elapsed = time.time() - start_time
-                                        speed = (downloaded_size / (1024 * 1024)) / elapsed if elapsed > 0 else 0
-                                        remaining = (total_size - downloaded_size) / (speed * 1024 * 1024) if speed > 0 else 0
-                                        
-                                        # Format time remaining
-                                        mins = int(remaining // 60)
-                                        secs = int(remaining % 60)
-                                        
-                                        # Update progress bar postfix
-                                        pbar.set_postfix_str(
-                                            f"Speed: {speed:.1f} MB/s | ETA: {mins:02d}:{secs:02d}"
-                                        )
                                         
                                         # Small sleep to prevent high CPU usage
                                         await asyncio.sleep(0.0001)
