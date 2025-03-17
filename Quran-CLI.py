@@ -52,12 +52,7 @@ class QuranApp:
                 self._clear_terminal()
                 self._display_header()
 
-                # Print usage instructions
-                print(Style.BRIGHT + Fore.RED + "Instructions:")
-                print(Style.NORMAL + Fore.WHITE + "├─ Type 'quit' or 'exit' to close the application")
-                print(Fore.WHITE + "├─ Press Ctrl+C to cancel current operation")
-                print(Fore.WHITE + "└─ Arabic text may appear reversed but will copy correctly\n")
-                print(Style.BRIGHT + Fore.RED + "=" * 70 + "\n")
+
 
                 try:
                     while True:
@@ -66,20 +61,26 @@ class QuranApp:
                         if surah_number is None:
                             return  # Exit completely instead of break
 
-                        print(Style.BRIGHT + Fore.RED + "\n" + "=" * 70)
+                        print(Style.BRIGHT + Fore.RED + "\n" + "=" * 52)
 
                         surah_info = self.data_handler.get_surah_info(surah_number)
-                        print(Style.BRIGHT + Fore.RED + f"\n📜 Surah Information:")
-                        print(Fore.RED + "├─ " + Style.BRIGHT + Fore.WHITE + "Name: " +
-                              Style.BRIGHT + Fore.RED + f"{surah_info.surah_name}")
-                        print(Fore.RED + "├─ " + Style.BRIGHT + Fore.WHITE + "Arabic: " +
-                              Style.BRIGHT + Fore.RED + f"{surah_info.surah_name_arabic}")
-                        print(Fore.RED + "├─ " + Style.BRIGHT + Fore.WHITE + "Revelation: " +
-                              Style.BRIGHT + Fore.RED + f"{surah_info.revelation_place}")
-                        print(Fore.RED + "└─ " + Style.BRIGHT + Fore.WHITE + "Total Ayahs: " +
-                              Style.BRIGHT + Fore.RED + f"{surah_info.total_ayah}")
-                        print(Style.DIM + Fore.YELLOW + "\nNote: Arabic text appears reversed in terminal but copies correctly")
-                        print(Style.BRIGHT + Fore.RED + "-" * 70)
+                        # Surah Information Header
+                        box_width = 52  # Adjust width if needed
+                        separator = "─" * box_width
+
+                        print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.WHITE + "📜 Surah Information")
+                        print(Fore.RED + f"│ • {Style.BRIGHT}{Fore.WHITE}Name:       {Fore.RED}{surah_info.surah_name}")
+                        print(Fore.RED + f"│ • {Style.BRIGHT}{Fore.WHITE}Arabic:     {Fore.RED}{surah_info.surah_name_arabic}")
+                        print(Fore.RED + f"│ • {Style.BRIGHT}{Fore.WHITE}Revelation: {Fore.RED}{surah_info.revelation_place}")
+                        print(Fore.RED + f"│ • {Style.BRIGHT}{Fore.WHITE}Total Ayahs:{Fore.RED} {surah_info.total_ayah}")
+                        print(Fore.RED + "╰" + separator)
+
+                        # Note Section
+                        print(Style.DIM + Fore.YELLOW + "⚠ Note: Arabic text may appear reversed in the terminal but will copy correctly.")
+                        print(Style.BRIGHT + Fore.RED + separator)
+
+
+
 
                         while True:
                             start, end = self._get_ayah_range(surah_info.total_ayah)

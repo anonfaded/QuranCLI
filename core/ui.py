@@ -29,16 +29,23 @@ class UI:
         sys.stdout.flush()
 
     def display_header(self, QURAN_CLI_ASCII):
-            """Display app header"""
-            from core.version import VERSION
-            print(QURAN_CLI_ASCII)
-            print(Style.BRIGHT + Fore.RED + "=" * 70)
-            print(Fore.WHITE + f"📖 Welcome to QuranCLI v{VERSION}" + Fore.WHITE + " - Your Digital Quran Companion")
-            if self.github_updater:  # Check for updater and new version
-                update_message = self._get_update_message()
-                if update_message:
-                    print(update_message)
-            print(Style.BRIGHT + Fore.RED + "=" * 70 + "\n")
+        """Display app header"""
+        from core.version import VERSION
+        print(QURAN_CLI_ASCII)
+        
+        print(Fore.RED + "╭──" + Style.BRIGHT + Fore.GREEN + "✨ As-salamu alaykum! " + Fore.RED + Style.NORMAL + "─" * 26 + "╮")
+        print(Fore.RED + "│ " + Fore.LIGHTMAGENTA_EX + "QuranCLI - Your Digital Quran Companion".ljust(49) + Fore.RED + "│")
+        print(Fore.RED + "├" + "─" * 50 + "┤")
+        print(Fore.RED + "│ " + Style.BRIGHT + "Version: " + Style.NORMAL + f"v{VERSION}".ljust(40) + "│")
+        print(Fore.RED + "│ " + Style.BRIGHT + "Author: " + Style.NORMAL + "https://github.com/anonfaded".ljust(41) + "│")
+        print(Fore.RED + "├" + "─" * 50 + "┤")
+        print(Fore.RED + "│ " + Style.BRIGHT + "Instructions:".ljust(49) + Style.NORMAL + "│")
+        print(Fore.RED + "│ • " + Fore.WHITE + "Type 'quit' or 'exit' to close".ljust(47) + Fore.RED + "│")
+        print(Fore.RED + "│ • " + Fore.WHITE + "Press Ctrl+C to cancel".ljust(47) + Fore.RED + "│")
+        print(Fore.RED + "│ • " + Fore.WHITE + "Arabic text copies correctly".ljust(47) + Fore.RED + "│")
+        print(Fore.RED + "╰" + "─" * 50 + "╯\n")
+
+
     def _get_update_message(self) -> str:
         """Check for new version and returns the update message"""
         if self.github_updater:
