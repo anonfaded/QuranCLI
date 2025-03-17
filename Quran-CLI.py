@@ -660,21 +660,38 @@ class QuranApp:
                     print(Fore.RED + "\nNo reciters available")
                     return
 
-                print(Fore.CYAN + "\nAvailable Reciters:")
-                for rid, info in surah_info.audio.items():
-                    print(f"{Fore.GREEN}{rid}{Fore.WHITE}: {info['reciter']}")
-                
-                print(Fore.WHITE + "\nEnter reciter number: ", end="", flush=True)
-                reciter_input = msvcrt.getch().decode()
-                
-                if reciter_input in surah_info.audio:
-                    audio_url = surah_info.audio[reciter_input]["url"]
-                    reciter_name = surah_info.audio[reciter_input]["reciter"]
-                    self.audio_manager.stop_audio()  # Stop current audio before changing
-                    asyncio.run(self._handle_audio_playback(audio_url, surah_info.surah_number, reciter_name))
-                else:
-                    print(Fore.RED + "\nInvalid reciter selection")
-                    time.sleep(1)
+                while True:  # Add loop for reciter selection
+                    print(Fore.CYAN + "\nAvailable Reciters:")
+                    for rid, info in surah_info.audio.items():
+                        print(f"{Fore.GREEN}{rid}{Fore.WHITE}: {info['reciter']}")
+                    
+                    print(Fore.WHITE + "\nEnter reciter number" + 
+                        Fore.YELLOW + " (or 'q' to cancel)" + 
+                        Fore.WHITE + ": ", end="", flush=True)
+                    
+                    try:
+                        reciter_input = msvcrt.getch().decode()
+                        
+                        if reciter_input.lower() == 'q':
+                            print("\nCancelled reciter selection")
+                            time.sleep(1)
+                            break
+                            
+                        if reciter_input in surah_info.audio:
+                            audio_url = surah_info.audio[reciter_input]["url"]
+                            reciter_name = surah_info.audio[reciter_input]["reciter"]
+                            self.audio_manager.stop_audio()  # Stop current audio before changing
+                            asyncio.run(self._handle_audio_playback(audio_url, surah_info.surah_number, reciter_name))
+                            break
+                        else:
+                            print(Fore.RED + "\nInvalid selection. Please choose a valid reciter number.")
+                            time.sleep(1.5)
+                            continue
+                            
+                    except (UnicodeDecodeError, AttributeError):
+                        print(Fore.RED + "\nInvalid input. Please try again.")
+                        time.sleep(1.5)
+                        continue
 
         except Exception as e:
             print(Fore.RED + f"\nError handling audio command: {e}")
