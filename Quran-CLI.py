@@ -35,6 +35,7 @@ class QuranApp:
         self.data_handler = QuranDataHandler(self.client.cache)
         self.ui = UI(self.audio_manager, self.term_size)  # Create UI
         self.updater = GithubUpdater("anonfaded", "QuranCLI", VERSION)#Replace owner and name
+        self.ui = UI(self.audio_manager, self.term_size, self.updater)  # <---  Pass updater to UI
         self._clear_terminal()  # Calling it here, so the program clears the terminal on startup
 
     def _clear_terminal(self):
@@ -44,7 +45,7 @@ class QuranApp:
         self.ui.display_header(QURAN_CLI_ASCII)
 
     def run(self):
-        self.updater.check_for_updates() # Check for updates at start of run
+        # self.updater.check_for_updates() # Check for updates at start of run
         
         while True:
             try:

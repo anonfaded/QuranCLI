@@ -1,8 +1,7 @@
 # core/github_updater.py
 import requests
-import webbrowser
-from colorama import Fore
 import re
+from colorama import Fore
 
 class GithubUpdater:
     def __init__(self, repo_owner, repo_name, current_version):
@@ -11,32 +10,17 @@ class GithubUpdater:
         self.current_version = current_version
         self.api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
 
-    def check_for_updates(self):
+    def get_latest_release_info(self):
+        """Gets the latest tag name and URL of GitHub releases. Returns empty strings on failure."""
         try:
-            response = requests.get(self.api_url)
-            response.raise_for_status()
+            response = requests.get(self.api_url, timeout=3) # Timeout after 3 seconds
+            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
             release_info = response.json()
             latest_tag_name = release_info["tag_name"]
-
-            if self.compare_versions(latest_tag_name, self.current_version) > 0:
-                print(Fore.YELLOW + f"A new version ({latest_tag_name}) is available!")
-                print(Fore.YELLOW + "Visit the GitHub releases page to download it.")
-                if self.open_github_page(release_info["html_url"]):
-                    return
-                else:
-                    print(Fore.YELLOW + f"Visit {release_info['html_url']} to download it")
-            else:
-                print(Fore.GREEN + "You are using the latest version.")
-
-        except requests.exceptions.RequestException as e:
-            print(Fore.RED + f"Failed to check for updates: {e}")
-
-    def open_github_page(self, url):
-        try:
-            webbrowser.open(url)
-            return True
-        except webbrowser.Error:
-            return False
+            release_url = release_info["html_url"]
+            return latest_tag_name, release_url
+        except:
+            return "", ""  # Return empty strings on failure
 
     def compare_versions(self, version1, version2):
         """Compares two version strings (e.g., "v1.0.0", "v1.0.0-beta").
