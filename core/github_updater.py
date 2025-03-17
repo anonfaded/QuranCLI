@@ -1,25 +1,95 @@
-# core/github_updater.py
 import requests
 import re
+import time
+import json
+import os
 from colorama import Fore
+from pathlib import Path
+
 
 class GithubUpdater:
+    CACHE_FILE = Path(__file__).parent / "api_cache.json"
+    CACHE_EXPIRY = 3600  # Cache expiry time in seconds (1 hour)
+    GITHUB_REPO_OWNER = "anonfaded"
+    GITHUB_REPO_NAME = "QuranCLI"
+
     def __init__(self, repo_owner, repo_name, current_version):
         self.repo_owner = repo_owner
         self.repo_name = repo_name
         self.current_version = current_version
         self.api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+        self.cache = self._load_cache()
+
+    def _load_cache(self):
+        """Loads the cache from the JSON file. Creates the file if it doesn't exist."""
+        try:
+            if not self.CACHE_FILE.exists():
+                # Create the cache file with a default structure
+                default_cache = {"last_check": 0, "data": {}}
+                with open(self.CACHE_FILE, "w") as f:
+                    json.dump(default_cache, f, indent=4)
+                return default_cache
+
+            with open(self.CACHE_FILE, "r") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            print(Fore.YELLOW + "Cache file is corrupted. Resetting cache.")
+            # Handle corrupted cache file by creating a new one
+            default_cache = {"last_check": 0, "data": {}}
+            with open(self.CACHE_FILE, "w") as f:
+                json.dump(default_cache, f, indent=4)
+            return default_cache
+        except Exception as e:
+            print(Fore.RED + f"Error loading cache: {e}")
+            return {"last_check": 0, "data": {}}  # Return a default cache on error
+
+    def _save_cache(self):
+        """Saves the cache to the JSON file."""
+        try:
+            with open(self.CACHE_FILE, "w") as f:
+                json.dump(self.cache, f, indent=4)
+        except IOError as e:
+            print(Fore.RED + f"Error saving cache: {e}")
 
     def get_latest_release_info(self):
-        """Gets the latest tag name and URL of GitHub releases. Returns empty strings on failure."""
+        """Gets the latest tag name and URL of GitHub releases, using the cache."""
+        now = time.time()
+        cache_key = f"{self.repo_owner}/{self.repo_name}"
+
+        if (
+            "data" in self.cache
+            and cache_key in self.cache["data"]
+            and "expiry" in self.cache["data"][cache_key]
+            and self.cache["data"][cache_key]["expiry"] > now
+        ):
+            # Cache hit
+            #print(Fore.GREEN + "Using cached release info.")#no neded
+            return (
+                self.cache["data"][cache_key]["tag_name"],
+                self.cache["data"][cache_key]["release_url"],
+            )
+
+        # Cache miss or expired
+        #print(Fore.YELLOW + "Fetching new release info from GitHub API...")#no neded, lets no annoy the users.
         try:
-            response = requests.get(self.api_url, timeout=3) # Timeout after 3 seconds
-            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+            response = requests.get(self.api_url, timeout=5)
+            response.raise_for_status()
             release_info = response.json()
             latest_tag_name = release_info["tag_name"]
-            release_url = release_info["html_url"]
-            return latest_tag_name, release_url
-        except:
+            latest_release_url = release_info["html_url"]
+
+            # Update cache
+            self.cache["data"][cache_key] = {
+                "tag_name": latest_tag_name,
+                "release_url": latest_release_url,
+                "expiry": now + self.CACHE_EXPIRY,
+            }
+            self.cache["last_check"] = now  # Update last check timestamp
+            self._save_cache()
+            return latest_tag_name, latest_release_url
+
+        except Exception as e:
+           # print(Fore.RED + f"Failed to get release info: {e}")##No need to print to annoy them
             return "", ""  # Return empty strings on failure
 
     def compare_versions(self, version1, version2):
