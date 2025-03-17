@@ -661,6 +661,10 @@ class QuranApp:
                     return
 
                 while True:  # Add loop for reciter selection
+                    self._clear_terminal()  # Clear before showing options
+                    print(Style.BRIGHT + Fore.RED + "\nAudio Player - " + 
+                        Fore.WHITE + f"{surah_info.surah_name}")
+                        
                     print(Fore.CYAN + "\nAvailable Reciters:")
                     for rid, info in surah_info.audio.items():
                         print(f"{Fore.GREEN}{rid}{Fore.WHITE}: {info['reciter']}")
@@ -673,8 +677,9 @@ class QuranApp:
                         reciter_input = msvcrt.getch().decode()
                         
                         if reciter_input.lower() == 'q':
-                            print("\nCancelled reciter selection")
-                            time.sleep(1)
+                            # Clear and restore audio player display
+                            self._clear_terminal()
+                            print(self._get_audio_display(surah_info), end='', flush=True)
                             break
                             
                         if reciter_input in surah_info.audio:
