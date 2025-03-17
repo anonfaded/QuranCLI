@@ -85,7 +85,17 @@ The application is structured into several core modules:
 *   `AudioManager`: Manages audio playback and controls.
 *   `UI`: Handles user interface elements.
 *   `QuranApp`: Orchestrates the application.
+*   version.py: Stores the version information for easy access.
 
+*   ui.py: Displays the version in the application header.
+
+*   github_updater.py:
+
+        Fetches the latest release from the GitHub API.
+
+        Compares VERSION_CODE with the latest release's tag.
+
+        Informs the user about updates and provides a link.
 ## 🛠️ Dependencies
 
 *   requests

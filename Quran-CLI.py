@@ -4,6 +4,8 @@ from core.quran_api_client import QuranAPIClient
 from core.quran_data_handler import QuranDataHandler
 from core.audio_manager import AudioManager
 from core.ui import UI
+from core.github_updater import GithubUpdater
+from core.version import VERSION
 
 from colorama import Fore, Style, init
 from typing import  Optional
@@ -32,6 +34,7 @@ class QuranApp:
         self.audio_manager = AudioManager()
         self.data_handler = QuranDataHandler(self.client.cache)
         self.ui = UI(self.audio_manager, self.term_size)  # Create UI
+        self.updater = GithubUpdater("anonfaded", "QuranCLI", VERSION)#Replace owner and name
         self._clear_terminal()  # Calling it here, so the program clears the terminal on startup
 
     def _clear_terminal(self):
@@ -41,6 +44,8 @@ class QuranApp:
         self.ui.display_header(QURAN_CLI_ASCII)
 
     def run(self):
+        self.updater.check_for_updates() # Check for updates at start of run
+        
         while True:
             try:
                 self._clear_terminal()

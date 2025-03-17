@@ -26,10 +26,10 @@ class UI:
         sys.stdout.flush()
 
     def display_header(self, QURAN_CLI_ASCII):
-        """Display app header"""
+        from core.version import VERSION
         print(QURAN_CLI_ASCII)
         print(Style.BRIGHT + Fore.RED + "=" * 70)
-        print(Fore.WHITE + "📖 Welcome to " + Fore.RED + "QuranCLI" + Fore.WHITE + " - Your Digital Quran Companion")
+        print(Fore.WHITE + f"📖 Welcome to QuranCLI v{VERSION}" + Fore.WHITE + " - Your Digital Quran Companion")
         print(Style.BRIGHT + Fore.RED + "=" * 70 + "\n")
 
     def paginate_output(self, ayahs: List[Ayah], page_size: int = None, surah_info: SurahInfo = None):
