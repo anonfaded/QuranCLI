@@ -250,6 +250,8 @@ class QuranAPIClient:
 class AudioManager:
     """Handles audio downloads and playback"""
     def __init__(self):
+        # Add current_surah tracking
+        self.current_surah = None
         self.audio_dir = Path(__file__).parent / 'audio_cache'
         self.audio_dir.mkdir(exist_ok=True)
         pygame.mixer.init()
@@ -268,18 +270,94 @@ class AudioManager:
         """Get audio file path"""
         return self.audio_dir / f"surah_{surah_num}_reciter_{reciter}.mp3"
 
-    async def download_audio(self, url: str, surah_num: int, reciter: str) -> Path:
-        """Download audio file if not exists"""
+    async def download_audio(self, url: str, surah_num: int, reciter: str, max_retries: int = 5) -> Path:
+        """Download audio file with resume support and retry handling"""
         filename = self.get_audio_path(surah_num, reciter)
-        if not filename.exists():
-            print(Fore.YELLOW + "\n⏳ Downloading audio...")
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    response.raise_for_status()
-                    async with aiofiles.open(filename, 'wb') as f:
-                        await f.write(await response.read())
-            print(Fore.GREEN + "✓ Audio downloaded!")
-        return filename
+        temp_file = filename.with_suffix('.tmp')
+        
+        for attempt in range(max_retries):
+            try:
+                # Verify existing file first
+                if filename.exists():
+                    if os.path.getsize(filename) > 0:
+                        try:
+                            MP3(str(filename))
+                            return filename
+                        except Exception:
+                            os.remove(filename)
+                    else:
+                        os.remove(filename)
+                
+                # Get file size and resume position
+                start_pos = os.path.getsize(temp_file) if temp_file.exists() else 0
+                headers = {'Range': f'bytes={start_pos}-'} if start_pos > 0 else {}
+                
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, headers=headers) as response:
+                        response.raise_for_status()
+                        total_size = int(response.headers.get('content-length', 0)) + start_pos
+                        
+                        if total_size == 0:
+                            raise ValueError("Empty response from server")
+                        
+                        print(Fore.CYAN + "\nConnected to server, starting download...")
+                        
+                        with tqdm.tqdm(
+                            total=total_size/(1024*1024),  # Convert to MB
+                            initial=start_pos/(1024*1024),
+                            desc=f"{Fore.RED}Downloading (Attempt {attempt + 1}/{max_retries})",
+                            unit='MB',
+                            bar_format='{desc}: {percentage:3.0f}%|{bar:30}| {n:.1f}/{total:.1f}MB [{elapsed}<{remaining}]',
+                            colour='red'
+                        ) as pbar:
+                            try:
+                                mode = 'ab' if start_pos > 0 else 'wb'
+                                async with aiofiles.open(temp_file, mode) as f:
+                                    downloaded_size = start_pos
+                                    chunk_size = 8192
+                                    
+                                    async for chunk in response.content.iter_chunked(chunk_size):
+                                        await f.write(chunk)
+                                        downloaded_size += len(chunk)
+                                        pbar.update(len(chunk)/(1024*1024))  # Update in MB
+                                
+                                if downloaded_size != total_size:
+                                    raise ValueError(f"Download incomplete: {downloaded_size}/{total_size} bytes")
+                                
+                                # Verify and move file
+                                if os.path.exists(filename):
+                                    os.remove(filename)
+                                os.rename(temp_file, filename)
+                                
+                                # Validate MP3
+                                MP3(str(filename))
+                                print(Fore.GREEN + "\n✓ Audio downloaded and verified!")
+                                return filename
+                                
+                            except Exception as e:
+                                print(Fore.RED + f"\nDownload interrupted: {str(e)}")
+                                raise e
+                                
+            except aiohttp.ClientError as e:
+                print(Fore.RED + f"\nNetwork error (Attempt {attempt + 1}/{max_retries}): {str(e)}")
+            except Exception as e:
+                print(Fore.RED + f"\nDownload failed (Attempt {attempt + 1}/{max_retries}): {str(e)}")
+            
+            if attempt < max_retries - 1:
+                retry_delay = (attempt + 1) * 2
+                print(Fore.YELLOW + f"\nRetrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+        
+        # All attempts failed
+        print(Fore.RED + "\n❌ Download failed after all attempts")
+        print(Fore.YELLOW + "Would you like to try downloading again? (y/n): ", end="")
+        try:
+            if msvcrt.getch().decode().lower() == 'y':
+                return await self.download_audio(url, surah_num, reciter)
+        except Exception:
+            pass
+        
+        raise Exception("Failed to download audio")
 
     def load_audio(self, file_path: Path):
         """Load audio and get duration"""
@@ -291,7 +369,7 @@ class AudioManager:
         """Play audio file with progress tracking"""
         try:
             if self.is_playing:
-                self.stop_audio()
+                self.stop_audio(reset_state=True)
             
             audio = self.load_audio(file_path)
             pygame.mixer.music.load(str(file_path))
@@ -302,12 +380,17 @@ class AudioManager:
             self.current_position = 0
             self.start_time = time.time()
             
-            # Start progress tracking
+            # Update current surah from filename
+            try:
+                self.current_surah = int(file_path.stem.split('_')[1])
+            except (IndexError, ValueError):
+                self.current_surah = None
+            
             self.start_progress_tracking()
             
         except Exception as e:
             print(Fore.RED + f"\nError playing audio: {e}")
-            self.stop_audio()
+            self.stop_audio(reset_state=True)
 
     def _track_progress(self):
         """Track progress with accurate timing"""
@@ -366,15 +449,22 @@ class AudioManager:
         self.progress_thread.daemon = True
         self.progress_thread.start()
 
-    def stop_audio(self, restart=False):
+    def stop_audio(self, reset_state=False):
         """Stop audio with cleanup"""
         self.should_stop = True
-        if self.progress_thread and not restart:
+        if self.progress_thread:
             self.progress_thread.join(timeout=0.5)
         pygame.mixer.music.stop()
-        if not restart:
+        pygame.mixer.music.unload()  # Add this to fully unload the audio
+        
+        if reset_state:
             self.is_playing = False
             self.current_position = 0
+            self.current_audio = None
+            self.current_reciter = None
+            self.current_surah = None
+            self.duration = 0
+            self.start_time = 0  # Add this to reset timing
 
     def pause_audio(self):
         """Pause audio playback and store position"""
@@ -406,8 +496,12 @@ class AudioManager:
         
         progress = min(self.current_position / self.duration, 1)
         filled = int(width * progress)
-        bar = (Fore.RED + "▓" * filled + 
-               Fore.WHITE + "░" * (width - filled))
+        empty = width - filled
+        
+        # Use block characters for better visibility
+        bar = (Fore.RED + "█" * filled + 
+            Fore.WHITE + "░" * empty)
+        
         current = self.format_time(self.current_position)
         total = self.format_time(self.duration)
         
@@ -532,10 +626,11 @@ class QuranApp:
         """Handle audio control input"""
         try:
             if choice == 'p':
-                if not self.audio_manager.current_audio:
+                if not self.audio_manager.current_audio or self.audio_manager.current_surah != surah_info.surah_number:
+                    # Reset audio state for new surah
+                    self.audio_manager.stop_audio(reset_state=True)
                     print(Fore.YELLOW + "\nℹ Loading default reciter...")
-                    # Start with default reciter
-                    reciter_id = next(iter(surah_info.audio))  # Get first available reciter
+                    reciter_id = next(iter(surah_info.audio))
                     audio_url = surah_info.audio[reciter_id]["url"]
                     reciter_name = surah_info.audio[reciter_id]["reciter"]
                     asyncio.run(self._handle_audio_playback(audio_url, surah_info.surah_number, reciter_name))
@@ -575,13 +670,15 @@ class QuranApp:
     async def _handle_audio_playback(self, url: str, surah_num: int, reciter: str):
         """Handle audio download and playback"""
         try:
-            print(Fore.YELLOW + "\n⏳ Downloading audio...")
+            print(Fore.YELLOW + "\n⏳ Starting download, please wait...")
+            print(Fore.CYAN + "This may take a moment depending on your internet speed.")
             file_path = await self.audio_manager.download_audio(url, surah_num, reciter)
-            print(Fore.GREEN + "✓ Starting playback...")
+            print(Fore.GREEN + "\n✓ Starting playback...")
             self.audio_manager.play_audio(file_path, reciter)
         except Exception as e:
-            print(Fore.RED + f"\nError playing audio: {e}")
-            time.sleep(1)
+            print(Fore.RED + f"\nError: {str(e)}")
+            print(Fore.YELLOW + "Please try again or choose a different reciter.")
+            time.sleep(2)
 
     def _display_audio_controls(self, surah_info: SurahInfo):
         """Display audio controls with real-time updates"""
@@ -647,9 +744,11 @@ class QuranApp:
         """Get current audio display with input hints"""
         output = []
         output.append(Style.BRIGHT + Fore.RED + "\nAudio Player - " + 
-                     Fore.WHITE + f"{surah_info.surah_name}")
+                    Fore.WHITE + f"{surah_info.surah_name}")
         
-        if not self.audio_manager.current_audio:
+        # Only show audio info if it matches current surah
+        if (not self.audio_manager.current_audio or 
+            self.audio_manager.current_surah != surah_info.surah_number):
             output.append(Style.BRIGHT + Fore.YELLOW + "\n\nℹ Press 'p' to download and play audio")
         else:
             state = "▶ Playing" if self.audio_manager.is_playing else "⏸ Paused"
@@ -661,7 +760,6 @@ class QuranApp:
                 output.append("\nProgress:")
                 output.append(self.audio_manager.get_progress_bar())
                 
-                # Show finished state
                 if not self.audio_manager.is_playing and self.audio_manager.current_position >= self.audio_manager.duration:
                     output.append(Style.DIM + Fore.YELLOW + "\nAudio finished - Press 'p' to replay")
         
