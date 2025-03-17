@@ -3,12 +3,14 @@
 A feature-rich Command Line Interface for reading and listening to the Holy Quran.
 
 ```ascii
+
  ██████╗ ██╗   ██╗██████╗  █████╗ ███╗   ██╗     ██████╗██╗     ██╗
 ██╔═══██╗██║   ██║██╔══██╗██╔══██╗████╗  ██║    ██╔════╝██║     ██║
 ██║   ██║██║   ██║██████╔╝███████║██╔██╗ ██║    ██║     ██║     ██║
 ██║▄▄ ██║██║   ██║██╔══██╗██╔══██║██║╚██╗██║    ██║     ██║     ██║
 ╚██████╔╝╚██████╔╝██║  ██║██║  ██║██║ ╚████║    ╚██████╗███████╗██║
  ╚══▀▀═╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝     ╚═════╝╚══════╝╚═╝
+
 ```
 
 ## ✨ Features
@@ -32,86 +34,78 @@ A feature-rich Command Line Interface for reading and listening to the Holy Qura
 
 ### Installation
 
-1. Clone the repository:
-```bash
-git clone https://github.com/anonfaded/QuranCLI.git
-cd QuranCLI
-```
+1.  Clone the repository:
 
-2. Install required packages:
-```bash
-pip install -r requirements.txt
-```
+    ```bash
+    git clone https://github.com/anonfaded/QuranCLI.git
+    cd QuranCLI
+    ```
 
-3. Run the application:
-```bash
-python Quran-CLI.py
-```
+2.  Install required packages:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3.  Run the application:
+
+    ```bash
+    python Quran-CLI.py
+    ```
 
 ## 🎮 Controls
 
 ### Navigation
-- Enter surah number (1-114)
-- Select ayah range
-- Use 'n' for next page
-- Use 'p' for previous page
-- Use 'q' to go back/quit
+
+*   Enter surah number (1-114)
+*   Select ayah range
+*   Use `n` for next page
+*   Use `p` for previous page
+*   Use `q` to go back/quit
 
 ### Audio Controls
-- `p`: Play/Pause
-- `s`: Stop
-- `r`: Change reciter
-- `←/→`: Seek 5 seconds
-- `Ctrl + ←/→`: Seek 30 seconds
-- `q`: Return to text view
 
-## 🏗️ Technical Architecture
+*   `p`: Play/Pause
+*   `s`: Stop
+*   `r`: Change reciter
+*   `←/→`: Seek 5 seconds
+*   `Ctrl + ←/→`: Seek 30 seconds
+*   `q`: Return to text view
 
-### Core Components
+## 🏗️ Architecture
 
-1. **QuranAPIClient**
-   - Handles API communication
-   - Manages data caching
-   - Processes Arabic text formatting
+The application is structured into several core modules:
 
-2. **AudioManager**
-   - Controls audio playback
-   - Manages audio downloads
-   - Provides seeking and progress tracking
-
-3. **QuranCache**
-   - Implements efficient caching system
-   - Handles data persistence
-   - Validates cached content
-
-4. **QuranApp**
-   - Main application interface
-   - Manages user interaction
-   - Coordinates all components
-
-### Data Management
-- Local caching of Quran text
-- Efficient audio file management
-- Thread-safe operations
-- Automatic data validation
+*   `QuranAPIClient`: Handles API communication and data caching.
+*   `QuranCache`: Provides efficient local caching.
+*   `QuranDataHandler`: Handles data retrieval and formatting.
+*   `AudioManager`: Manages audio playback and controls.
+*   `UI`: Handles user interface elements.
+*   `QuranApp`: Orchestrates the application.
 
 ## 🛠️ Dependencies
 
-- requests: API communication
-- pydantic: Data validation
-- colorama: Terminal colors
-- pygame: Audio playback
-- arabic-reshaper: Arabic text processing
-- python-bidi: Bidirectional text support
-- aiohttp: Async downloads
-- mutagen: Audio metadata
+*   requests
+*   pydantic
+*   colorama
+*   python-bidi
+*   arabic-reshaper
+*   tqdm
+*   pygame
+*   aiohttp
+*   aiofiles
+*   keyboard
+*   mutagen
+
+```python
+pip install requests pydantic colorama python-bidi arabic-reshaper tqdm pygame aiohttp aiofiles keyboard mutagen
+```
 
 ## 📝 Notes
 
-- Arabic text appears reversed in terminal but copies correctly
-- Audio files are cached locally for faster access
-- Supports multiple Quran reciters
-- Auto-resumes from last position
+*   Arabic text appears reversed in the terminal but copies correctly.
+*   Audio files are cached locally.
+*   Supports multiple reciters.
 
 ## 🤝 Contributing
 
