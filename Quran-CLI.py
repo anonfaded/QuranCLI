@@ -406,7 +406,7 @@ class AudioManager:
         
         progress = min(self.current_position / self.duration, 1)
         filled = int(width * progress)
-        bar = (Fore.GREEN + "▓" * filled + 
+        bar = (Fore.RED + "▓" * filled + 
                Fore.WHITE + "░" * (width - filled))
         current = self.format_time(self.current_position)
         total = self.format_time(self.duration)
