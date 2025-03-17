@@ -13,6 +13,9 @@ A feature-rich Command Line Interface for reading and listening to the Holy Qura
 
 ```
 
+![image](https://github.com/user-attachments/assets/e5fa1c2b-fb35-41f9-be34-98688d4bdbc0)
+
+
 ## ✨ Features
 
 - 📑 Read all 114 Surahs of the Quran
