@@ -14,6 +14,14 @@ import threading
 import shutil
 import sys
 import math
+import pygame
+import asyncio
+import aiohttp
+import aiofiles
+from pathlib import Path
+from mutagen.mp3 import MP3
+import keyboard
+import msvcrt  # For Windows keyboard input
 
 # Initialize colorama
 init(autoreset=True)
@@ -22,7 +30,7 @@ init(autoreset=True)
 
 VERSE_SYNC_ASCII = """
 \033[31m██╗   ██╗███████╗██████╗ ███████╗███████╗███████╗██╗   ██╗███╗   ██╗ ██████╗
-██║   ██║██╔════╝██╔══██╗██╔════╝██╔════╝██╔════╝╚██╗ ██╔╝████╗  ██║██╔════╝
+██║   ██║██╔════╝██╔══██╗██╔════╝██╔════╝╚██╗ ██╔╝████╗  ██║██╔════╝
 ██║   ██║█████╗  ██████╔╝███████╗█████╗  ███████╗ ╚████╔╝ ██╔██╗ ██║██║     
 ╚██╗ ██╔╝██╔══╝  ██╔══██╗╚════██║██╔══╝  ╚════██║  ╚██╔╝  ██║╚██╗██║██║     
  ╚████╔╝ ███████╗██║  ██║███████║███████╗███████║   ██║   ██║ ╚████║╚██████╗
@@ -38,6 +46,8 @@ class SurahInfo(BaseModel):
     surah_name_arabic: str
     total_ayah: int
     revelation_place: str
+    surah_number: int
+    audio: Dict[str, Dict[str, str]]
 
 class Ayah(BaseModel):
     number: int
@@ -198,7 +208,9 @@ class QuranAPIClient:
             surah_name=data.get("surahName", "Unknown"),
             surah_name_arabic=self.fix_arabic_text(data.get("surahNameArabic", "غير معروف")),
             total_ayah=data.get("totalAyah", 0),
-            revelation_place=data.get("revelationPlace", "Unknown")
+            revelation_place=data.get("revelationPlace", "Unknown"),
+            surah_number=surah_number,
+            audio=data.get("audio", {})
         )
 
     def get_ayahs(self, surah_number: int, start: int, end: int) -> List[Ayah]:
@@ -233,12 +245,180 @@ class QuranAPIClient:
         return "".join(reversed(bidi_text))  # Ensure correct order when copying
 
 
+class AudioManager:
+    """Handles audio downloads and playback"""
+    def __init__(self):
+        self.audio_dir = Path(__file__).parent / 'audio_cache'
+        self.audio_dir.mkdir(exist_ok=True)
+        pygame.mixer.init()
+        self.current_audio = None
+        self.current_reciter = None
+        self.is_playing = False
+        self.duration = 0
+        self.current_position = 0
+        self.progress_thread = None
+        self.should_stop = False
+        self.seek_lock = threading.Lock()
+        self.update_event = threading.Event()
+        self.start_time = 0
+        
+    def get_audio_path(self, surah_num: int, reciter: str) -> Path:
+        """Get audio file path"""
+        return self.audio_dir / f"surah_{surah_num}_reciter_{reciter}.mp3"
+
+    async def download_audio(self, url: str, surah_num: int, reciter: str) -> Path:
+        """Download audio file if not exists"""
+        filename = self.get_audio_path(surah_num, reciter)
+        if not filename.exists():
+            print(Fore.YELLOW + "\n⏳ Downloading audio...")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    response.raise_for_status()
+                    async with aiofiles.open(filename, 'wb') as f:
+                        await f.write(await response.read())
+            print(Fore.GREEN + "✓ Audio downloaded!")
+        return filename
+
+    def load_audio(self, file_path: Path):
+        """Load audio and get duration"""
+        audio = MP3(str(file_path))
+        self.duration = audio.info.length
+        return audio
+
+    def play_audio(self, file_path: Path, reciter: str):
+        """Play audio file with progress tracking"""
+        try:
+            if self.is_playing:
+                self.stop_audio()
+            
+            audio = self.load_audio(file_path)
+            pygame.mixer.music.load(str(file_path))
+            pygame.mixer.music.play()
+            self.is_playing = True
+            self.current_audio = file_path
+            self.current_reciter = reciter
+            self.current_position = 0
+            self.start_time = time.time()
+            
+            # Start progress tracking
+            self.start_progress_tracking()
+            
+        except Exception as e:
+            print(Fore.RED + f"\nError playing audio: {e}")
+            self.stop_audio()
+
+    def _track_progress(self):
+        """Track progress with accurate timing"""
+        try:
+            while not self.should_stop and pygame.mixer.music.get_busy():
+                self.current_position = time.time() - self.start_time
+                if self.current_position >= self.duration:
+                    self.stop_audio()
+                    break
+                self.update_event.set()
+                time.sleep(0.1)
+            
+            if not pygame.mixer.music.get_busy() and self.is_playing:
+                self.stop_audio()
+        except Exception:
+            pass
+
+    def seek(self, position: float):
+        """Seek with accurate position tracking"""
+        with self.seek_lock:
+            try:
+                if not self.current_audio:
+                    return
+                
+                # Calculate new position
+                position = max(0, min(position, self.duration))
+                
+                # Store playing state
+                was_playing = self.is_playing
+                
+                # Stop current playback
+                pygame.mixer.music.stop()
+                
+                # Start from new position
+                pygame.mixer.music.load(str(self.current_audio))
+                pygame.mixer.music.play(start=position)
+                
+                # Update timing
+                self.current_position = position
+                self.start_time = time.time() - position
+                
+                # Restore state
+                self.is_playing = was_playing
+                if self.is_playing:
+                    self.start_progress_tracking()
+                else:
+                    pygame.mixer.music.pause()
+                
+            except Exception as e:
+                print(Fore.RED + f"\nSeek error: {e}")
+
+    def start_progress_tracking(self):
+        """Start progress tracking thread safely"""
+        self.should_stop = False
+        self.progress_thread = threading.Thread(target=self._track_progress)
+        self.progress_thread.daemon = True
+        self.progress_thread.start()
+
+    def stop_audio(self, restart=False):
+        """Stop audio with cleanup"""
+        self.should_stop = True
+        if self.progress_thread and not restart:
+            self.progress_thread.join(timeout=0.5)
+        pygame.mixer.music.stop()
+        if not restart:
+            self.is_playing = False
+            self.current_position = 0
+
+    def pause_audio(self):
+        """Pause audio playback and store position"""
+        if self.is_playing:
+            pygame.mixer.music.pause()
+            self.is_playing = False
+            self.current_position = time.time() - self.start_time
+            print(Fore.YELLOW + "⏸ Audio paused")
+
+    def resume_audio(self):
+        """Resume audio from last position"""
+        if self.current_audio and not self.is_playing:
+            pygame.mixer.music.load(str(self.current_audio))
+            # Start from last position
+            pygame.mixer.music.play(start=self.current_position)
+            self.is_playing = True
+            self.start_time = time.time() - self.current_position
+            self.start_progress_tracking()
+            print(Fore.GREEN + "▶ Audio resumed")
+
+    def format_time(self, seconds: float) -> str:
+        """Format seconds to MM:SS"""
+        return f"{int(seconds//60):02d}:{int(seconds%60):02d}"
+
+    def get_progress_bar(self, width: int = 40) -> str:
+        """Generate progress bar with colors"""
+        if not self.duration:
+            return ""
+        
+        progress = min(self.current_position / self.duration, 1)
+        filled = int(width * progress)
+        bar = (Fore.GREEN + "▓" * filled + 
+               Fore.WHITE + "░" * (width - filled))
+        current = self.format_time(self.current_position)
+        total = self.format_time(self.duration)
+        
+        return f"{bar} {Fore.CYAN}{current}{Fore.WHITE}/{Fore.CYAN}{total}"
+
+
 class QuranApp:
     def __init__(self):
         self._clear_terminal()
         self.client = QuranAPIClient()
         # Get terminal size
         self.term_size = shutil.get_terminal_size()
+        self.audio_manager = AudioManager()
         
     def _clear_terminal(self):
         """Clear terminal with fallback and scroll reset"""
@@ -274,20 +454,29 @@ class QuranApp:
             for ayah in ayahs[start_idx:end_idx]:
                 self._display_single_ayah(ayah)
             
+            # Navigation options
+            print(Style.BRIGHT + Fore.RED + "\nNavigation:")
             if total_pages > 1:
-                print(Style.BRIGHT + Fore.RED + "\nNavigation:")
-                print(Fore.WHITE + "n: Next page | p: Previous page | q: Return to menu")
-                choice = input(Fore.RED + "\n└──╼ " + Fore.WHITE).lower()
-                
-                if choice == 'n' and current_page < total_pages:
+                print(Fore.CYAN + "n" + Fore.WHITE + ": Next page")
+                print(Fore.CYAN + "p" + Fore.WHITE + ": Previous page")
+            print(Fore.YELLOW + "a" + Fore.WHITE + ": Play audio")
+            print(Fore.RED + "q" + Fore.WHITE + ": Return")
+            
+            choice = input(Fore.RED + "\n└──╼ " + Fore.WHITE).lower()
+            
+            if choice == 'n' and current_page < total_pages:
+                current_page += 1
+            elif choice == 'p' and current_page > 1:
+                current_page -= 1
+            elif choice == 'a':
+                self._display_audio_controls(surah_info)
+            elif choice == 'q':
+                return
+            elif not choice:  # Enter was pressed
+                if current_page < total_pages:
                     current_page += 1
-                elif choice == 'p' and current_page > 1:
-                    current_page -= 1
-                elif choice == 'q':
-                    break
-            else:
-                input(Fore.RED + "\nPress Enter to continue...")
-                return  # Return instead of break
+                else:
+                    return
 
     def _display_single_ayah(self, ayah: Ayah):
         """Display a single ayah with proper formatting"""
@@ -335,9 +524,158 @@ class QuranApp:
 
     def _display_ayahs(self, ayahs: List[Ayah], surah_info: SurahInfo):
         """Display ayahs with pagination"""
-        print(Style.BRIGHT + Fore.CYAN + f"\n📖 {surah_info.surah_name}")
-        print(Fore.WHITE + f"   {surah_info.surah_name_arabic}\n")
         self._paginate_output(ayahs, surah_info=surah_info)
+
+    def _handle_audio_choice(self, choice: str, surah_info: SurahInfo):
+        """Handle audio control input"""
+        try:
+            if choice == 'p':
+                if not self.audio_manager.current_audio:
+                    print(Fore.YELLOW + "\nℹ Loading default reciter...")
+                    # Start with default reciter
+                    reciter_id = next(iter(surah_info.audio))  # Get first available reciter
+                    audio_url = surah_info.audio[reciter_id]["url"]
+                    reciter_name = surah_info.audio[reciter_id]["reciter"]
+                    asyncio.run(self._handle_audio_playback(audio_url, surah_info.surah_number, reciter_name))
+                elif self.audio_manager.is_playing:
+                    self.audio_manager.pause_audio()
+                else:
+                    self.audio_manager.resume_audio()
+                    
+            elif choice == 's':
+                self.audio_manager.stop_audio()
+                
+            elif choice == 'r':
+                if not surah_info.audio:
+                    print(Fore.RED + "\nNo reciters available")
+                    return
+
+                print(Fore.CYAN + "\nAvailable Reciters:")
+                for rid, info in surah_info.audio.items():
+                    print(f"{Fore.GREEN}{rid}{Fore.WHITE}: {info['reciter']}")
+                
+                print(Fore.WHITE + "\nEnter reciter number: ", end="", flush=True)
+                reciter_input = msvcrt.getch().decode()
+                
+                if reciter_input in surah_info.audio:
+                    audio_url = surah_info.audio[reciter_input]["url"]
+                    reciter_name = surah_info.audio[reciter_input]["reciter"]
+                    self.audio_manager.stop_audio()  # Stop current audio before changing
+                    asyncio.run(self._handle_audio_playback(audio_url, surah_info.surah_number, reciter_name))
+                else:
+                    print(Fore.RED + "\nInvalid reciter selection")
+                    time.sleep(1)
+
+        except Exception as e:
+            print(Fore.RED + f"\nError handling audio command: {e}")
+            time.sleep(1)
+
+    async def _handle_audio_playback(self, url: str, surah_num: int, reciter: str):
+        """Handle audio download and playback"""
+        try:
+            print(Fore.YELLOW + "\n⏳ Downloading audio...")
+            file_path = await self.audio_manager.download_audio(url, surah_num, reciter)
+            print(Fore.GREEN + "✓ Starting playback...")
+            self.audio_manager.play_audio(file_path, reciter)
+        except Exception as e:
+            print(Fore.RED + f"\nError playing audio: {e}")
+            time.sleep(1)
+
+    def _display_audio_controls(self, surah_info: SurahInfo):
+        """Display audio controls with real-time updates"""
+        if not surah_info.audio:
+            print(Fore.RED + "\n❌ Audio not available for this surah")
+            return
+
+        try:
+            # Register safe keyboard shortcuts with error handling
+            try:
+                keyboard.unhook_all()  # Clean up any existing hooks
+                keyboard.add_hotkey('left', lambda: self.audio_manager.seek(max(0, self.audio_manager.current_position - 5)))
+                keyboard.add_hotkey('right', lambda: self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 5)))
+                keyboard.add_hotkey('ctrl+left', lambda: self.audio_manager.seek(max(0, self.audio_manager.current_position - 30)))
+                keyboard.add_hotkey('ctrl+right', lambda: self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 30)))
+            except Exception as e:
+                print(Fore.RED + f"\nWarning: Keyboard shortcuts not available: {e}")
+
+            last_display = ""
+            while True:
+                try:
+                    if msvcrt.kbhit():
+                        try:
+                            key_byte = msvcrt.getch()
+                            # Handle arrow keys
+                            if key_byte == b'\xe0':  # Special key prefix
+                                arrow = msvcrt.getch()
+                                if arrow == b'K':  # Left arrow
+                                    self.audio_manager.seek(max(0, self.audio_manager.current_position - 5))
+                                elif arrow == b'M':  # Right arrow
+                                    self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 5))
+                            else:
+                                choice = key_byte.decode('ascii', errors='ignore').lower()
+                                if choice == 'q':
+                                    break
+                                self._handle_audio_choice(choice, surah_info)
+                        except UnicodeDecodeError:
+                            continue  # Skip invalid characters
+
+                    # Update display only if changed
+                    current_display = self._get_audio_display(surah_info)
+                    if current_display != last_display:
+                        self._clear_terminal()
+                        print(current_display, end='', flush=True)
+                        last_display = current_display
+                        sys.stdout.flush()  # Ensure cursor is at the correct position
+
+                    time.sleep(0.1)  # Prevent high CPU usage
+
+                except Exception as e:
+                    print(Fore.RED + f"\nError in audio control loop: {e}")
+                    time.sleep(1)
+                    continue  # Continue instead of break to keep player running
+
+        finally:
+            try:
+                keyboard.unhook_all()
+                self.audio_manager.stop_audio()
+            except Exception:
+                pass
+
+    def _get_audio_display(self, surah_info: SurahInfo) -> str:
+        """Get current audio display with input hints"""
+        output = []
+        output.append(Style.BRIGHT + Fore.RED + "\nAudio Player - " + 
+                     Fore.WHITE + f"{surah_info.surah_name}")
+        
+        if not self.audio_manager.current_audio:
+            output.append(Style.BRIGHT + Fore.YELLOW + "\n\nℹ Press 'p' to download and play audio")
+        else:
+            state = "▶ Playing" if self.audio_manager.is_playing else "⏸ Paused"
+            state_color = Fore.GREEN if self.audio_manager.is_playing else Fore.YELLOW
+            output.append(f"\nState: {state_color}{state}")
+            output.append(f"Reciter: {Fore.CYAN}{self.audio_manager.current_reciter}")
+            
+            if self.audio_manager.duration:
+                output.append("\nProgress:")
+                output.append(self.audio_manager.get_progress_bar())
+                
+                # Show finished state
+                if not self.audio_manager.is_playing and self.audio_manager.current_position >= self.audio_manager.duration:
+                    output.append(Style.DIM + Fore.YELLOW + "\nAudio finished - Press 'p' to replay")
+        
+        output.append(Style.BRIGHT + Fore.RED + "\n\nControls:")
+        output.append(Fore.GREEN + "p" + Fore.WHITE + ": Play/Pause")
+        output.append(Fore.CYAN + "← / →" + Fore.WHITE + ": Seek 5s")
+        output.append(Fore.CYAN + "Ctrl + ← / →" + Fore.WHITE + ": Seek 30s")
+        output.append(Fore.RED + "s" + Fore.WHITE + ": Stop")
+        output.append(Fore.YELLOW + "r" + Fore.WHITE + ": Change Reciter")
+        output.append(Fore.MAGENTA + "q" + Fore.WHITE + ": Return")
+        
+        # Add dim input hint
+        output.append(Style.DIM + Fore.WHITE + "\nPress any key to execute command (no Enter needed)")
+        output.append(Fore.RED + "└──╼ " + Fore.WHITE)
+        
+        return '\n'.join(output)
 
     def run(self):
         while True:
