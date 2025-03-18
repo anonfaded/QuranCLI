@@ -11,12 +11,14 @@ from core.models import Ayah, SurahInfo
 from core.audio_manager import AudioManager
 import requests # Add Requests
 from core.github_updater import GithubUpdater  # Import GithubUpdater
+from core.version import VERSION  # Import VERSION
 
 class UI:
     def __init__(self, audio_manager: AudioManager, term_size, github_updater: Optional[GithubUpdater] = None):
         self.audio_manager = audio_manager
         self.term_size = term_size
         self.github_updater = github_updater  # Store GithubUpdater
+        self.update_message = self._get_update_message() # Get the update message during initialization
 
     def clear_terminal(self):
         """Clear terminal with fallback and scroll reset"""
@@ -29,10 +31,17 @@ class UI:
         sys.stdout.flush()
 
     def display_header(self, QURAN_CLI_ASCII):
-        """Display app header"""
-        from core.version import VERSION
-        print(QURAN_CLI_ASCII)
+        """Display app header dynamically"""
         
+
+        print(QURAN_CLI_ASCII)
+
+        # Call _get_update_message() inside display_header to ensure latest updates
+        update_message = self._get_update_message()
+
+        if update_message:
+            print(update_message)  # Print directly instead of wrapping
+
         print(Fore.RED + "╭──" + Style.BRIGHT + Fore.GREEN + "✨ As-salamu alaykum! " + Fore.RED + Style.NORMAL + "─" * 26 + "╮")
         print(Fore.RED + "│ " + Fore.LIGHTMAGENTA_EX + "QuranCLI - Your Digital Quran Companion".ljust(49) + Fore.RED + "│")
         print(Fore.RED + "├" + "─" * 50 + "┤")
@@ -46,14 +55,31 @@ class UI:
         print(Fore.RED + "╰" + "─" * 50 + "╯\n")
 
 
+
     def _get_update_message(self) -> str:
-        """Check for new version and returns the update message"""
-        if self.github_updater:
-            latest_tag_name, release_url = self.github_updater.get_latest_release_info()
-            if latest_tag_name and release_url:
-                if self.github_updater.compare_versions(latest_tag_name, self.github_updater.current_version) > 0:
-                    return Fore.YELLOW + f"\n✨ A new version ({Fore.GREEN}{latest_tag_name}{Fore.YELLOW}) is available!\n   Visit {Fore.GREEN}{release_url}{Fore.YELLOW} to download it."
+        """Check for a new version and return the update message"""
+        if not self.github_updater:
+            return ""
+
+        latest_tag_name, release_url = self.github_updater.get_latest_release_info()
+
+        if not latest_tag_name or not release_url:
+            return ""
+
+        if self.github_updater.compare_versions(latest_tag_name, self.github_updater.current_version) > 0:
+            return (
+                f"\n{Fore.GREEN}{'─' * 60}\n"
+                f"✨🚀 {Fore.YELLOW}UPDATE AVAILABLE! 🚀✨\n"
+                f"{Fore.GREEN}New Version: {Fore.MAGENTA}{latest_tag_name}\n"
+                f"{Fore.GREEN}🔗 Download: {Fore.MAGENTA}{release_url}\n"
+                f"{Fore.GREEN}{'─' * 60}\n"
+            )
+
+
         return ""
+
+
+
 
     def paginate_output(self, ayahs: List[Ayah], page_size: int = None, surah_info: SurahInfo = None):
         """Display ayahs with pagination"""

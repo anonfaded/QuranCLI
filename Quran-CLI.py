@@ -45,14 +45,10 @@ class QuranApp:
         self.ui.display_header(QURAN_CLI_ASCII)
 
     def run(self):
-        # self.updater.check_for_updates() # Check for updates at start of run
-        
         while True:
             try:
                 self._clear_terminal()
                 self._display_header()
-
-
 
                 try:
                     while True:
@@ -78,9 +74,6 @@ class QuranApp:
                         # Note Section
                         print(Style.DIM + Fore.YELLOW + "⚠ Note: Arabic text may appear reversed in the terminal but will copy correctly.")
                         print(Style.BRIGHT + Fore.RED + separator)
-
-
-
 
                         while True:
                             start, end = self._get_ayah_range(surah_info.total_ayah)
