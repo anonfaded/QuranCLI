@@ -9,3 +9,5 @@ aiohttp
 aiofiles
 keyboard
 mutagen
+shutil
+difflib
