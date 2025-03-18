@@ -1,8 +1,6 @@
 # core/quran_data_handler.py
 import arabic_reshaper
-
-# from bidi.algorithm import get_display removed for testing
-
+from bidi.algorithm import get_display
 from typing import List
 from core.models import SurahInfo, Ayah
 from core.quran_cache import QuranCache
@@ -14,11 +12,8 @@ class QuranDataHandler:
     @staticmethod
     def fix_arabic_text(text: str) -> str:
         reshaped_text = arabic_reshaper.reshape(text)
-        
-        # bidi_text = get_display(reshaped_text)
-        # return "".join(reversed(bidi_text))  # Ensure correct order when copying
-        
-        return arabic_reshaper.reshape(text)
+        bidi_text = get_display(reshaped_text)
+        return "".join(reversed(bidi_text))  # Ensure correct order when copying
 
     def get_surah_info(self, surah_number: int) -> SurahInfo:
         """Get surah info from cache or download if missing"""
