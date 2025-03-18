@@ -1,4 +1,11 @@
+# Command for packing the repo for AI 
+# repomix  --ignore "cache/**/*,__pycache__/**/*,*.py[cod],*$py.class,dist/**/*,build/**/*,*.egg-info/**/*,*.egg,venv/**/*,env/**/*,ENV/**/*,venv_aarch64/**/*,audio_cache/**/*,api_cache.json,LICENSE,.vscode/**/*,.idea/**/*,*.swp,*.swo,.DS_Store,Thumbs.db,*.so,*.dll,*.dylib"
+
 /core/__pycache__/
 /audio_cache/
 api_cache.json
 venv_aarch64/
+.repomixignore
+repomix-output.md
+.repomix/bundles.json
+repomix.config.json
