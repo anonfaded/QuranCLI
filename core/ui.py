@@ -193,7 +193,7 @@ class UI:
                     self.audio_manager.resume_audio()
 
             elif choice == 's':
-                self.audio_manager.stop_audio()
+                self.audio_manager.stop_audio(reset_state=True)
 
             elif choice == 'r':
                 if not surah_info.audio:
