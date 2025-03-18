@@ -92,13 +92,8 @@ class QuranApp:
                             ayahs = self.data_handler.get_ayahs(surah_number, start, end)
                             self.ui.display_ayahs(ayahs, surah_info)
 
-                            # Cleaner ayah range selection prompt
-                            print(Fore.WHITE + "\nSelect another range for " +
-                                  Fore.RED + f"{surah_info.surah_name}" +
-                                  Style.DIM + Fore.WHITE + " (y/n)" + Style.NORMAL +
-                                  Fore.WHITE + ":\n", end="")
 
-                            if not self._ask_yes_no():
+                            if not self._ask_yes_no(surah_info.surah_name):
                                 self._clear_terminal()
                                 self._display_header()
                                 break
@@ -170,7 +165,7 @@ class QuranApp:
                     print(Fore.YELLOW + "Did you mean one of these?" + Fore.WHITE + '\n')
                     for idx, match in enumerate(close_matches, 1):
                         surah_number = [num for num, name in self.surah_names.items() if name == match][0]
-                        print(Fore.CYAN + f" {idx}. " + Fore.WHITE + f"{match}{Fore.LIGHTBLACK_EX} (Surah {surah_number}) \n")
+                        print(Fore.WHITE + f" {idx}. " + Fore.CYAN + f"(Surah {surah_number}) "+ Fore.WHITE + f"{match} \n")
 
                     # Ask user to select a Surah from the suggestions
                     while True:
@@ -210,9 +205,9 @@ class QuranApp:
                 pass
             print(Fore.RED + "└──╼ " + "Invalid range. Please try again.")
 
-    def _ask_yes_no(self) -> bool:
+    def _ask_yes_no(self, surah_name:str) -> bool:
         while True:
-            choice = input(Fore.BLUE + "Select another range for this Surah (y/n): " + Fore.WHITE).strip().lower()
+            choice = input(Fore.BLUE + f"Select another range for {Fore.GREEN}{surah_name}{Fore.LIGHTBLACK_EX} (y/n){Fore.WHITE}: ").strip().lower()
             if choice in ['y', 'yes']:
                 return True
             if choice in ['n', 'no']:
