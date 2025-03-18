@@ -79,15 +79,21 @@ class UI:
             for ayah in ayahs[start_idx:end_idx]:
                 self.display_single_ayah(ayah)
 
-            # Navigation options
-            print(Style.BRIGHT + Fore.RED + "\nNavigation:")
-            if total_pages > 1:
-                print(Fore.CYAN + "n" + Fore.WHITE + ": Next page")
-                print(Fore.CYAN + "p" + Fore.WHITE + ": Previous page")
-            print(Fore.YELLOW + "a" + Fore.WHITE + ": Play audio")
-            print(Fore.RED + "q" + Fore.WHITE + ": Return")
+            # Navigation Menu
+            box_width = 26  # Adjust width if needed
+            separator = "─" * box_width
 
-            choice = input(Fore.RED + "\n└──╼ " + Fore.WHITE).lower()
+            print(Style.BRIGHT + Fore.RED + "\n╭─ " + Fore.WHITE + "🧭 Navigation")
+            if total_pages > 1:
+                print(Fore.RED + "│ → " + Fore.CYAN + "n " + Fore.WHITE + ": Next page")
+                print(Fore.RED + "│ → " + Fore.CYAN + "p " + Fore.WHITE + ": Previous page")
+            print(Fore.RED + "│ → " + Fore.YELLOW + "a " + Fore.WHITE + ": Play audio")
+            print(Fore.RED + "│ → " + Fore.RED + "q " + Fore.WHITE + ": Return")
+            print(Fore.RED + "╰" + separator)
+
+            # User input prompt (aligned with box)
+            choice = input(Fore.RED + "  ❯ " + Fore.WHITE).lower()
+
 
             if choice == 'n' and current_page < total_pages:
                 current_page += 1
@@ -116,7 +122,7 @@ class UI:
         print(Style.BRIGHT + Fore.RED + "\nUthmani Script:" + Style.BRIGHT + Fore.WHITE)
         print("    " + ayah.arabic_uthmani)
 
-        print(Style.BRIGHT + Fore.WHITE + "\n" + "-" * min(40, self.term_size.columns))
+        print(Style.BRIGHT + Fore.GREEN + "\n" + "-" * min(40, self.term_size.columns))
 
     def wrap_text(self, text: str, width: int) -> str:
         """Wrap text to specified width"""

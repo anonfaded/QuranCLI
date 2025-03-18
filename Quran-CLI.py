@@ -56,23 +56,23 @@ class QuranApp:
 
                 try:
                     while True:
-                        print(Fore.RED + "┌─" + Fore.WHITE + " Select Surah")
+                        print(Fore.RED + "┌─" + Fore.RED + Style.BRIGHT + " Select Surah")
                         surah_number = self._get_surah_number()
                         if surah_number is None:
                             return  # Exit completely instead of break
 
-                        print(Style.BRIGHT + Fore.RED + "\n" + "=" * 52)
+                        print(Style.BRIGHT + Fore.GREEN + "\n" + "=" * 52)
 
                         surah_info = self.data_handler.get_surah_info(surah_number)
                         # Surah Information Header
                         box_width = 52  # Adjust width if needed
                         separator = "─" * box_width
 
-                        print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.WHITE + "📜 Surah Information")
-                        print(Fore.RED + f"│ • {Style.BRIGHT}{Fore.WHITE}Name:       {Fore.RED}{surah_info.surah_name}")
-                        print(Fore.RED + f"│ • {Style.BRIGHT}{Fore.WHITE}Arabic:     {Fore.RED}{surah_info.surah_name_arabic}")
-                        print(Fore.RED + f"│ • {Style.BRIGHT}{Fore.WHITE}Revelation: {Fore.RED}{surah_info.revelation_place}")
-                        print(Fore.RED + f"│ • {Style.BRIGHT}{Fore.WHITE}Total Ayahs:{Fore.RED} {surah_info.total_ayah}")
+                        print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.RED + "📜 Surah Information")
+                        print(Fore.RED + f"│ • {Fore.WHITE}Name:       {Fore.CYAN}{surah_info.surah_name}")
+                        print(Fore.RED + f"│ • {Fore.WHITE}Arabic:     {Fore.CYAN}{surah_info.surah_name_arabic}")
+                        print(Fore.RED + f"│ • {Fore.WHITE}Revelation: {Fore.CYAN}{surah_info.revelation_place}")
+                        print(Fore.RED + f"│ • {Fore.WHITE}Total Ayahs:{Fore.CYAN} {surah_info.total_ayah}")
                         print(Fore.RED + "╰" + separator)
 
                         # Note Section
@@ -88,10 +88,10 @@ class QuranApp:
                             self.ui.display_ayahs(ayahs, surah_info)
 
                             # Cleaner ayah range selection prompt
-                            print(Fore.BLUE + "\nSelect another range for " +
+                            print(Fore.WHITE + "\nSelect another range for " +
                                   Fore.RED + f"{surah_info.surah_name}" +
-                                  Style.DIM + Fore.WHITE + " (y/n)" +
-                                  Fore.WHITE + ": ", end="")
+                                  Style.DIM + Fore.WHITE + " (y/n)" + Style.NORMAL +
+                                  Fore.WHITE + ":\n" + Fore.RED + "  ❯ " + Fore.WHITE, end="")
 
                             if not self._ask_yes_no(""):
                                 self._clear_terminal()
@@ -109,7 +109,7 @@ class QuranApp:
     def _get_surah_number(self) -> Optional[int]:
         while True:
             try:
-                print(Fore.RED + "└──╼ " + Fore.WHITE + "Enter number (1-114) or 'quit': ", end="")
+                print(Fore.RED + "└──╼ " + Fore.GREEN + "Enter number (1-114)" + Style.DIM + Fore.WHITE + ' or quit' + Style.NORMAL + ":\n" + Fore.RED + "  ❯ " + Fore.WHITE , end="")
                 user_input = input().strip().lower()
                 if user_input in ['quit', 'exit']:
                     print(Fore.RED + "\n✨ Thank you for using " + Fore.WHITE + "QuranCLI" + Fore.RED + "!")
@@ -125,10 +125,10 @@ class QuranApp:
     def _get_ayah_range(self, total_ayah: int) -> tuple:
         while True:
             try:
-                print(Fore.RED + "\n┌─" + Fore.WHITE + f" Ayah Selection (1-{total_ayah})")
-                print(Fore.RED + "├──╼ " + Fore.WHITE + "Start: ", end="")
+                print(Fore.RED + "\n┌─" + Fore.RED + Style.BRIGHT + f" Ayah Selection (1-{total_ayah})")
+                print(Fore.RED + "├──╼ " + Fore.GREEN + "Start" + ":\n" + Fore.RED + "│ ❯ " + Fore.WHITE, end="")
                 start = int(input())
-                print(Fore.RED + "└──╼ " + Fore.WHITE + "End: ", end="")
+                print(Fore.RED + "├──╼ " + Fore.GREEN + "End" + ":\n" + Fore.RED + "│ ❯ " + Fore.WHITE, end="")
                 end = int(input())
                 if 1 <= start <= end <= total_ayah:
                     return start, end
