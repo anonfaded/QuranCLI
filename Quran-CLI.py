@@ -1,20 +1,63 @@
-# Quran-CLI.py
-from core.quran_api_client import QuranAPIClient
-from core.quran_data_handler import QuranDataHandler
-from core.audio_manager import AudioManager
-from core.ui import UI
-from core.github_updater import GithubUpdater
-from core.version import VERSION
-
-from colorama import Fore, Style, init
-from typing import  Optional
+import sys
 import os
-import shutil
+import subprocess
 
-import difflib
+def get_termux_architecture():
+    try:
+        output = subprocess.check_output(["uname", "-m"]).decode("utf-8").strip()
+        return output
+    except FileNotFoundError:
+        return None
 
-# Initialize colorama
-init(autoreset=True)
+def check_python_version():
+    if sys.version_info < (3, 9):
+        print("Error: QuranCLI requires Python 3.9 or higher in Termux.")
+        print("Please upgrade your Python installation.")
+        sys.exit(1)
+
+# Check if running in Termux
+if "TERMUX_VERSION" in os.environ:
+    check_python_version()
+    architecture = get_termux_architecture()
+    if architecture:
+        wheelhouse_path = os.path.join(os.path.dirname(__file__), "cache", architecture)
+        if os.path.exists(wheelhouse_path):
+            sys.path.insert(0, wheelhouse_path)
+            print(f"Running in Termux (architecture: {architecture}), using local dependencies from {wheelhouse_path}.")
+        else:
+            print(f"Warning: No wheel files found for architecture {architecture}. Please check the 'cache' directory.")
+    else:
+        print("Warning: Could not determine Termux architecture.")
+
+    # Now import everything else
+    from core.quran_api_client import QuranAPIClient
+    from core.quran_data_handler import QuranDataHandler
+    from core.audio_manager import AudioManager
+    from core.ui import UI
+    from core.github_updater import GithubUpdater
+    from core.version import VERSION
+
+    from colorama import Fore, Style, init
+    from typing import  Optional
+    import shutil
+    import difflib
+
+    # Initialize colorama
+    init(autoreset=True)
+else:
+    from colorama import Fore, Style, init
+    init(autoreset=True)
+    
+    from core.quran_api_client import QuranAPIClient
+    from core.quran_data_handler import QuranDataHandler
+    from core.audio_manager import AudioManager
+    from core.ui import UI
+    from core.github_updater import GithubUpdater
+    from core.version import VERSION
+
+    from typing import  Optional
+    import shutil
+    import difflib
 
 QURAN_CLI_ASCII = """
 \033[31m
