@@ -1,5 +1,4 @@
 # Quran-CLI.py
-
 from core.quran_api_client import QuranAPIClient
 from core.quran_data_handler import QuranDataHandler
 from core.audio_manager import AudioManager
@@ -37,6 +36,19 @@ class QuranApp:
         self.updater = GithubUpdater("anonfaded", "QuranCLI", VERSION)#Replace owner and name
         self.ui = UI(self.audio_manager, self.term_size, self.updater)  # <---  Pass updater to UI
         self._clear_terminal()  # Calling it here, so the program clears the terminal on startup
+        self.surah_names = self._load_surah_names()
+
+    def _load_surah_names(self):
+        """Load surah names from the cached data."""
+        surah_names = {}
+        for i in range(1, 115):  # Loop through all surah numbers
+            try:
+                surah_info = self.data_handler.get_surah_info(i)
+                surah_names[i] = surah_info.surah_name  # Store the surah name
+            except ValueError:
+                print(Fore.RED + f"Warning: Could not load surah info for surah {i}")
+                surah_names[i] = "Unknown"
+        return surah_names
 
     def _clear_terminal(self):
         self.ui.clear_terminal()
@@ -99,21 +111,50 @@ class QuranApp:
                 print(Style.BRIGHT + Fore.YELLOW + "⚠ To exit, please type 'quit' or 'exit'")
                 continue
 
+    def _display_surah_list(self):
+        """Display surah names in multiple columns."""
+        self._clear_terminal()
+        self._display_header()
+        num_surahs = len(self.surah_names)
+        columns = 5  # Adjust number of columns based on terminal width
+        surahs_per_column = (num_surahs + columns - 1) // columns  # Ceiling division
+
+        print(Fore.RED + Style.BRIGHT + "Quran - List of Surahs:")
+        print(Fore.CYAN + "-" * 25)
+
+        for i in range(surahs_per_column):
+            row_output = []
+            for j in range(columns):
+                surah_number = i + j * surahs_per_column
+                if surah_number < num_surahs:
+                    number = surah_number + 1
+                    name = self.surah_names[number]
+                    row_output.append(Fore.GREEN + f"{number:3d}. {Fore.WHITE}{name}".ljust(30))  # Adjust spacing
+            print("".join(row_output))
+
+        print(Fore.CYAN + "-" * 25)
+        input(Fore.YELLOW + "\nPress Enter to return to the surah selection...")  # Pause
+        self._clear_terminal()
+        self._display_header()
+
     def _get_surah_number(self) -> Optional[int]:
         while True:
             try:
-                print(Fore.RED + "└──╼ " + Fore.GREEN + "Enter number (1-114)" + Style.DIM + Fore.WHITE + ' or quit' + Style.NORMAL + ":\n" + Fore.RED + "  ❯ " + Fore.WHITE , end="")
+                print(Fore.RED + "└──╼ " + Fore.GREEN + "Enter number (1-114), 'list', or 'quit'" + Style.DIM + Fore.WHITE + ":\n" + Fore.RED + "  ❯ " + Fore.WHITE , end="")
                 user_input = input().strip().lower()
                 if user_input in ['quit', 'exit']:
                     print(Fore.RED + "\n✨ Thank you for using " + Fore.WHITE + "QuranCLI" + Fore.RED + "!")
                     return None
+                elif user_input == 'list':
+                    self._display_surah_list()
+                    return self._get_surah_number()  # Re-prompt after list is displayed
 
                 number = int(user_input)
                 if 1 <= number <= 114:
                     return number
                 raise ValueError
             except ValueError:
-                print(Fore.RED + "└──╼ " + "Invalid input. Enter a number between 1-114")
+                print(Fore.RED + "└──╼ " + "Invalid input. Enter a number between 1-114, 'list', or 'quit'")
 
     def _get_ayah_range(self, total_ayah: int) -> tuple:
         while True:
