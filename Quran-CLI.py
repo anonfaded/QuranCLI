@@ -11,6 +11,7 @@ from typing import  Optional
 import os
 import shutil
 
+import difflib
 
 # Initialize colorama
 init(autoreset=True)
@@ -39,12 +40,11 @@ class QuranApp:
         self.surah_names = self._load_surah_names()
 
     def _load_surah_names(self):
-        """Load surah names from the cached data."""
         surah_names = {}
-        for i in range(1, 115):  # Loop through all surah numbers
+        for i in range(1, 115):
             try:
                 surah_info = self.data_handler.get_surah_info(i)
-                surah_names[i] = surah_info.surah_name  # Store the surah name
+                surah_names[i] = surah_info.surah_name
             except ValueError:
                 print(Fore.RED + f"Warning: Could not load surah info for surah {i}")
                 surah_names[i] = "Unknown"
@@ -84,7 +84,7 @@ class QuranApp:
                         print(Fore.RED + "╰" + separator)
 
                         # Note Section
-                        print(Style.DIM + Fore.YELLOW + "⚠ Note: Arabic text may appear reversed in the terminal but will copy correctly.")
+                        print(Style.DIM + Fore.YELLOW + "⚠ Note: Arabic text may appear reversed but will copy correctly.")
                         print(Style.BRIGHT + Fore.RED + separator)
 
                         while True:
@@ -134,14 +134,21 @@ class QuranApp:
 
         print(Fore.CYAN + "-" * 25)
         input(Fore.YELLOW + "\nPress Enter to return to the surah selection...")  # Pause
+        #Clear it before re-prompting.
         self._clear_terminal()
         self._display_header()
 
     def _get_surah_number(self) -> Optional[int]:
         while True:
             try:
-                print(Fore.RED + "└──╼ " + Fore.GREEN + "Enter number (1-114), 'list', or 'quit'" + Style.DIM + Fore.WHITE + ":\n" + Fore.RED + "  ❯ " + Fore.WHITE , end="")
+                # Clear terminal and display header before prompt
+                self._clear_terminal()
+                self._display_header()
+
+                # Prompt user for input
+                print(Fore.RED + "└──╼ " + Fore.GREEN + "Enter number (1-114), surah name, 'list', or 'quit'" + Style.DIM + Fore.WHITE + ":\n" + Fore.RED + "  ❯ " + Fore.WHITE, end="")
                 user_input = input().strip().lower()
+
                 if user_input in ['quit', 'exit']:
                     print(Fore.RED + "\n✨ Thank you for using " + Fore.WHITE + "QuranCLI" + Fore.RED + "!")
                     return None
@@ -149,12 +156,45 @@ class QuranApp:
                     self._display_surah_list()
                     return self._get_surah_number()  # Re-prompt after list is displayed
 
-                number = int(user_input)
-                if 1 <= number <= 114:
-                    return number
-                raise ValueError
+                # Check if input is a number
+                if user_input.isdigit():
+                    number = int(user_input)
+                    if 1 <= number <= 114:
+                        return number
+                    raise ValueError
+
+                # Attempt fuzzy matching for Surah names
+                close_matches = difflib.get_close_matches(user_input, self.surah_names.values(), n=5, cutoff=0.5)
+
+                if close_matches:
+                    print(Fore.YELLOW + "Did you mean one of these?" + Fore.WHITE)
+                    for idx, match in enumerate(close_matches, 1):
+                        surah_number = [num for num, name in self.surah_names.items() if name == match][0]
+                        print(Fore.GREEN + f" {idx}. {match} (Surah {surah_number})")
+
+                    # Ask user to select a Surah from the suggestions
+                    while True:
+                        print(Fore.RED + "└──╼ " + Fore.GREEN + "Select a number from the list, or 'r' to retry:" + Fore.WHITE)
+                        user_choice = input("  ❯ ").strip()
+
+                        if user_choice.isdigit():
+                            choice_idx = int(user_choice) - 1
+                            if 0 <= choice_idx < len(close_matches):
+                                selected_surah = close_matches[choice_idx]
+                                return [num for num, name in self.surah_names.items() if name == selected_surah][0]
+                            else:
+                                print(Fore.RED + "Invalid choice. Please select a number from the list or 'r' to retry.")
+                        elif user_choice.lower() == 'r':
+                            self._clear_terminal()
+                            self._display_header()
+                            break  # Restart input prompt
+                        else:
+                            print(Fore.RED + "Invalid choice. Please select a number from the list or 'r' to retry.")
+                else:
+                    print(Fore.RED + "└──╼ " + "No close matches found. Please enter a valid Surah number, name, 'list', or 'quit'")
+
             except ValueError:
-                print(Fore.RED + "└──╼ " + "Invalid input. Enter a number between 1-114, 'list', or 'quit'")
+                print(Fore.RED + "└──╼ " + "Invalid input. Enter a number between 1-114, a Surah name, 'list', or 'quit'")
 
     def _get_ayah_range(self, total_ayah: int) -> tuple:
         while True:
