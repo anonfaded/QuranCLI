@@ -96,9 +96,9 @@ class QuranApp:
                             print(Fore.WHITE + "\nSelect another range for " +
                                   Fore.RED + f"{surah_info.surah_name}" +
                                   Style.DIM + Fore.WHITE + " (y/n)" + Style.NORMAL +
-                                  Fore.WHITE + ":\n" + Fore.RED + "  ❯ " + Fore.WHITE, end="")
+                                  Fore.WHITE + ":\n", end="")
 
-                            if not self._ask_yes_no(""):
+                            if not self._ask_yes_no():
                                 self._clear_terminal()
                                 self._display_header()
                                 break
@@ -146,8 +146,8 @@ class QuranApp:
                 self._display_header()
 
                 # Prompt user for input
-                print(Fore.RED + "└──╼ " + Fore.GREEN + "Enter number (1-114), surah name, 'list', or 'quit'" + Style.DIM + Fore.WHITE + ":\n" + Fore.RED + "  ❯ " + Fore.WHITE, end="")
-                user_input = input().strip().lower()
+                print(Fore.GREEN + "Enter number (1-114), surah name, 'list', or 'quit':" + Style.DIM + Fore.WHITE )
+                user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
 
                 if user_input in ['quit', 'exit']:
                     print(Fore.RED + "\n✨ Thank you for using " + Fore.WHITE + "QuranCLI" + Fore.RED + "!")
@@ -167,15 +167,15 @@ class QuranApp:
                 close_matches = difflib.get_close_matches(user_input, self.surah_names.values(), n=5, cutoff=0.5)
 
                 if close_matches:
-                    print(Fore.YELLOW + "Did you mean one of these?" + Fore.WHITE)
+                    print(Fore.YELLOW + "Did you mean one of these?" + Fore.WHITE + '\n')
                     for idx, match in enumerate(close_matches, 1):
                         surah_number = [num for num, name in self.surah_names.items() if name == match][0]
-                        print(Fore.GREEN + f" {idx}. {match} (Surah {surah_number})")
+                        print(Fore.CYAN + f" {idx}. " + Fore.WHITE + f"{match}{Fore.LIGHTBLACK_EX} (Surah {surah_number}) \n")
 
                     # Ask user to select a Surah from the suggestions
                     while True:
-                        print(Fore.RED + "└──╼ " + Fore.GREEN + "Select a number from the list, or 'r' to retry:" + Fore.WHITE)
-                        user_choice = input("  ❯ ").strip()
+                        print(Fore.GREEN + "Select a number from the list, or 'r' to retry:")
+                        user_choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
 
                         if user_choice.isdigit():
                             choice_idx = int(user_choice) - 1
@@ -191,27 +191,33 @@ class QuranApp:
                         else:
                             print(Fore.RED + "Invalid choice. Please select a number from the list or 'r' to retry.")
                 else:
-                    print(Fore.RED + "└──╼ " + "No close matches found. Please enter a valid Surah number, name, 'list', or 'quit'")
+                    print(Fore.RED + "No close matches found. Please enter a valid Surah number, name, 'list', or 'quit'")
 
             except ValueError:
-                print(Fore.RED + "└──╼ " + "Invalid input. Enter a number between 1-114, a Surah name, 'list', or 'quit'")
+                print(Fore.RED + "Invalid input. Enter a number between 1-114, a Surah name, 'list', or 'quit'")
 
     def _get_ayah_range(self, total_ayah: int) -> tuple:
         while True:
             try:
                 print(Fore.RED + "\n┌─" + Fore.RED + Style.BRIGHT + f" Ayah Selection (1-{total_ayah})")
-                print(Fore.RED + "├──╼ " + Fore.GREEN + "Start" + ":\n" + Fore.RED + "│ ❯ " + Fore.WHITE, end="")
-                start = int(input())
-                print(Fore.RED + "├──╼ " + Fore.GREEN + "End" + ":\n" + Fore.RED + "│ ❯ " + Fore.WHITE, end="")
-                end = int(input())
+                print(Fore.RED + "├──╼ " + Fore.GREEN + "Start" + ":\n" , end="")
+                start = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
+                print(Fore.RED + "├──╼ " + Fore.GREEN + "End" + ":\n" , end="")
+                end = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
                 if 1 <= start <= end <= total_ayah:
                     return start, end
             except ValueError:
                 pass
             print(Fore.RED + "└──╼ " + "Invalid range. Please try again.")
 
-    def _ask_yes_no(self, prompt: str) -> bool:
-        return self.ui.ask_yes_no(prompt)
+    def _ask_yes_no(self) -> bool:
+        while True:
+            choice = input(Fore.BLUE + "Select another range for this Surah (y/n): " + Fore.WHITE).strip().lower()
+            if choice in ['y', 'yes']:
+                return True
+            if choice in ['n', 'no']:
+                return False
+            print(Fore.RED + "Invalid input. Please enter 'y' or 'n'.")
 
 if __name__ == "__main__":
     try:
