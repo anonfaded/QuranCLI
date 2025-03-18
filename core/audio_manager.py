@@ -173,16 +173,19 @@ class AudioManager:
     def _track_progress(self):
         """Track progress with accurate timing"""
         try:
-            while not self.should_stop and pygame.mixer.music.get_busy():
-                self.current_position = time.time() - self.start_time
-                if self.current_position >= self.duration:
-                    self.stop_audio()
-                    break
-                self.update_event.set()
-                time.sleep(0.1)
-            
+            while not self.should_stop:
+                if self.is_playing and pygame.mixer.music.get_busy():#Combined conditions
+                    self.current_position = time.time() - self.start_time
+                    if self.current_position >= self.duration:
+                        self.stop_audio(reset_state=True)
+                        break
+                    self.update_event.set()
+                    time.sleep(0.1)
+                else:
+                    time.sleep(0.1) #Prevent busy-waiting
+
             if not pygame.mixer.music.get_busy() and self.is_playing:
-                self.stop_audio()
+                self.stop_audio(reset_state=True)#Also resetting in this case
         except Exception:
             pass
 

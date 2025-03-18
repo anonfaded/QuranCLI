@@ -321,13 +321,30 @@ class UI:
         output.append(Style.BRIGHT + Fore.RED + "\nAudio Player - " +
                     Fore.WHITE + f"{surah_info.surah_name}")
 
+        # Check if audio file exists locally
+        audio_file_exists = False
+        if surah_info.audio:
+            reciter_id = next(iter(surah_info.audio))  # Get first reciter
+            audio_url = surah_info.audio[reciter_id]["url"]
+            reciter_name = surah_info.audio[reciter_id]["reciter"]
+            audio_file_path = self.audio_manager.get_audio_path(surah_info.surah_number, reciter_name)
+            audio_file_exists = audio_file_path.exists()
+
         # Only show audio info if it matches current surah
         if (not self.audio_manager.current_audio or
-            self.audio_manager.current_surah != surah_info.surah_number):
+            self.audio_manager.current_surah != surah_info.surah_number) and not audio_file_exists:
             output.append(Style.BRIGHT + Fore.YELLOW + "\n\nℹ Press 'p' to download and play audio")
         else:
-            state = "▶ Playing" if self.audio_manager.is_playing else "⏸ Paused"
-            state_color = Fore.GREEN if self.audio_manager.is_playing else Fore.YELLOW
+            if self.audio_manager.is_playing and self.audio_manager.current_position < self.audio_manager.duration:
+                state = "▶ Playing"
+                state_color = Fore.GREEN
+            elif self.audio_manager.current_audio and self.audio_manager.current_position >= self.audio_manager.duration: # check audip and position
+                state = "Audio finished"
+                state_color = Fore.YELLOW
+            else:
+                state = "⏸ Paused"
+                state_color = Fore.YELLOW
+
             output.append(f"\nState: {state_color}{state}")
             output.append(f"Reciter: {Fore.CYAN}{self.audio_manager.current_reciter}")
 
@@ -335,8 +352,8 @@ class UI:
                 output.append("\nProgress:")
                 output.append(self.audio_manager.get_progress_bar())
 
-                if not self.audio_manager.is_playing and self.audio_manager.current_position >= self.audio_manager.duration:
-                    output.append(Style.DIM + Fore.YELLOW + "\nAudio finished - Press 'p' to replay")
+            if state == "Audio finished":#show only if that is the state
+                output.append(Style.DIM + Fore.YELLOW + "\nPress 's' to stop and reset")
 
         output.append(Style.BRIGHT + Fore.RED + "\n\nControls:")
         output.append(Fore.GREEN + "p" + Fore.WHITE + ": Play/Pause")
