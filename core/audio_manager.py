@@ -44,29 +44,31 @@ class AudioManager:
         self.start_time = 0
         
     def _detect_audio_driver(self):
-        """Manually detect the best available audio driver on Linux"""
+        """Manually detect and prioritize the best audio driver on Linux."""
         if sys.platform == "win32":
             return None  # Use default on Windows
 
         try:
-            subprocess.run(["pactl", "info"], check=True, capture_output=True)
-            os.environ["SDL_AUDIODRIVER"] = "pulse"
-            print(Fore.CYAN + "Using PulseAudio.")
-            return "pulse"
+            # Check for PipeWire first
+            subprocess.run(["pw-cli", "info"], check=True, capture_output=True)
+            os.environ["SDL_AUDIODRIVER"] = "pipewire"
+            print(Fore.CYAN + "✅ Using PipeWire for audio.")
+            return "pipewire"
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
 
         try:
-            subprocess.run(["pw-cli", "info"], check=True, capture_output=True)
-            os.environ["SDL_AUDIODRIVER"] = "pipewire"
-            print(Fore.CYAN + "Using PipeWire.")
-            return "pipewire"
+            # Check for PulseAudio
+            subprocess.run(["pactl", "info"], check=True, capture_output=True)
+            os.environ["SDL_AUDIODRIVER"] = "pulse"
+            print(Fore.BLUE + "✅ Using PulseAudio for audio.")
+            return "pulse"
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
 
         # Fallback to ALSA
         os.environ["SDL_AUDIODRIVER"] = "alsa"
-        print(Fore.YELLOW + "Using ALSA.")
+        print(Fore.YELLOW + "⚠️ Using ALSA (fallback mode).")
         return "alsa"
 
 
