@@ -10,7 +10,10 @@ import time
 import threading
 from colorama import Fore
 import tqdm
-import msvcrt # For Windows keyboard input
+
+import sys
+if sys.platform == "win32":
+    import msvcrt
 
 class AudioManager:
     """Handles audio downloads and playback"""

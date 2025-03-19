@@ -1,4 +1,117 @@
 # core/quran_api_client.py
+import sys
+import subprocess
+import shutil
+from typing import Dict, List, Tuple
+
+def get_package_map() -> Dict[str, str]:
+    """Map pip package names to their apt equivalents"""
+    return {
+        'requests': 'python3-requests',
+        'pydantic': 'python3-pydantic',
+        'colorama': 'python3-colorama',
+        'python-bidi': 'python3-bidi',
+        'arabic-reshaper': 'python3-arabic-reshaper',
+        'tqdm': 'python3-tqdm',
+        'pygame': 'python3-pygame',
+        'aiohttp': 'python3-aiohttp',
+        'aiofiles': 'python3-aiofiles',
+        'keyboard': 'python3-keyboard',
+        'mutagen': 'python3-mutagen'
+    }
+    
+def check_dependencies():
+    """Check and install required dependencies with improved output"""
+    package_map = get_package_map()
+    missing_packages: List[Tuple[str, bool]] = []
+    failed_installs: List[str] = []
+    
+    print("\n" + "═" * 60)
+    print("📦 Checking Dependencies...")
+    print("═" * 60)
+    
+    # First pass: Check what's missing
+    for pip_package in package_map.keys():
+        try:
+            __import__(pip_package.replace('-', '_'))
+        except ImportError:
+            apt_package = package_map[pip_package]
+            apt_available = bool(shutil.which('apt'))
+            missing_packages.append((pip_package, apt_available))
+    
+    if not missing_packages:
+        print("\n" + "╭" + "─" * 58 + "╮")
+        print("│" + f"{Fore.GREEN}✓ All dependencies are satisfied!".center(58) + Fore.RESET + "│")
+        print("╰" + "─" * 58 + "╯\n")
+        return
+
+    # Second pass: Try to install missing packages
+    for pip_package, apt_available in missing_packages:
+        print(f"\n{Fore.RED}❌ Missing package: {Fore.YELLOW}{pip_package}{Fore.RESET}")
+        installed = False
+        
+        # Try apt first if available
+        if apt_available:
+            apt_package = package_map[pip_package]
+            print(f"\n{Fore.CYAN}📦 Attempting to install via apt...{Fore.RESET}")
+            try:
+                result = subprocess.run(['sudo', 'apt', 'install', '-y', apt_package], 
+                                     check=True, capture_output=True, text=True)
+                if "Unable to locate package" not in result.stderr:
+                    installed = True
+                    continue
+            except subprocess.CalledProcessError:
+                pass
+        
+        # If apt failed or not available, try pip installations
+        if not installed:
+            try:
+                # Try pip install --user first
+                print(f"\n{Fore.CYAN}📦 Attempting to install via pip...{Fore.RESET}")
+                subprocess.run([sys.executable, '-m', 'pip', 'install', '--user', pip_package],
+                             check=True, capture_output=True, text=True)
+                installed = True
+            except subprocess.CalledProcessError:
+                try:
+                    # If that fails, try sudo pip3 install
+                    print(f"\n{Fore.CYAN}📦 Attempting to install with sudo...{Fore.RESET}")
+                    subprocess.run(['sudo', 'pip3', 'install', '--break-system-packages', pip_package],
+                                 check=True, capture_output=True, text=True)
+                    installed = True
+                except subprocess.CalledProcessError:
+                    failed_installs.append(pip_package)
+    
+    # If any installations failed, show manual instructions
+    if failed_installs:
+        print(f"\n{Fore.YELLOW}⚠️  Some packages need manual installation:{Fore.RESET}")
+        print("\n╭" + "─" * 58 + "╮")
+        print(f"│ {Fore.RED}Failed to install:{Fore.RESET}".ljust(59) + "│")
+        for package in failed_installs:
+            print(f"│ • {Fore.YELLOW}{package}".ljust(59) + Fore.RESET + "│")
+        print("│" + " " * 58 + "│")
+        print("│ " + Fore.GREEN + "Try these commands:".ljust(56) + Fore.RESET + " │")
+        for package in failed_installs:
+            print("│" + " " * 58 + "│")
+            print(f"│ {Fore.CYAN}For {package}:".ljust(59) + Fore.RESET + "│")
+            print(f"│   sudo pip3 install --break-system-packages {package}".ljust(59) + "│")
+            print(f"│   # or".ljust(59) + "│")
+            print(f"│   pip install --user {package}".ljust(59) + "│")
+        print("╰" + "─" * 58 + "╯\n")
+        sys.exit(1)
+
+# Import colorama first for colored output
+try:
+    from colorama import Fore, init
+    init(autoreset=True)
+except ImportError:
+    # Fallback if colorama isn't available yet
+    class Fore:
+        RED = YELLOW = GREEN = CYAN = RESET = ''
+
+# Check dependencies before other imports
+check_dependencies()
+
+
 import requests
 import json
 from colorama import Fore

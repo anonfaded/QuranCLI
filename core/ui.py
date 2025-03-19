@@ -4,7 +4,10 @@ import math
 import time
 import asyncio
 import keyboard
-import msvcrt
+
+if sys.platform == "win32":
+    import msvcrt
+    
 from typing import List, Optional
 from colorama import Fore, Style
 from core.models import Ayah, SurahInfo
