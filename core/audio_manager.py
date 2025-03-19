@@ -44,12 +44,34 @@ class AudioManager:
         self.start_time = 0
         
     def _detect_audio_driver(self):
-        """Ensure the system uses PipeWire or PulseAudio—no ALSA fallback."""
+        """Ensure the system uses PipeWire or PulseAudio—automatically install if missing."""
         if sys.platform == "win32":
             return None  # Use default on Windows
 
+        def is_installed(command):
+            """Check if a command exists on the system."""
+            return subprocess.run(["which", command], capture_output=True).returncode == 0
+
+        def install_package(package):
+            """Attempt to install a package using the appropriate package manager."""
+            print(Fore.YELLOW + f"⚙ Installing {package}...")
+            try:
+                subprocess.run(["sudo", "apt", "install", "-y", package], check=True)
+                print(Fore.GREEN + f"✅ {package} installed successfully!")
+            except subprocess.CalledProcessError:
+                print(Fore.RED + f"❌ Failed to install {package}. Please install it manually.")
+                sys.exit(1)
+
+        # Check and install PipeWire if missing
+        if not is_installed("pw-cli"):
+            install_package("pipewire")
+
+        # Check and install PulseAudio if missing
+        if not is_installed("pactl"):
+            install_package("pulseaudio")
+
+        # Retry detection after installation
         try:
-            # First, try PipeWire
             subprocess.run(["pw-cli", "info"], check=True, capture_output=True)
             os.environ["SDL_AUDIODRIVER"] = "pipewire"
             print(Fore.CYAN + "✅ Using PipeWire for audio.")
@@ -58,7 +80,6 @@ class AudioManager:
             pass
 
         try:
-            # If PipeWire isn't available, try PulseAudio
             subprocess.run(["pactl", "info"], check=True, capture_output=True)
             os.environ["SDL_AUDIODRIVER"] = "pulse"
             print(Fore.BLUE + "✅ Using PulseAudio for audio.")
@@ -67,9 +88,8 @@ class AudioManager:
             pass
 
         # If neither PipeWire nor PulseAudio is available, exit the program
-        print(Fore.RED + "❌ No supported audio driver found! Install PipeWire or PulseAudio.")
-        sys.exit(1)  # Exit the program since audio playback won't work
-
+        print(Fore.RED + "❌ Audio setup failed! Please install PipeWire or PulseAudio manually.")
+        sys.exit(1)
 
         
     def get_audio_path(self, surah_num: int, reciter: str) -> Path:
