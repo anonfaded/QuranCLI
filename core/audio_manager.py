@@ -24,6 +24,7 @@ class AudioManager:
         
         try:
             pygame.mixer.init()
+            self.mixer_initialized = True
         except pygame.error as e:
             print(Fore.RED + f"Error initializing Pygame mixer: {e}")
             print(Fore.YELLOW + f"Audio functionality might be limited.  Trying driver: {self.audio_driver}")
@@ -43,32 +44,30 @@ class AudioManager:
         self.start_time = 0
         
     def _detect_audio_driver(self):
-        """Detect the best available audio driver on Linux"""
+        """Detect the best available audio driver on Linux and set it before initializing pygame"""
         if sys.platform == "win32":
-            return None  # Use default on Windows
+            return None  # Default on Windows
 
-        try:
-            # Check for PulseAudio
-            subprocess.run(["pactl", "info"], check=True, capture_output=True)
-            print(Fore.CYAN + "PulseAudio detected.")
-            os.environ['SDL_AUDIODRIVER'] = 'pulse'
-            return 'pulse'
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
+        available_drivers = pygame.get_sdl_audio_drivers()
+        print(Fore.CYAN + f"Available audio drivers: {available_drivers}")
 
-        try:
-            # Check for PipeWire (often emulates PulseAudio)
-            subprocess.run(["pw-cli", "info"], check=True, capture_output=True)
-            print(Fore.CYAN + "PipeWire detected.")
-            os.environ['SDL_AUDIODRIVER'] = 'pipewire'
-            return 'pipewire'
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
+        if "pulse" in available_drivers:
+            os.environ["SDL_AUDIODRIVER"] = "pulse"
+            print(Fore.CYAN + "Using PulseAudio.")
+            return "pulse"
+        elif "pipewire" in available_drivers:
+            os.environ["SDL_AUDIODRIVER"] = "pipewire"
+            print(Fore.CYAN + "Using PipeWire.")
+            return "pipewire"
+        elif "alsa" in available_drivers:
+            os.environ["SDL_AUDIODRIVER"] = "alsa"
+            print(Fore.YELLOW + "Using ALSA.")
+            return "alsa"
+        else:
+            os.environ["SDL_AUDIODRIVER"] = "dummy"
+            print(Fore.RED + "No suitable audio driver found. Using dummy mode (no sound).")
+            return "dummy"
 
-        # Fallback to ALSA
-        print(Fore.YELLOW + "Falling back to ALSA.")
-        os.environ['SDL_AUDIODRIVER'] = 'alsa'
-        return 'alsa'
         
     def get_audio_path(self, surah_num: int, reciter: str) -> Path:
         """Get audio file path"""
@@ -191,9 +190,15 @@ class AudioManager:
     def play_audio(self, file_path: Path, reciter: str):
         """Play audio file with progress tracking"""
         try:
+            # Retry initializing mixer if it wasn't initialized before
             if not self.mixer_initialized:
-                print(Fore.RED + "\nCannot play audio: Pygame mixer not initialized.")
-                return
+                print(Fore.YELLOW + "\nRetrying Pygame mixer initialization...")
+                try:
+                    pygame.mixer.init()
+                    self.mixer_initialized = True
+                except pygame.error as e:
+                    print(Fore.RED + f"Failed to initialize Pygame mixer: {e}")
+                    return  # Exit if still not initialized
 
             if self.is_playing:
                 self.stop_audio(reset_state=True)
@@ -207,17 +212,12 @@ class AudioManager:
             self.current_position = 0
             self.start_time = time.time()
 
-            # Update current surah from filename
-            try:
-                self.current_surah = int(file_path.stem.split('_')[1])
-            except (IndexError, ValueError):
-                self.current_surah = None
-
             self.start_progress_tracking()
 
         except Exception as e:
             print(Fore.RED + f"\nError playing audio: {e}")
             self.stop_audio(reset_state=True)
+
 
     def _track_progress(self):
         """Track progress with accurate timing"""
