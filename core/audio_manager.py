@@ -44,29 +44,31 @@ class AudioManager:
         self.start_time = 0
         
     def _detect_audio_driver(self):
-        """Detect the best available audio driver on Linux and set it before initializing pygame"""
+        """Manually detect the best available audio driver on Linux"""
         if sys.platform == "win32":
-            return None  # Default on Windows
+            return None  # Use default on Windows
 
-        available_drivers = pygame.get_sdl_audio_drivers()
-        print(Fore.CYAN + f"Available audio drivers: {available_drivers}")
-
-        if "pulse" in available_drivers:
+        try:
+            subprocess.run(["pactl", "info"], check=True, capture_output=True)
             os.environ["SDL_AUDIODRIVER"] = "pulse"
             print(Fore.CYAN + "Using PulseAudio.")
             return "pulse"
-        elif "pipewire" in available_drivers:
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+
+        try:
+            subprocess.run(["pw-cli", "info"], check=True, capture_output=True)
             os.environ["SDL_AUDIODRIVER"] = "pipewire"
             print(Fore.CYAN + "Using PipeWire.")
             return "pipewire"
-        elif "alsa" in available_drivers:
-            os.environ["SDL_AUDIODRIVER"] = "alsa"
-            print(Fore.YELLOW + "Using ALSA.")
-            return "alsa"
-        else:
-            os.environ["SDL_AUDIODRIVER"] = "dummy"
-            print(Fore.RED + "No suitable audio driver found. Using dummy mode (no sound).")
-            return "dummy"
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+
+        # Fallback to ALSA
+        os.environ["SDL_AUDIODRIVER"] = "alsa"
+        print(Fore.YELLOW + "Using ALSA.")
+        return "alsa"
+
 
         
     def get_audio_path(self, surah_num: int, reciter: str) -> Path:
