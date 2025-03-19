@@ -44,21 +44,25 @@ class AudioManager:
 
         try:
             # Check for PulseAudio
-            subprocess.run(["pactl", "info"], check=True, capture_output=True)
+            result = subprocess.run(["pactl", "info"], check=True, capture_output=True, text=True)
             print(Fore.CYAN + "PulseAudio detected.")
             os.environ['SDL_AUDIODRIVER'] = 'pulse'
             return 'pulse'
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
+        except FileNotFoundError:
+            print(Fore.YELLOW + "pactl not found (PulseAudio).")
+        except subprocess.CalledProcessError as e:
+            print(Fore.RED + f"pactl command failed: {e.stderr}")
 
         try:
             # Check for PipeWire (often emulates PulseAudio)
-            subprocess.run(["pw-cli", "info"], check=True, capture_output=True)
+            result = subprocess.run(["pw-cli", "info"], check=True, capture_output=True, text=True)
             print(Fore.CYAN + "PipeWire detected.")
             os.environ['SDL_AUDIODRIVER'] = 'pipewire'
             return 'pipewire'
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
+        except FileNotFoundError:
+            print(Fore.YELLOW + "pw-cli not found (PipeWire).")
+        except subprocess.CalledProcessError as e:
+            print(Fore.RED + f"pw-cli command failed: {e.stderr}")
 
         # Fallback to ALSA
         print(Fore.YELLOW + "Falling back to ALSA.")
