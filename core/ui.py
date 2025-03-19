@@ -278,23 +278,29 @@ class UI:
             last_display = ""
             while True:
                 try:
-                    if msvcrt.kbhit():
-                        try:
-                            key_byte = msvcrt.getch()
-                            # Handle arrow keys
-                            if key_byte == b'\xe0':  # Special key prefix
-                                arrow = msvcrt.getch()
-                                if arrow == b'K':  # Left arrow
-                                    self.audio_manager.seek(max(0, self.audio_manager.current_position - 5))
-                                elif arrow == b'M':  # Right arrow
-                                    self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 5))
-                            else:
-                                choice = key_byte.decode('ascii', errors='ignore').lower()
-                                if choice == 'q':
-                                    break
-                                self.handle_audio_choice(choice, surah_info)
-                        except UnicodeDecodeError:
-                            continue  # Skip invalid characters
+                    if sys.platform == "win32":
+                        if msvcrt.kbhit():
+                            try:
+                                key_byte = msvcrt.getch()
+                                # Handle arrow keys
+                                if key_byte == b'\xe0':  # Special key prefix
+                                    arrow = msvcrt.getch()
+                                    if arrow == b'K':  # Left arrow
+                                        self.audio_manager.seek(max(0, self.audio_manager.current_position - 5))
+                                    elif arrow == b'M':  # Right arrow
+                                        self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 5))
+                                else:
+                                    choice = key_byte.decode('ascii', errors='ignore').lower()
+                                    if choice == 'q':
+                                        break
+                                    self.handle_audio_choice(choice, surah_info)
+                            except UnicodeDecodeError:
+                                continue  # Skip invalid characters
+                    else:
+                        choice = keyboard.read_event().name
+                        if choice == 'q':
+                            break
+                        self.handle_audio_choice(choice, surah_info)
 
                     # Update display only if changed
                     current_display = self.get_audio_display(surah_info)
