@@ -44,12 +44,12 @@ class AudioManager:
         self.start_time = 0
         
     def _detect_audio_driver(self):
-        """Manually detect and prioritize the best audio driver on Linux."""
+        """Ensure the system uses PipeWire or PulseAudio—no ALSA fallback."""
         if sys.platform == "win32":
             return None  # Use default on Windows
 
         try:
-            # Check for PipeWire first
+            # First, try PipeWire
             subprocess.run(["pw-cli", "info"], check=True, capture_output=True)
             os.environ["SDL_AUDIODRIVER"] = "pipewire"
             print(Fore.CYAN + "✅ Using PipeWire for audio.")
@@ -58,7 +58,7 @@ class AudioManager:
             pass
 
         try:
-            # Check for PulseAudio
+            # If PipeWire isn't available, try PulseAudio
             subprocess.run(["pactl", "info"], check=True, capture_output=True)
             os.environ["SDL_AUDIODRIVER"] = "pulse"
             print(Fore.BLUE + "✅ Using PulseAudio for audio.")
@@ -66,10 +66,9 @@ class AudioManager:
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
 
-        # Fallback to ALSA
-        os.environ["SDL_AUDIODRIVER"] = "alsa"
-        print(Fore.YELLOW + "⚠️ Using ALSA (fallback mode).")
-        return "alsa"
+        # If neither PipeWire nor PulseAudio is available, exit the program
+        print(Fore.RED + "❌ No supported audio driver found! Install PipeWire or PulseAudio.")
+        sys.exit(1)  # Exit the program since audio playback won't work
 
 
         
