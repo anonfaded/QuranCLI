@@ -452,17 +452,18 @@ class UI:
             srt_content = self.generate_srt_content(surah_number, start_ayah, end_ayah, ayah_duration)
 
             # Save the SRT file
-            home_dir = os.path.expanduser("~")
-            subtitle_dir = os.path.join(home_dir, "subtitles")
+            documents_dir = os.path.join(os.path.expanduser("~"), "Documents")
+            quran_dir = os.path.join(documents_dir, "QuranCLI Subtitles")
+            surah_dir = os.path.join(quran_dir, surah_info.surah_name)
 
-            # Ensure the subtitle directory exists
-            os.makedirs(subtitle_dir, exist_ok=True)
+            # Ensure the directories exist
+            os.makedirs(surah_dir, exist_ok=True)
 
             # Create filename
             now = datetime.datetime.now()
             date_str = now.strftime("%Y-%m-%d")
             filename = f"Surah{surah_number:03d}_Ayah{start_ayah:03d}-Ayah{end_ayah:03d}_{date_str}.srt"
-            filepath = os.path.join(subtitle_dir, filename)
+            filepath = os.path.join(surah_dir, filename)
 
             try:
                 with open(filepath, "w", encoding="utf-8") as f:
@@ -473,6 +474,21 @@ class UI:
             except Exception as e:
                 print(Fore.RED + f"\nError saving subtitle file: {e}")
 
+            #Give options.
+            while True:
+                user_input = input(Fore.BLUE + "\nType 'open' to open the folder, or press Enter to return to the main menu: " + Fore.WHITE).strip().lower()
+                if user_input == 'open':
+                    try:
+                        if os.name == 'nt':  # Windows
+                            os.startfile(surah_dir)
+                        elif os.name == 'posix':  # macOS and Linux
+                            subprocess.run(['open', surah_dir])
+                        else:
+                            print(Fore.RED + "Unsupported operating system for 'open' command.")
+                    except Exception as e:
+                        print(Fore.RED + f"Error opening folder: {e}")
+                else:
+                    break  # Return to Surah selection.
 
         except Exception as e:
             print(Fore.RED + f"\nAn error occurred in subtitle creation: {e}")

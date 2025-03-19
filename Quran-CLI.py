@@ -239,7 +239,7 @@ class QuranApp:
                     self.ui.display_subtitle_menu(surah_info)
                     continue # After subtitle, return to main
                 # Check if input is a number
-                elif user_input.isdigit():
+                if user_input.isdigit():
                     number = int(user_input)
                     if 1 <= number <= 114:
                         return number
@@ -275,7 +275,7 @@ class QuranApp:
                             print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to surah selection.")
                             break # Return to surah selection.
             except ValueError:
-                print(Fore.RED + "Invalid input. Enter a number between 1-114, a Surah name, 'list', 'sub', or 'quit'")
+                    print(Fore.RED + "Invalid input. Enter a number between 1-114, a Surah name, 'list', 'sub', or 'quit'")
             except KeyboardInterrupt:  # Add this to handle control + c during input
                 print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to main menu.")
                 break # Return to main menu immediately, *without exiting app*.
