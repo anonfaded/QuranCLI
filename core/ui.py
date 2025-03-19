@@ -6,6 +6,7 @@ import asyncio
 import keyboard
 import json
 import os
+import datetime
 
 if sys.platform == "win32":
     import msvcrt
@@ -19,9 +20,10 @@ from core.github_updater import GithubUpdater  # Import GithubUpdater
 from core.version import VERSION  # Import VERSION
 
 class UI:
-    def __init__(self, audio_manager: AudioManager, term_size, github_updater: Optional[GithubUpdater] = None, preferences: dict = None):
+    def __init__(self, audio_manager: AudioManager, term_size, data_handler, github_updater: Optional[GithubUpdater] = None, preferences: dict = None):
         self.audio_manager = audio_manager
         self.term_size = term_size
+        self.data_handler = data_handler  # Store data_handler
         self.github_updater = github_updater  # Store GithubUpdater
         self.update_message = self._get_update_message() # Get the update message during initialization
         self.preferences = preferences or {} # Load preferences
@@ -189,7 +191,7 @@ class UI:
         """Display ayahs with pagination"""
         self.paginate_output(ayahs, surah_info=surah_info)
 
-# core/ui.py
+
 
     def handle_audio_choice(self, choice: str, surah_info: SurahInfo):
         """Handle audio control input"""
@@ -417,3 +419,93 @@ class UI:
             if choice in ['n', 'no']:
                 return False
             print(Fore.RED + "Invalid input. Please enter 'y' or 'n'.")
+            
+            
+
+    def display_subtitle_menu(self, surah_info: SurahInfo):
+        """Handles the subtitle creation process."""
+        try:
+            surah_number = surah_info.surah_number
+            total_ayah = surah_info.total_ayah
+
+            while True:
+                try:
+                    print(Fore.RED + "\n┌─" + Fore.RED + Style.BRIGHT + f" Subtitle Creation - Surah {surah_info.surah_name} (Ayah 1-{total_ayah})")
+                    print(Fore.RED + "├──╼ " + Fore.GREEN + "Start Ayah" + ":\n", end="")
+                    start_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
+                    print(Fore.RED + "├──╼ " + Fore.GREEN + "End Ayah" + ":\n", end="")
+                    end_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
+                    #print(Fore.RED + "├──╼ " + Fore.GREEN + "Ayah Duration (seconds)"+ ":\n", end="")
+                    #ayah_duration = float(input(Fore.RED + "│ ❯ " + Fore.WHITE)) #Implement this correctly later
+                    ayah_duration = 5.0
+                    if 1 <= start_ayah <= end_ayah <= total_ayah:
+                        break
+                    else:
+                        print(Fore.RED + "└──╼ " + "Invalid ayah range. Please try again.")
+                except ValueError:
+                    print(Fore.RED + "└──╼ " + "Invalid input. Please enter integers.")
+                except KeyboardInterrupt:
+                    print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to main menu.")
+                    return #Return to main menu
+
+            # Generate SRT content
+            srt_content = self.generate_srt_content(surah_number, start_ayah, end_ayah, ayah_duration)
+
+            # Save the SRT file
+            home_dir = os.path.expanduser("~")
+            subtitle_dir = os.path.join(home_dir, "subtitles")
+
+            # Ensure the subtitle directory exists
+            os.makedirs(subtitle_dir, exist_ok=True)
+
+            # Create filename
+            now = datetime.datetime.now()
+            date_str = now.strftime("%Y-%m-%d")
+            filename = f"Surah{surah_number:03d}_Ayah{start_ayah:03d}-Ayah{end_ayah:03d}_{date_str}.srt"
+            filepath = os.path.join(subtitle_dir, filename)
+
+            try:
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write(srt_content)
+
+                print(Fore.GREEN + f"\n✓ Subtitle file saved to: {filepath}")
+
+            except Exception as e:
+                print(Fore.RED + f"\nError saving subtitle file: {e}")
+
+
+        except Exception as e:
+            print(Fore.RED + f"\nAn error occurred in subtitle creation: {e}")
+
+
+    def generate_srt_content(self, surah_number: int, start_ayah: int, end_ayah: int, ayah_duration: float) -> str:
+        """Generates the SRT content."""
+        try:
+            ayahs = self.data_handler.get_ayahs(surah_number, start_ayah, end_ayah)
+            srt_content = ""
+            start_time = 0.0
+
+            for i, ayah in enumerate(ayahs):
+                end_time = start_time + ayah_duration
+                srt_content += f"{i+1}\n"
+                srt_content += f"{self.format_time_srt(start_time)} --> {self.format_time_srt(end_time)}\n"
+                srt_content += f"{ayah.arabic_uthmani}\n"
+                srt_content += f"{ayah.text}\n\n"  # English Translation.
+                start_time = end_time
+
+            return srt_content
+
+        except Exception as e:
+            print(Fore.RED + f"\nError generating SRT content: {e}")
+            return ""
+
+    def format_time_srt(self, seconds: float) -> str:
+        """Formats seconds to SRT timestamp format (HH:MM:SS,MS)."""
+        milliseconds = int(seconds * 1000)
+        hours = milliseconds // (3600 * 1000)
+        milliseconds %= (3600 * 1000)
+        minutes = milliseconds // (60 * 1000)
+        milliseconds %= (60 * 1000)
+        seconds = milliseconds // 1000
+        milliseconds %= 1000
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"

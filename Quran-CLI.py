@@ -83,10 +83,10 @@ class QuranApp:
         self.preferences_file = os.path.join(os.path.dirname(__file__), 'core', 'preferences.json')
         self.preferences = self._load_preferences()
 
-        self.ui = UI(self.audio_manager, self.term_size, preferences=self.preferences)  # Create UI and pass preferences
+        self.ui = UI(self.audio_manager, self.term_size, self.data_handler, preferences=self.preferences)  # Create UI and pass preferences
 
         self.updater = GithubUpdater("anonfaded", "QuranCLI", VERSION)#Replace owner and name
-        self.ui = UI(self.audio_manager, self.term_size, self.updater, self.preferences)  # <---  Pass updater to UI
+        self.ui = UI(self.audio_manager, self.term_size, self.data_handler, self.updater, self.preferences)  # <---  Pass updater to UI
         self._clear_terminal()  # Calling it here, so the program clears the terminal on startup
         self.surah_names = self._load_surah_names()
 
@@ -164,7 +164,7 @@ class QuranApp:
                     print(Style.BRIGHT + Fore.RED + separator)
 
                     while True:
-                         try: #Added try block
+                        try:
                             start, end = self._get_ayah_range(surah_info.total_ayah)
                             ayahs = self.data_handler.get_ayahs(surah_number, start, end)
                             self.ui.display_ayahs(ayahs, surah_info)
@@ -173,9 +173,8 @@ class QuranApp:
                                 self._clear_terminal()
                                 self._display_header()
                                 break
-                         except KeyboardInterrupt: # Added KeyboardInterrupt
-                            print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to surah selection.")
-                            break
+                        except KeyboardInterrupt:
+                            break #Break the inner while loop
 
                 except KeyboardInterrupt:
                     print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to main menu.")
@@ -222,7 +221,7 @@ class QuranApp:
                 self._display_header()
 
                 # Prompt user for input
-                print(Fore.GREEN + "Enter number (1-114), surah name, 'list', or 'quit':" + Style.DIM + Fore.WHITE )
+                print(Fore.GREEN + "Enter number (1-114), surah name, 'list', 'sub', or 'quit':" + Style.DIM + Fore.WHITE )
                 user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
 
                 if user_input in ['quit', 'exit']:
@@ -230,11 +229,17 @@ class QuranApp:
                     return None
                 elif user_input == 'list':
                     self._display_surah_list()
-                    # No need to clear and display header here, _display_surah_list already does it
-                    continue # Re-prompt after list is displayed
-
+                    continue
+                elif user_input == 'sub':
+                    #Ask the user for the surah they want to generate subtitles for.
+                    surah_number = self._get_surah_number_for_subtitle()
+                    if surah_number is None:
+                        continue #Return to main selection.
+                    surah_info = self.data_handler.get_surah_info(surah_number)
+                    self.ui.display_subtitle_menu(surah_info)
+                    continue # After subtitle, return to main
                 # Check if input is a number
-                if user_input.isdigit():
+                elif user_input.isdigit():
                     number = int(user_input)
                     if 1 <= number <= 114:
                         return number
@@ -269,15 +274,39 @@ class QuranApp:
                         except KeyboardInterrupt:
                             print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to surah selection.")
                             break # Return to surah selection.
-                else: # Moved the code from else block inside the try block
-                    print(Fore.RED + "No close matches found. Please enter a valid Surah number, name, 'list', or 'quit'")
-
             except ValueError:
-                print(Fore.RED + "Invalid input. Enter a number between 1-114, a Surah name, 'list', or 'quit'")
+                print(Fore.RED + "Invalid input. Enter a number between 1-114, a Surah name, 'list', 'sub', or 'quit'")
             except KeyboardInterrupt:  # Add this to handle control + c during input
                 print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to main menu.")
                 break # Return to main menu immediately, *without exiting app*.
 
+    def _get_surah_number_for_subtitle(self) -> Optional[int]:
+        """Helper function to get surah number specifically for subtitle generation."""
+        while True:
+            try:
+                self._clear_terminal()
+                self._display_header()
+                print(Fore.GREEN + "Enter Surah number (1-114) for subtitle creation, or 'q' to return:" + Style.DIM + Fore.WHITE)
+                user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+
+                if user_input in ['q', 'quit', 'exit']:
+                    return None  # User wants to quit
+
+                if user_input.isdigit():
+                    number = int(user_input)
+                    if 1 <= number <= 114:
+                        return number
+                    else:
+                        print(Fore.RED + "Invalid Surah number. Please enter a number between 1 and 114 or 'q' to return")
+                else:
+                    print(Fore.RED + "Invalid input. Please enter a number or 'q'")
+
+            except ValueError:
+                print(Fore.RED + "Invalid input. Please enter a valid number.")
+            except KeyboardInterrupt:
+                print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to main menu.")
+                return None #Returning none as keyboard interupt.
+            
     def _get_ayah_range(self, total_ayah: int) -> tuple:
         while True:
             try:
