@@ -3,6 +3,7 @@ import sys
 import subprocess
 import shutil
 from typing import Dict, List, Tuple
+import os
 
 def get_package_map() -> Dict[str, str]:
     """Map pip package names to their apt equivalents"""
@@ -22,6 +23,10 @@ def get_package_map() -> Dict[str, str]:
     
 def check_dependencies():
     """Check and install required dependencies with improved output"""
+    # Only run dependency checks on Linux
+    if os.name != 'posix':
+        return
+        
     package_map = get_package_map()
     missing_packages: List[Tuple[str, bool]] = []
     failed_installs: List[str] = []
