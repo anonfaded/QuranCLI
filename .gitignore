@@ -9,3 +9,4 @@ api_cache.json
 repomix-output.md
 .repomix/bundles.json
 repomix.config.json
+/core/preferences.json

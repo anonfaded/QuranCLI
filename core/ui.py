@@ -4,6 +4,8 @@ import math
 import time
 import asyncio
 import keyboard
+import json
+import os
 
 if sys.platform == "win32":
     import msvcrt
@@ -17,11 +19,20 @@ from core.github_updater import GithubUpdater  # Import GithubUpdater
 from core.version import VERSION  # Import VERSION
 
 class UI:
-    def __init__(self, audio_manager: AudioManager, term_size, github_updater: Optional[GithubUpdater] = None):
+    def __init__(self, audio_manager: AudioManager, term_size, github_updater: Optional[GithubUpdater] = None, preferences: dict = None):
         self.audio_manager = audio_manager
         self.term_size = term_size
         self.github_updater = github_updater  # Store GithubUpdater
         self.update_message = self._get_update_message() # Get the update message during initialization
+        self.preferences = preferences or {} # Load preferences
+        self.preferences_file = os.path.join(os.path.dirname(__file__), 'preferences.json') # Preferences file location
+
+    def save_preferences(self):
+        try:
+            with open(self.preferences_file, 'w', encoding='utf-8') as f:
+                json.dump(self.preferences, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(Fore.RED + f"\nError saving preferences: {e}")
 
     def clear_terminal(self):
         """Clear terminal with fallback and scroll reset"""
@@ -178,18 +189,32 @@ class UI:
         """Display ayahs with pagination"""
         self.paginate_output(ayahs, surah_info=surah_info)
 
+# core/ui.py
+
     def handle_audio_choice(self, choice: str, surah_info: SurahInfo):
         """Handle audio control input"""
         try:
             if choice == 'p':
-                if not self.audio_manager.current_audio or self.audio_manager.current_surah != surah_info.surah_number:
+                surah_num = surah_info.surah_number # Get surah number
+                if not self.audio_manager.current_audio or self.audio_manager.current_surah != surah_num:
                     # Reset audio state for new surah
                     self.audio_manager.stop_audio(reset_state=True)
                     print(Fore.YELLOW + "\nℹ Loading default reciter...")
-                    reciter_id = next(iter(surah_info.audio))
-                    audio_url = surah_info.audio[reciter_id]["url"]
-                    reciter_name = surah_info.audio[reciter_id]["reciter"]
-                    asyncio.run(self.handle_audio_playback(audio_url, surah_info.surah_number, reciter_name))
+
+                    # Use saved reciter if available
+                    if str(surah_num) in self.preferences:
+                        reciter_data = self.preferences[str(surah_num)]
+                        print(Fore.GREEN + f"\n✅ Using saved reciter for Surah {surah_num}: {reciter_data['reciter_name']}")
+                        audio_url = reciter_data["reciter_url"]
+                        reciter_name = reciter_data["reciter_name"]
+
+                    else:
+                        # Fallback to default reciter
+                        reciter_id = next(iter(surah_info.audio))
+                        audio_url = surah_info.audio[reciter_id]["url"]
+                        reciter_name = surah_info.audio[reciter_id]["reciter"]
+
+                    asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_name))
                 elif self.audio_manager.is_playing:
                     self.audio_manager.pause_audio()
                 else:
@@ -199,6 +224,7 @@ class UI:
                 self.audio_manager.stop_audio(reset_state=True)
 
             elif choice == 'r':
+                surah_num = surah_info.surah_number  # Get surah number
                 if not surah_info.audio:
                     print(Fore.RED + "\nNo reciters available")
                     return
@@ -209,8 +235,10 @@ class UI:
                         Fore.WHITE + f"{surah_info.surah_name}")
 
                     print(Fore.CYAN + "\nAvailable Reciters:")
+                    reciter_options = []
                     for rid, info in surah_info.audio.items():
                         print(f"{Fore.GREEN}{rid}{Fore.WHITE}: {info['reciter']}")
+                        reciter_options.append((rid, info))
 
                     print(Fore.WHITE + "\nEnter reciter number" +
                         Fore.YELLOW + " (or 'q' to cancel)" +
@@ -225,11 +253,20 @@ class UI:
                             print(self.get_audio_display(surah_info), end='', flush=True)
                             break
 
-                        if reciter_input in surah_info.audio:
-                            audio_url = surah_info.audio[reciter_input]["url"]
-                            reciter_name = surah_info.audio[reciter_input]["reciter"]
+                        selected_reciter_info = surah_info.audio.get(reciter_input)
+
+                        if selected_reciter_info:
+                            audio_url = selected_reciter_info["url"]
+                            reciter_name = selected_reciter_info["reciter"]
                             self.audio_manager.stop_audio()  # Stop current audio before changing
-                            asyncio.run(self.handle_audio_playback(audio_url, surah_info.surah_number, reciter_name))
+                            asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_name))
+
+                            # Save reciter preference
+                            self.preferences[str(surah_num)] = {
+                                "reciter_name": reciter_name,
+                                "reciter_url": audio_url
+                            }
+                            self.save_preferences()
                             break
                         else:
                             print(Fore.RED + "\nInvalid selection. Please choose a valid reciter number.")

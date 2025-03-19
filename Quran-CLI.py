@@ -2,6 +2,7 @@
 import sys
 import os
 import subprocess
+import json
 
 def get_termux_architecture():
     try:
@@ -77,11 +78,41 @@ class QuranApp:
         self.term_size = shutil.get_terminal_size()
         self.audio_manager = AudioManager()
         self.data_handler = QuranDataHandler(self.client.cache)
-        self.ui = UI(self.audio_manager, self.term_size)  # Create UI
+
+        # Load preferences
+        self.preferences_file = os.path.join(os.path.dirname(__file__), 'core', 'preferences.json')
+        self.preferences = self._load_preferences()
+
+        self.ui = UI(self.audio_manager, self.term_size, preferences=self.preferences)  # Create UI and pass preferences
+
         self.updater = GithubUpdater("anonfaded", "QuranCLI", VERSION)#Replace owner and name
-        self.ui = UI(self.audio_manager, self.term_size, self.updater)  # <---  Pass updater to UI
+        self.ui = UI(self.audio_manager, self.term_size, self.updater, self.preferences)  # <---  Pass updater to UI
         self._clear_terminal()  # Calling it here, so the program clears the terminal on startup
         self.surah_names = self._load_surah_names()
+
+    def _load_preferences(self):
+        """Load preferences from file"""
+        try:
+            with open(self.preferences_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            print(Fore.YELLOW + "Preferences file not found, creating new one.")
+            return {}
+        except json.JSONDecodeError:
+            print(Fore.YELLOW + "Preferences file is corrupted, resetting.")
+            return {}
+        except Exception as e:
+            print(Fore.RED + f"Error loading preferences: {e}")
+            return {}
+
+    def _save_preferences(self):
+         """Save preferences to file"""
+         try:
+             with open(self.preferences_file, 'w', encoding='utf-8') as f:
+                 json.dump(self.preferences, f, ensure_ascii=False, indent=2)
+         except Exception as e:
+             print(Fore.RED + f"Error saving preferences: {e}")
+
 
     def _load_surah_names(self):
         surah_names = {}
@@ -133,13 +164,17 @@ class QuranApp:
                     print(Style.BRIGHT + Fore.RED + separator)
 
                     while True:
-                        start, end = self._get_ayah_range(surah_info.total_ayah)
-                        ayahs = self.data_handler.get_ayahs(surah_number, start, end)
-                        self.ui.display_ayahs(ayahs, surah_info)
+                         try: #Added try block
+                            start, end = self._get_ayah_range(surah_info.total_ayah)
+                            ayahs = self.data_handler.get_ayahs(surah_number, start, end)
+                            self.ui.display_ayahs(ayahs, surah_info)
 
-                        if not self._ask_yes_no(surah_info.surah_name):
-                            self._clear_terminal()
-                            self._display_header()
+                            if not self._ask_yes_no(surah_info.surah_name):
+                                self._clear_terminal()
+                                self._display_header()
+                                break
+                         except KeyboardInterrupt: # Added KeyboardInterrupt
+                            print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to surah selection.")
                             break
 
                 except KeyboardInterrupt:
@@ -234,8 +269,7 @@ class QuranApp:
                         except KeyboardInterrupt:
                             print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to surah selection.")
                             break # Return to surah selection.
-
-                else:
+                else: # Moved the code from else block inside the try block
                     print(Fore.RED + "No close matches found. Please enter a valid Surah number, name, 'list', or 'quit'")
 
             except ValueError:
