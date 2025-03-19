@@ -13,24 +13,18 @@ import tqdm
 import sys
 import subprocess  # Import the subprocess module
 
+
 class AudioManager:
     """Handles audio downloads and playback"""
+
     def __init__(self):
         # Add current_surah tracking
         self.current_surah = None
-        self.audio_dir = Path(__file__).parent.parent / 'audio_cache' #Adjusted path
+        self.audio_dir = Path(__file__).parent.parent / 'audio_cache'  # Adjusted path
         self.audio_dir.mkdir(exist_ok=True)
         self.audio_driver = self._detect_audio_driver()  # Detect driver
-        
-        try:
-            pygame.mixer.init()
-            self.mixer_initialized = True
-        except pygame.error as e:
-            print(Fore.RED + f"Error initializing Pygame mixer: {e}")
-            print(Fore.YELLOW + f"Audio functionality might be limited.  Trying driver: {self.audio_driver}")
-            self.mixer_initialized = False
-        else:
-            self.mixer_initialized = True
+        self.mixer_initialized = False # Initialize to False
+        self._init_mixer()  # Call init mixer after audio driver detect
 
         self.current_audio = None
         self.current_reciter = None
@@ -42,56 +36,46 @@ class AudioManager:
         self.seek_lock = threading.Lock()
         self.update_event = threading.Event()
         self.start_time = 0
-        
+
     def _detect_audio_driver(self):
-        """Ensure the system uses PipeWire or PulseAudio—automatically install if missing."""
+        """Detect the best available audio driver on Linux"""
         if sys.platform == "win32":
             return None  # Use default on Windows
 
-        def is_installed(command):
-            """Check if a command exists on the system."""
-            return subprocess.run(["which", command], capture_output=True).returncode == 0
-
-        def install_package(package):
-            """Attempt to install a package using the appropriate package manager."""
-            print(Fore.YELLOW + f"⚙ Installing {package}...")
-            try:
-                subprocess.run(["sudo", "apt", "install", "-y", package], check=True)
-                print(Fore.GREEN + f"✅ {package} installed successfully!")
-            except subprocess.CalledProcessError:
-                print(Fore.RED + f"❌ Failed to install {package}. Please install it manually.")
-                sys.exit(1)
-
-        # Check and install PipeWire if missing
-        if not is_installed("pw-cli"):
-            install_package("pipewire")
-
-        # Check and install PulseAudio if missing
-        if not is_installed("pactl"):
-            install_package("pulseaudio")
-
-        # Retry detection after installation
         try:
-            subprocess.run(["pw-cli", "info"], check=True, capture_output=True)
-            os.environ["SDL_AUDIODRIVER"] = "pipewire"
-            print(Fore.CYAN + "✅ Using PipeWire for audio.")
-            return "pipewire"
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
-
-        try:
+            # Check for PulseAudio
             subprocess.run(["pactl", "info"], check=True, capture_output=True)
-            os.environ["SDL_AUDIODRIVER"] = "pulse"
-            print(Fore.BLUE + "✅ Using PulseAudio for audio.")
-            return "pulse"
+            print(Fore.CYAN + "PulseAudio detected.")
+            os.environ['SDL_AUDIODRIVER'] = 'pulse'
+            return 'pulse'
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
 
-        # If neither PipeWire nor PulseAudio is available, exit the program
-        print(Fore.RED + "❌ Audio setup failed! Please install PipeWire or PulseAudio manually.")
-        sys.exit(1)
+        try:
+            # Check for PipeWire (often emulates PulseAudio)
+            subprocess.run(["pw-cli", "info"], check=True, capture_output=True)
+            print(Fore.CYAN + "PipeWire detected.")
+            os.environ['SDL_AUDIODRIVER'] = 'pipewire'
+            return 'pipewire'
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
 
-        
+        # Fallback to ALSA
+        print(Fore.YELLOW + "Falling back to ALSA.")
+        os.environ['SDL_AUDIODRIVER'] = 'alsa'
+        return 'alsa'
+
+    def _init_mixer(self):
+        """Initialize pygame mixer, after setting env variable"""
+        try:
+            pygame.mixer.init()
+            self.mixer_initialized = True
+            print(Fore.GREEN + "Pygame mixer initialized successfully.")
+        except pygame.error as e:
+            print(Fore.RED + f"Error initializing Pygame mixer: {e}")
+            print(Fore.YELLOW + f"Audio functionality might be limited. Trying driver: {self.audio_driver}")
+            self.mixer_initialized = False
+    
     def get_audio_path(self, surah_num: int, reciter: str) -> Path:
         """Get audio file path"""
         return self.audio_dir / f"surah_{surah_num}_reciter_{reciter}.mp3"
@@ -100,7 +84,7 @@ class AudioManager:
         """Download audio file with resume support and retry handling"""
         filename = self.get_audio_path(surah_num, reciter)
         temp_file = filename.with_suffix('.tmp')
-        
+
         for attempt in range(max_retries):
             try:
                 # Verify existing file first
@@ -113,25 +97,25 @@ class AudioManager:
                             os.remove(filename)
                     else:
                         os.remove(filename)
-                
+
                 # Get file size and resume position
                 start_pos = os.path.getsize(temp_file) if temp_file.exists() else 0
                 headers = {'Range': f'bytes={start_pos}-'} if start_pos > 0 else {}
-                
+
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url, headers=headers) as response:
                         response.raise_for_status()
                         total_size = int(response.headers.get('content-length', 0)) + start_pos
-                        
+
                         if total_size == 0:
                             raise ValueError("Empty response from server")
-                        
+
                         print(Fore.CYAN + "\nConnected to server, starting download...")
-                        
+
                         # Convert sizes to MB for display
                         total_mb = total_size / (1024 * 1024)
                         downloaded_mb = start_pos / (1024 * 1024)
-                        
+
                         with tqdm.tqdm(
                             total=total_mb,
                             initial=downloaded_mb,
@@ -150,43 +134,43 @@ class AudioManager:
                                     downloaded_size = start_pos
                                     chunk_size = 8192
                                     start_time = time.time()
-                                    
+
                                     async for chunk in response.content.iter_chunked(chunk_size):
                                         await f.write(chunk)
                                         downloaded_size += len(chunk)
                                         chunk_mb = len(chunk) / (1024 * 1024)
                                         pbar.update(chunk_mb)
-                                        
+
                                         # Small sleep to prevent high CPU usage
                                         await asyncio.sleep(0.0001)
-                                
+
                                 if downloaded_size != total_size:
                                     raise ValueError(f"Download incomplete: {downloaded_size}/{total_size} bytes")
-                                
+
                                 # Verify and move file
                                 if os.path.exists(filename):
                                     os.remove(filename)
                                 os.rename(temp_file, filename)
-                                
+
                                 # Validate MP3
                                 MP3(str(filename))
                                 print(Fore.GREEN + "\n✓ Audio downloaded and verified!")
                                 return filename
-                                
+
                             except Exception as e:
                                 print(Fore.RED + f"\nDownload interrupted: {str(e)}")
                                 raise e
-                                
+
             except aiohttp.ClientError as e:
                 print(Fore.RED + f"\nNetwork error (Attempt {attempt + 1}/{max_retries}): {str(e)}")
             except Exception as e:
                 print(Fore.RED + f"\nDownload failed (Attempt {attempt + 1}/{max_retries}): {str(e)}")
-            
+
             if attempt < max_retries - 1:
                 retry_delay = (attempt + 1) * 2
                 print(Fore.YELLOW + f"\nRetrying in {retry_delay} seconds...")
                 await asyncio.sleep(retry_delay)
-        
+
         # All attempts failed
         print(Fore.RED + "\n❌ Download failed after all attempts")
         print(Fore.YELLOW + "Would you like to try downloading again? (y/n): ", end="")
@@ -201,7 +185,7 @@ class AudioManager:
                     return await self.download_audio(url, surah_num, reciter)
         except Exception:
             pass
-        
+
         raise Exception("Failed to download audio")
 
     def load_audio(self, file_path: Path):
@@ -213,15 +197,9 @@ class AudioManager:
     def play_audio(self, file_path: Path, reciter: str):
         """Play audio file with progress tracking"""
         try:
-            # Retry initializing mixer if it wasn't initialized before
             if not self.mixer_initialized:
-                print(Fore.YELLOW + "\nRetrying Pygame mixer initialization...")
-                try:
-                    pygame.mixer.init()
-                    self.mixer_initialized = True
-                except pygame.error as e:
-                    print(Fore.RED + f"Failed to initialize Pygame mixer: {e}")
-                    return  # Exit if still not initialized
+                print(Fore.RED + "\nCannot play audio: Pygame mixer not initialized.")
+                return
 
             if self.is_playing:
                 self.stop_audio(reset_state=True)
@@ -235,18 +213,23 @@ class AudioManager:
             self.current_position = 0
             self.start_time = time.time()
 
+            # Update current surah from filename
+            try:
+                self.current_surah = int(file_path.stem.split('_')[1])
+            except (IndexError, ValueError):
+                self.current_surah = None
+
             self.start_progress_tracking()
 
         except Exception as e:
             print(Fore.RED + f"\nError playing audio: {e}")
             self.stop_audio(reset_state=True)
 
-
     def _track_progress(self):
         """Track progress with accurate timing"""
         try:
             while not self.should_stop:
-                if self.is_playing and pygame.mixer.music.get_busy():#Combined conditions
+                if self.is_playing and pygame.mixer.music.get_busy():  # Combined conditions
                     self.current_position = time.time() - self.start_time
                     if self.current_position >= self.duration:
                         self.stop_audio(reset_state=True)
@@ -254,10 +237,10 @@ class AudioManager:
                     self.update_event.set()
                     time.sleep(0.1)
                 else:
-                    time.sleep(0.1) #Prevent busy-waiting
+                    time.sleep(0.1)  # Prevent busy-waiting
 
             if not pygame.mixer.music.get_busy() and self.is_playing:
-                self.stop_audio(reset_state=True)#Also resetting in this case
+                self.stop_audio(reset_state=True)  # Also resetting in this case
         except Exception:
             pass
 
@@ -267,31 +250,31 @@ class AudioManager:
             try:
                 if not self.current_audio:
                     return
-                
+
                 # Calculate new position
                 position = max(0, min(position, self.duration))
-                
+
                 # Store playing state
                 was_playing = self.is_playing
-                
+
                 # Stop current playback
                 pygame.mixer.music.stop()
-                
+
                 # Start from new position
                 pygame.mixer.music.load(str(self.current_audio))
                 pygame.mixer.music.play(start=position)
-                
+
                 # Update timing
                 self.current_position = position
                 self.start_time = time.time() - position
-                
+
                 # Restore state
                 self.is_playing = was_playing
                 if self.is_playing:
                     self.start_progress_tracking()
                 else:
                     pygame.mixer.music.pause()
-                
+
             except Exception as e:
                 print(Fore.RED + f"\nSeek error: {e}")
 
@@ -309,7 +292,7 @@ class AudioManager:
             self.progress_thread.join(timeout=0.5)
         pygame.mixer.music.stop()
         pygame.mixer.music.unload()  # Add this to fully unload the audio
-        
+
         if reset_state:
             self.is_playing = False
             self.current_position = 0
@@ -340,22 +323,22 @@ class AudioManager:
 
     def format_time(self, seconds: float) -> str:
         """Format seconds to MM:SS"""
-        return f"{int(seconds//60):02d}:{int(seconds%60):02d}"
+        return f"{int(seconds // 60):02d}:{int(seconds % 60):02d}"
 
     def get_progress_bar(self, width: int = 40) -> str:
         """Generate progress bar with colors"""
         if not self.duration:
             return ""
-        
+
         progress = min(self.current_position / self.duration, 1)
         filled = int(width * progress)
         empty = width - filled
-        
+
         # Use block characters for better visibility
-        bar = (Fore.RED + "█" * filled + 
-            Fore.WHITE + "░" * empty)
-        
+        bar = (Fore.RED + "█" * filled +
+               Fore.WHITE + "░" * empty)
+
         current = self.format_time(self.current_position)
         total = self.format_time(self.duration)
-        
+
         return f"{bar} {Fore.CYAN}{current}{Fore.WHITE}/{Fore.CYAN}{total}"
