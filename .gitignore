@@ -4,7 +4,7 @@
 /core/__pycache__/
 /audio_cache/
 api_cache.json
-venv_aarch64/
+# venv_aarch64/
 .repomixignore
 repomix-output.md
 .repomix/bundles.json
