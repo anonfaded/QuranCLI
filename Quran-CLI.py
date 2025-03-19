@@ -1,3 +1,4 @@
+# Quran-CLI.py
 import sys
 import os
 import subprocess
@@ -105,49 +106,51 @@ class QuranApp:
                 self._clear_terminal()
                 self._display_header()
 
+                print(Fore.RED + "┌─" + Fore.RED + Style.BRIGHT + " Select Surah")  # Move this line here
+                surah_number = self._get_surah_number()
+
+                if surah_number is None:
+                    # Exit the run loop if _get_surah_number returns None (quit or exit)
+                    break
+
                 try:
+                    print(Style.BRIGHT + Fore.GREEN + "\n" + "=" * 52)
+
+                    surah_info = self.data_handler.get_surah_info(surah_number)
+                    # Surah Information Header
+                    box_width = 52  # Adjust width if needed
+                    separator = "─" * box_width
+
+                    print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.RED + "📜 Surah Information")
+                    print(Fore.RED + f"│ • {Fore.WHITE}Name:       {Fore.CYAN}{surah_info.surah_name}")
+                    print(Fore.RED + f"│ • {Fore.WHITE}Arabic:     {Fore.CYAN}{surah_info.surah_name_arabic}")
+                    print(Fore.RED + f"│ • {Fore.WHITE}Revelation: {Fore.CYAN}{surah_info.revelation_place}")
+                    print(Fore.RED + f"│ • {Fore.WHITE}Total Ayahs:{Fore.CYAN} {surah_info.total_ayah}")
+                    print(Fore.RED + "╰" + separator)
+
+                    # Note Section
+                    print(Style.DIM + Fore.YELLOW + "⚠ Note: Arabic text may appear reversed but will copy correctly.")
+                    print(Style.BRIGHT + Fore.RED + separator)
+
                     while True:
-                        print(Fore.RED + "┌─" + Fore.RED + Style.BRIGHT + " Select Surah")
-                        surah_number = self._get_surah_number()
-                        if surah_number is None:
-                            return  # Exit completely instead of break
+                        start, end = self._get_ayah_range(surah_info.total_ayah)
+                        ayahs = self.data_handler.get_ayahs(surah_number, start, end)
+                        self.ui.display_ayahs(ayahs, surah_info)
 
-                        print(Style.BRIGHT + Fore.GREEN + "\n" + "=" * 52)
-
-                        surah_info = self.data_handler.get_surah_info(surah_number)
-                        # Surah Information Header
-                        box_width = 52  # Adjust width if needed
-                        separator = "─" * box_width
-
-                        print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.RED + "📜 Surah Information")
-                        print(Fore.RED + f"│ • {Fore.WHITE}Name:       {Fore.CYAN}{surah_info.surah_name}")
-                        print(Fore.RED + f"│ • {Fore.WHITE}Arabic:     {Fore.CYAN}{surah_info.surah_name_arabic}")
-                        print(Fore.RED + f"│ • {Fore.WHITE}Revelation: {Fore.CYAN}{surah_info.revelation_place}")
-                        print(Fore.RED + f"│ • {Fore.WHITE}Total Ayahs:{Fore.CYAN} {surah_info.total_ayah}")
-                        print(Fore.RED + "╰" + separator)
-
-                        # Note Section
-                        print(Style.DIM + Fore.YELLOW + "⚠ Note: Arabic text may appear reversed but will copy correctly.")
-                        print(Style.BRIGHT + Fore.RED + separator)
-
-                        while True:
-                            start, end = self._get_ayah_range(surah_info.total_ayah)
-                            ayahs = self.data_handler.get_ayahs(surah_number, start, end)
-                            self.ui.display_ayahs(ayahs, surah_info)
-
-
-                            if not self._ask_yes_no(surah_info.surah_name):
-                                self._clear_terminal()
-                                self._display_header()
-                                break
+                        if not self._ask_yes_no(surah_info.surah_name):
+                            self._clear_terminal()
+                            self._display_header()
+                            break
 
                 except KeyboardInterrupt:
-                    print(Fore.YELLOW + "\n\nTo exit, please type 'quit' or 'exit'")
-                    self.run()  # Restart the main loop
+                    print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to main menu.")
+                    continue  # Continue to the outer loop
+
             except KeyboardInterrupt:
-                self._clear_terminal()
-                print(Style.BRIGHT + Fore.YELLOW + "⚠ To exit, please type 'quit' or 'exit'")
-                continue
+                # Allow KeyboardInterrupt to propagate to the top level handler
+                raise
+        # Removed this duplicate thank you message that appears when control c is pressed on first input 
+        # print(Fore.RED + "\n✨ Thank you for using " + Fore.WHITE + "QuranCLI" + Fore.RED + "!") # Print exit message after loop ends
 
     def _display_surah_list(self):
         """Display surah names in multiple columns."""
@@ -192,7 +195,8 @@ class QuranApp:
                     return None
                 elif user_input == 'list':
                     self._display_surah_list()
-                    return self._get_surah_number()  # Re-prompt after list is displayed
+                    # No need to clear and display header here, _display_surah_list already does it
+                    continue # Re-prompt after list is displayed
 
                 # Check if input is a number
                 if user_input.isdigit():
@@ -212,27 +216,33 @@ class QuranApp:
 
                     # Ask user to select a Surah from the suggestions
                     while True:
-                        print(Fore.GREEN + "Select a number from the list, or 'r' to retry:")
-                        user_choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                        try:
+                            print(Fore.GREEN + "Select a number from the list, or 'r' to retry:")
+                            user_choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
 
-                        if user_choice.isdigit():
-                            choice_idx = int(user_choice) - 1
-                            if 0 <= choice_idx < len(close_matches):
-                                selected_surah = close_matches[choice_idx]
-                                return [num for num, name in self.surah_names.items() if name == selected_surah][0]
+                            if user_choice.isdigit():
+                                choice_idx = int(user_choice) - 1
+                                if 0 <= choice_idx < len(close_matches):
+                                    selected_surah = close_matches[choice_idx]
+                                    return [num for num, name in self.surah_names.items() if name == selected_surah][0]
+                                else:
+                                    print(Fore.RED + "Invalid choice. Please select a number from the list or 'r' to retry.")
+                            elif user_choice.lower() == 'r':
+                                break  # Restart input prompt
                             else:
                                 print(Fore.RED + "Invalid choice. Please select a number from the list or 'r' to retry.")
-                        elif user_choice.lower() == 'r':
-                            self._clear_terminal()
-                            self._display_header()
-                            break  # Restart input prompt
-                        else:
-                            print(Fore.RED + "Invalid choice. Please select a number from the list or 'r' to retry.")
+                        except KeyboardInterrupt:
+                            print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to surah selection.")
+                            break # Return to surah selection.
+
                 else:
                     print(Fore.RED + "No close matches found. Please enter a valid Surah number, name, 'list', or 'quit'")
 
             except ValueError:
                 print(Fore.RED + "Invalid input. Enter a number between 1-114, a Surah name, 'list', or 'quit'")
+            except KeyboardInterrupt:  # Add this to handle control + c during input
+                print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to main menu.")
+                break # Return to main menu immediately, *without exiting app*.
 
     def _get_ayah_range(self, total_ayah: int) -> tuple:
         while True:
@@ -246,21 +256,34 @@ class QuranApp:
                     return start, end
             except ValueError:
                 pass
+            except KeyboardInterrupt: # Add this to handle control + c during input
+                print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to surah selection.")
+                raise KeyboardInterrupt # Re-raise to go to surah selection.
+
             print(Fore.RED + "└──╼ " + "Invalid range. Please try again.")
 
     def _ask_yes_no(self, surah_name:str) -> bool:
         while True:
-            choice = input(Fore.BLUE + f"Select another range for {Fore.GREEN}{surah_name}{Fore.LIGHTBLACK_EX} (y/n){Fore.WHITE}: ").strip().lower()
-            if choice in ['y', 'yes']:
-                return True
-            if choice in ['n', 'no']:
-                return False
-            print(Fore.RED + "Invalid input. Please enter 'y' or 'n'.")
+            try:
+                choice = input(Fore.BLUE + f"Select another range for {Fore.GREEN}{surah_name}{Fore.LIGHTBLACK_EX} (y/n){Fore.WHITE}: ").strip().lower()
+                if choice in ['y', 'yes']:
+                    return True
+                if choice in ['n', 'no']:
+                    return False
+                print(Fore.RED + "Invalid input. Please enter 'y' or 'n'.")
+            except KeyboardInterrupt: # Add this to handle control + c during input
+                print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to surah selection.")
+                return False  # Treat as 'no' and return to surah selection.
 
 if __name__ == "__main__":
+    # Wrap the entire app execution in a try-except block
+    # to handle KeyboardInterrupt at the top level. This
+    # ensures Ctrl+C at the main menu does not crash the app
+    # but gracefully prompts for 'quit' or 'exit'
     try:
         QuranApp().run()
+        sys.exit(0) # Exit normally
     except KeyboardInterrupt:
         os.system('cls' if os.name == 'nt' else 'clear')  # Clear terminal
         print(Style.BRIGHT + Fore.YELLOW + "⚠ To exit, please type 'quit' or 'exit'")
-        QuranApp().run()
+        sys.exit(1) # Exit with error code
