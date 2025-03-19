@@ -423,75 +423,78 @@ class UI:
             
 
     def display_subtitle_menu(self, surah_info: SurahInfo):
-        """Handles the subtitle creation process."""
-        try:
-            surah_number = surah_info.surah_number
-            total_ayah = surah_info.total_ayah
+            """Handles the subtitle creation process."""
+            try:
+                surah_number = surah_info.surah_number
+                total_ayah = surah_info.total_ayah
 
-            while True:
+                while True:
+                    try:
+                        print(Fore.RED + "\n┌─" + Fore.RED + Style.BRIGHT + f" Subtitle Creation - Surah {surah_info.surah_name} (1-{total_ayah} Ayahs)")
+                        print(Fore.RED + "├──╼ " + Fore.GREEN + "Start Ayah" + ":\n", end="")
+                        start_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
+                        print(Fore.RED + "├──╼ " + Fore.GREEN + "End Ayah" + ":\n", end="")
+                        end_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
+                        ayah_duration = 5.0
+
+                        if 1 <= start_ayah <= end_ayah <= total_ayah:
+                            break
+                        else:
+                            print(Fore.RED + "└──╼ " + "Invalid ayah range. Please try again.")
+                    except ValueError:
+                        print(Fore.RED + "└──╼ " + "Invalid input. Please enter integers.")
+                    except KeyboardInterrupt:
+                        print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
+                        return #Return to main menu
+
+                # Generate SRT content
+                srt_content = self.generate_srt_content(surah_number, start_ayah, end_ayah, ayah_duration)
+
+                # Save the SRT file
+                documents_dir = os.path.join(os.path.expanduser("~"), "Documents")
+                quran_dir = os.path.join(documents_dir, "QuranCLI Subtitles")
+                surah_dir = os.path.join(quran_dir, surah_info.surah_name)
+
+                # Ensure the directories exist
+                os.makedirs(surah_dir, exist_ok=True)
+
+                # Create filename
+                now = datetime.datetime.now()
+                date_str = now.strftime("%Y-%m-%d")
+                filename = f"Surah{surah_number:03d}_Ayah{start_ayah:03d}-Ayah{end_ayah:03d}_{date_str}.srt"
+                filepath = os.path.join(surah_dir, filename)
+
                 try:
-                    print(Fore.RED + "\n┌─" + Fore.RED + Style.BRIGHT + f" Subtitle Creation - Surah {surah_info.surah_name} (Ayah 1-{total_ayah})")
-                    print(Fore.RED + "├──╼ " + Fore.GREEN + "Start Ayah" + ":\n", end="")
-                    start_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
-                    print(Fore.RED + "├──╼ " + Fore.GREEN + "End Ayah" + ":\n", end="")
-                    end_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
-                    #print(Fore.RED + "├──╼ " + Fore.GREEN + "Ayah Duration (seconds)"+ ":\n", end="")
-                    #ayah_duration = float(input(Fore.RED + "│ ❯ " + Fore.WHITE)) #Implement this correctly later
-                    ayah_duration = 5.0
-                    if 1 <= start_ayah <= end_ayah <= total_ayah:
+                    with open(filepath, "w", encoding="utf-8") as f:
+                        f.write(srt_content)
+
+                    print(Fore.GREEN + f"\n✅ Subtitle file saved to: {Fore.RED}{filepath}") #Red color.
+
+                except Exception as e:
+                    print(Fore.RED + f"\n❌ Error saving subtitle file: {e}")
+
+                while True:
+                    user_input = input(Fore.BLUE + "➡️  Type " + Fore.YELLOW + "'open'" + Fore.BLUE + " to open folder, or press " + Fore.CYAN + "Enter" + Fore.BLUE + " to return to menu: " + Fore.WHITE).strip().lower()
+                    if user_input == 'open':
+                        try:
+                            if os.name == 'nt':  # Windows
+                                os.startfile(surah_dir)
+                            elif os.name == 'posix':  # macOS and Linux
+                                subprocess.run(['open', surah_dir])
+                            else:
+                                print(Fore.RED + "❌ Unsupported operating system for 'open' command.")
+                        except Exception as e:
+                            print(Fore.RED + f"❌ Error opening folder: {e}")
+                        print(Fore.YELLOW + "Press Enter to continue..." + Fore.WHITE) # Clear indication of what to do.
+                        input() #Just a clear input
+                        break
+                    elif user_input == "": #Check if it is "" to proceed to the next selection
                         break
                     else:
-                        print(Fore.RED + "└──╼ " + "Invalid ayah range. Please try again.")
-                except ValueError:
-                    print(Fore.RED + "└──╼ " + "Invalid input. Please enter integers.")
-                except KeyboardInterrupt:
-                    print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to main menu.")
-                    return #Return to main menu
-
-            # Generate SRT content
-            srt_content = self.generate_srt_content(surah_number, start_ayah, end_ayah, ayah_duration)
-
-            # Save the SRT file
-            documents_dir = os.path.join(os.path.expanduser("~"), "Documents")
-            quran_dir = os.path.join(documents_dir, "QuranCLI Subtitles")
-            surah_dir = os.path.join(quran_dir, surah_info.surah_name)
-
-            # Ensure the directories exist
-            os.makedirs(surah_dir, exist_ok=True)
-
-            # Create filename
-            now = datetime.datetime.now()
-            date_str = now.strftime("%Y-%m-%d")
-            filename = f"Surah{surah_number:03d}_Ayah{start_ayah:03d}-Ayah{end_ayah:03d}_{date_str}.srt"
-            filepath = os.path.join(surah_dir, filename)
-
-            try:
-                with open(filepath, "w", encoding="utf-8") as f:
-                    f.write(srt_content)
-
-                print(Fore.GREEN + f"\n✓ Subtitle file saved to: {filepath}")
-
+                        print(Fore.RED + "❌ Invalid Command. Press Enter or type 'open' and then press Enter")
+                        continue
             except Exception as e:
-                print(Fore.RED + f"\nError saving subtitle file: {e}")
-
-            #Give options.
-            while True:
-                user_input = input(Fore.BLUE + "\nType 'open' to open the folder, or press Enter to return to the main menu: " + Fore.WHITE).strip().lower()
-                if user_input == 'open':
-                    try:
-                        if os.name == 'nt':  # Windows
-                            os.startfile(surah_dir)
-                        elif os.name == 'posix':  # macOS and Linux
-                            subprocess.run(['open', surah_dir])
-                        else:
-                            print(Fore.RED + "Unsupported operating system for 'open' command.")
-                    except Exception as e:
-                        print(Fore.RED + f"Error opening folder: {e}")
-                else:
-                    break  # Return to Surah selection.
-
-        except Exception as e:
-            print(Fore.RED + f"\nAn error occurred in subtitle creation: {e}")
+                print(Fore.RED + f"\n❌ An error occurred in subtitle creation: {e}")
 
 
     def generate_srt_content(self, surah_number: int, start_ayah: int, end_ayah: int, ayah_duration: float) -> str:
