@@ -10,10 +10,8 @@ import time
 import threading
 from colorama import Fore
 import tqdm
-
 import sys
-if sys.platform == "win32":
-    import msvcrt
+import subprocess  # Import the subprocess module
 
 class AudioManager:
     """Handles audio downloads and playback"""
@@ -22,7 +20,17 @@ class AudioManager:
         self.current_surah = None
         self.audio_dir = Path(__file__).parent.parent / 'audio_cache' #Adjusted path
         self.audio_dir.mkdir(exist_ok=True)
-        pygame.mixer.init()
+        self.audio_driver = self._detect_audio_driver()  # Detect driver
+        
+        try:
+            pygame.mixer.init()
+        except pygame.error as e:
+            print(Fore.RED + f"Error initializing Pygame mixer: {e}")
+            print(Fore.YELLOW + f"Audio functionality might be limited.  Trying driver: {self.audio_driver}")
+            self.mixer_initialized = False
+        else:
+            self.mixer_initialized = True
+
         self.current_audio = None
         self.current_reciter = None
         self.is_playing = False
@@ -33,6 +41,34 @@ class AudioManager:
         self.seek_lock = threading.Lock()
         self.update_event = threading.Event()
         self.start_time = 0
+        
+    def _detect_audio_driver(self):
+        """Detect the best available audio driver on Linux"""
+        if sys.platform == "win32":
+            return None  # Use default on Windows
+
+        try:
+            # Check for PulseAudio
+            subprocess.run(["pactl", "info"], check=True, capture_output=True)
+            print(Fore.CYAN + "PulseAudio detected.")
+            os.environ['SDL_AUDIODRIVER'] = 'pulse'
+            return 'pulse'
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+
+        try:
+            # Check for PipeWire (often emulates PulseAudio)
+            subprocess.run(["pw-cli", "info"], check=True, capture_output=True)
+            print(Fore.CYAN + "PipeWire detected.")
+            os.environ['SDL_AUDIODRIVER'] = 'pipewire'
+            return 'pipewire'
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+
+        # Fallback to ALSA
+        print(Fore.YELLOW + "Falling back to ALSA.")
+        os.environ['SDL_AUDIODRIVER'] = 'alsa'
+        return 'alsa'
         
     def get_audio_path(self, surah_num: int, reciter: str) -> Path:
         """Get audio file path"""
@@ -133,8 +169,14 @@ class AudioManager:
         print(Fore.RED + "\n❌ Download failed after all attempts")
         print(Fore.YELLOW + "Would you like to try downloading again? (y/n): ", end="")
         try:
-            if msvcrt.getch().decode().lower() == 'y':
-                return await self.download_audio(url, surah_num, reciter)
+            if sys.platform == "win32":
+                import msvcrt
+                if msvcrt.getch().decode().lower() == 'y':
+                    return await self.download_audio(url, surah_num, reciter)
+            else:
+                # Simulate getch for non-Windows systems
+                if input().lower() == 'y':
+                    return await self.download_audio(url, surah_num, reciter)
         except Exception:
             pass
         
@@ -149,9 +191,13 @@ class AudioManager:
     def play_audio(self, file_path: Path, reciter: str):
         """Play audio file with progress tracking"""
         try:
+            if not self.mixer_initialized:
+                print(Fore.RED + "\nCannot play audio: Pygame mixer not initialized.")
+                return
+
             if self.is_playing:
                 self.stop_audio(reset_state=True)
-            
+
             audio = self.load_audio(file_path)
             pygame.mixer.music.load(str(file_path))
             pygame.mixer.music.play()
@@ -160,15 +206,15 @@ class AudioManager:
             self.current_reciter = reciter
             self.current_position = 0
             self.start_time = time.time()
-            
+
             # Update current surah from filename
             try:
                 self.current_surah = int(file_path.stem.split('_')[1])
             except (IndexError, ValueError):
                 self.current_surah = None
-            
+
             self.start_progress_tracking()
-            
+
         except Exception as e:
             print(Fore.RED + f"\nError playing audio: {e}")
             self.stop_audio(reset_state=True)
