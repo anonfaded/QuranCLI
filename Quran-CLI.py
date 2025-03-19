@@ -220,8 +220,19 @@ class QuranApp:
                 self._clear_terminal()
                 self._display_header()
 
+                # Descriptive command list with colors
+                print(Fore.GREEN + "Available Commands:")
+                print(Fore.CYAN + "  1-114" + Fore.WHITE + ": Select Surah by number")
+                print(Fore.CYAN + "  Surah Name" + Fore.WHITE + ": Search Surah (e.g., 'Rahman')")
+                print(Fore.CYAN + "  list" + Fore.WHITE + ": Display list of Surahs")
+                print(Fore.CYAN + "  sub" + Fore.WHITE + ": Create subtitles for Ayahs")
+                print(Fore.CYAN + "  quit" + Fore.WHITE + ": Exit the application")
+
+                # Helper Text
+                print(Style.DIM + Fore.WHITE + "\nType any of the above commands and press Enter.")
+
                 # Prompt user for input
-                print(Fore.GREEN + "Enter number (1-114), surah name, 'list', 'sub', or 'quit':" + Style.DIM + Fore.WHITE )
+                print(Fore.GREEN + "\nEnter command:" + Style.DIM + Fore.WHITE )
                 user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
 
                 if user_input in ['quit', 'exit']:
@@ -239,7 +250,7 @@ class QuranApp:
                     self.ui.display_subtitle_menu(surah_info)
                     continue # After subtitle, return to main
                 # Check if input is a number
-                if user_input.isdigit():
+                elif user_input.isdigit():
                     number = int(user_input)
                     if 1 <= number <= 114:
                         return number
@@ -272,40 +283,48 @@ class QuranApp:
                             else:
                                 print(Fore.RED + "Invalid choice. Please select a number from the list or 'r' to retry.")
                         except KeyboardInterrupt:
-                            print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to surah selection.")
+                            print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to surah selection.")
                             break # Return to surah selection.
             except ValueError:
-                    print(Fore.RED + "Invalid input. Enter a number between 1-114, a Surah name, 'list', 'sub', or 'quit'")
+                print(Fore.RED + "Invalid input. Enter a number between 1-114, a Surah name, 'list', 'sub', or 'quit'")
             except KeyboardInterrupt:  # Add this to handle control + c during input
-                print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to main menu.")
+                print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
                 break # Return to main menu immediately, *without exiting app*.
-
     def _get_surah_number_for_subtitle(self) -> Optional[int]:
-        """Helper function to get surah number specifically for subtitle generation."""
-        while True:
-            try:
-                self._clear_terminal()
-                self._display_header()
-                print(Fore.GREEN + "Enter Surah number (1-114) for subtitle creation, or 'q' to return:" + Style.DIM + Fore.WHITE)
-                user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+            """Helper function to get surah number specifically for subtitle generation."""
+            while True:
+                try:
+                    self._clear_terminal()
+                    self._display_header()
 
-                if user_input in ['q', 'quit', 'exit']:
-                    return None  # User wants to quit
+                    print(Fore.GREEN + "Available Commands (Subtitle Creation):")
+                    print(Fore.CYAN + "  1-114" + Fore.WHITE + ": Select Surah by number")
+                    print(Fore.CYAN + "  q" + Fore.WHITE + ": Return to main menu")
 
-                if user_input.isdigit():
-                    number = int(user_input)
-                    if 1 <= number <= 114:
-                        return number
+                    # Helper Text
+                    print(Style.DIM + Fore.WHITE + "\nType any of the above commands and press Enter.")
+
+                    # Prompt user for input
+                    print(Fore.GREEN + "\nEnter Surah number:" + Style.DIM + Fore.WHITE)
+                    user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+
+                    if user_input in ['q', 'quit', 'exit']:
+                        return None  # User wants to quit
+
+                    if user_input.isdigit():
+                        number = int(user_input)
+                        if 1 <= number <= 114:
+                            return number
+                        else:
+                            print(Fore.RED + "Invalid Surah number. Please enter a number between 1 and 114 or 'q' to return")
                     else:
-                        print(Fore.RED + "Invalid Surah number. Please enter a number between 1 and 114 or 'q' to return")
-                else:
-                    print(Fore.RED + "Invalid input. Please enter a number or 'q'")
+                        print(Fore.RED + "Invalid input. Please enter a number or 'q'")
 
-            except ValueError:
-                print(Fore.RED + "Invalid input. Please enter a valid number.")
-            except KeyboardInterrupt:
-                print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to main menu.")
-                return None #Returning none as keyboard interupt.
+                except ValueError:
+                    print(Fore.RED + "Invalid input. Please enter a valid number.")
+                except KeyboardInterrupt:
+                    print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
+                    return None #Returning none as keyboard interupt.
             
     def _get_ayah_range(self, total_ayah: int) -> tuple:
         while True:
