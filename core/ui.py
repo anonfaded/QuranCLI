@@ -34,7 +34,8 @@ class UI:
         self.update_message = self._get_update_message() # Get the update message during initialization
         self.preferences = preferences or {} # Load preferences
         self.preferences_file = os.path.join(os.path.dirname(__file__), 'preferences.json') # Preferences file location
-
+        self.httpd = None #Add HTTPServer
+        
     def save_preferences(self):
         try:
             with open(self.preferences_file, 'w', encoding='utf-8') as f:
@@ -429,194 +430,186 @@ class UI:
             
 
     def display_subtitle_menu(self, surah_info: SurahInfo):
-            """Handles the subtitle creation process."""
-            try:
-                surah_number = surah_info.surah_number
-                total_ayah = surah_info.total_ayah
+        """Handles the subtitle creation process."""
+        try:
+            surah_number = surah_info.surah_number
+            total_ayah = surah_info.total_ayah
 
-                while True:
-                    try:
-                        print(Fore.RED + "\n┌─" + Fore.RED + Style.BRIGHT + f" Subtitle Creation - Surah {surah_info.surah_name} (1-{total_ayah} Ayahs)")
-                        print(Fore.RED + "├──╼ " + Fore.GREEN + "Start Ayah" + ":\n", end="")
-                        start_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
-                        print(Fore.RED + "├──╼ " + Fore.GREEN + "End Ayah" + ":\n", end="")
-                        end_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
-                        ayah_duration = 5.0
-
-                        if 1 <= start_ayah <= end_ayah <= total_ayah:
-                            break
-                        else:
-                            print(Fore.RED + "└──╼ " + "Invalid ayah range. Please try again.")
-                    except ValueError:
-                        print(Fore.RED + "└──╼ " + "Invalid input. Please enter integers.")
-                    except KeyboardInterrupt:
-                        print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
-                        return #Return to main menu
-
-                # Generate SRT content
-                srt_content = self.generate_srt_content(surah_number, start_ayah, end_ayah, ayah_duration)
-
-                # Save the SRT file
-                documents_dir = os.path.join(os.path.expanduser("~"), "Documents")
-                quran_dir = os.path.join(documents_dir, "QuranCLI Subtitles")
-                surah_dir = os.path.join(quran_dir, surah_info.surah_name)
-
-                # Ensure the directories exist
-                os.makedirs(surah_dir, exist_ok=True)
-
-                # Create filename
-                now = datetime.datetime.now()
-                date_str = now.strftime("%Y-%m-%d")
-                filename = f"Surah{surah_number:03d}_Ayah{start_ayah:03d}-Ayah{end_ayah:03d}_{date_str}.srt"
-                filepath = os.path.join(surah_dir, filename)
-                
-                #Get filename only for url
-                url_filename = filename
-
+            while True:
                 try:
-                    with open(filepath, "w", encoding="utf-8") as f:
-                        f.write(srt_content)
+                    print(Fore.RED + "\n┌─" + Fore.RED + Style.BRIGHT + f" Subtitle Creation - Surah {surah_info.surah_name} (1-{total_ayah} Ayahs)")
+                    print(Fore.RED + "├──╼ " + Fore.GREEN + "Start Ayah" + ":\n", end="")
+                    start_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
+                    print(Fore.RED + "├──╼ " + Fore.GREEN + "End Ayah" + ":\n", end="")
+                    end_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
+                    ayah_duration = 5.0
 
-                    print(Fore.GREEN + f"\n✅ Subtitle file saved to: {Fore.RED}{filepath}") #Red color.
-
-                except Exception as e:
-                    print(Fore.RED + f"\n❌ Error saving subtitle file: {e}")
-                    return  # Exit if file saving fails
-
-
-
-
-
-
-
-
-                def start_server(directory, port, surah_name):
-                    """Starts an HTTP server serving a custom HTML page with file links."""
-                    try:
-                        # Use the directory where the Surah's subtitles are saved.
-                        web_dir = os.path.join(os.path.dirname(__file__), "web")  # Path to web directory
-
-                        class CustomHandler(http.server.SimpleHTTPRequestHandler):
-                            def do_GET(self):
-                                filepath = os.path.join(directory, self.path[1:])  # Construct full file path
-
-                                # Force download for .srt files
-                                if os.path.isfile(filepath) and filepath.endswith(".srt"):
-                                    self.send_response(200)
-                                    self.send_header('Content-Type', 'application/octet-stream')  # Generic binary stream
-                                    self.send_header('Content-Disposition', f'attachment; filename="{os.path.basename(filepath)}"')
-                                    self.end_headers()
-
-                                    try:
-                                        with open(filepath, 'rb') as f:
-                                            self.wfile.write(f.read())  # Write file content to response
-                                        return
-                                    except Exception as e:
-                                        print(Fore.RED + f"❌ Error reading file: {e}")
-                                        self.send_error(500, "Error reading file")  # Internal Server Error
-                                        return
-
-                                if self.path == "/":
-                                    # Serve the custom index.html
-                                    try:
-                                        with open(os.path.join(web_dir, "index.html"), 'rb') as f:  # web_dir here
-                                            content = f.read()
-                                            files = [os.path.basename(f) for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]  # directory here - getting filename only
-
-                                            # Inject the file list and Surah name into the HTML
-                                            files_str = str(files).replace("'", '"')  # Escape quotes for JavaScript
-                                            content = content.replace(b'/*FILE_LIST*/',
-                                                                    f'const files = {files_str}; addFileLinks(files);'.encode())
-                                            content = content.replace(b'<!--SURAH_NAME-->', surah_name.encode())  # Surah Tag
-
-                                            self.send_response(200)
-                                            self.send_header('Content-type', 'text/html')
-                                            self.end_headers()
-                                            self.wfile.write(content)
-                                            return
-                                    except FileNotFoundError:
-                                        self.send_error(404, "index.html not found")
-                                        return
-
-                                elif self.path.startswith("/web/"):
-                                    # Serve static files (CSS, etc.) from the web directory
-                                    try:
-                                        filepath = os.path.join(web_dir, self.path[5:])  # Correct web directory here
-                                        with open(filepath, 'rb') as f:
-                                            content = f.read()
-                                            self.send_response(200)
-                                            if self.path.endswith(".css"):
-                                                self.send_header('Content-type', 'text/css')
-                                            else:
-                                                self.send_header('Content-type', 'text/html')  # Default
-                                            self.end_headers()
-                                            self.wfile.write(content)
-                                            return
-                                    except FileNotFoundError:
-                                        self.send_error(404, "File not found")
-                                        return
-
-                                self.send_error(404, "File not found")  # If reach here 404
-
-                        with socketserver.TCPServer(("", port), CustomHandler) as httpd:
-                            print(Fore.GREEN + f"\n🌐 Serving custom webpage from: {Fore.CYAN}{directory} at port {port}. Press CTRL+C to stop." + Fore.WHITE)
-                            httpd.serve_forever()
-                    except OSError as e:
-                        print(Fore.RED + f"❌ Error starting server: {e}")
-
-
-
-
-
-
-
-
-
-                def get_primary_ip_address():
-                    """Get a single IP Adress"""
-                    ip_address = ""
-                    try:
-                        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                        sock.connect(("8.8.8.8", 80))  # Google's public DNS server
-                        ip_address = sock.getsockname()[0]
-                        sock.close()
-                    except Exception as e:
-                        print(Fore.RED + f"❌ Could not get local IP address: {e}")
-                    return ip_address
-
-                # start the server
-                PORT = 8000 # Change port number to avoid conflict
-
-                # construct the download url
-                ip_address = get_primary_ip_address()
-                print(Fore.GREEN + f"\nShare this link with other devices on the same network to browse and download subtitle files of {surah_info.surah_name}:" + Fore.WHITE)
-                print(Fore.YELLOW + f"   http://{ip_address}:{PORT}"+ Fore.WHITE)
-                #Directory to be accessed.
-                server_thread = threading.Thread(target=start_server, args=(surah_dir, PORT, surah_info.surah_name), daemon=True)
-                server_thread.start()
-
-                while True:
-                    user_input = input(Fore.BLUE + "➡️  Type " + Fore.YELLOW + "'open'" + Fore.BLUE + " to open folder, or press " + Fore.CYAN + "Enter" + Fore.BLUE + " to return to menu: " + Fore.WHITE).strip().lower()
-                    if user_input == 'open':
-                        try:
-                            if os.name == 'nt':  # Windows
-                                os.startfile(surah_dir)
-                            elif os.name == 'posix':  # macOS and Linux
-                                subprocess.run(['open', surah_dir])
-                            else:
-                                print(Fore.RED + "❌ Unsupported operating system for 'open' command.")
-                        except Exception as e:
-                            print(Fore.RED + f"❌ Error opening folder: {e}")
-                        print(Fore.YELLOW + "Press Enter to continue..." + Fore.WHITE) # Clear indication of what to do.
-                        input() #Just a clear input
-                        break
-                    elif user_input == "": #Check if it is "" to proceed to the next selection
+                    if 1 <= start_ayah <= end_ayah <= total_ayah:
                         break
                     else:
-                        print(Fore.RED + "❌ Invalid Command. Press Enter or type 'open' and then press Enter")
-                        continue
+                        print(Fore.RED + "└──╼ " + "Invalid ayah range. Please try again.")
+                except ValueError:
+                    print(Fore.RED + "└──╼ " + "Invalid input. Please enter integers.")
+                except KeyboardInterrupt:
+                    print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
+                    return #Return to main menu
+
+            # Generate SRT content
+            srt_content = self.generate_srt_content(surah_number, start_ayah, end_ayah, ayah_duration)
+
+            # Save the SRT file
+            documents_dir = os.path.join(os.path.expanduser("~"), "Documents")
+            quran_dir = os.path.join(documents_dir, "QuranCLI Subtitles")
+            surah_dir = os.path.join(quran_dir, surah_info.surah_name)
+
+            # Ensure the directories exist
+            os.makedirs(surah_dir, exist_ok=True)
+
+            # Create filename
+            now = datetime.datetime.now()
+            date_str = now.strftime("%Y-%m-%d")
+            filename = f"Surah{surah_number:03d}_Ayah{start_ayah:03d}-Ayah{end_ayah:03d}_{date_str}.srt"
+            filepath = os.path.join(surah_dir, filename)
+
+            try:
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write(srt_content)
+
+                print(Fore.GREEN + f"\n✅ Subtitle file saved to: {Fore.RED}{filepath}") #Red color.
+
             except Exception as e:
-                print(Fore.RED + f"\n❌ An error occurred in subtitle creation: {e}")
+                print(Fore.RED + f"\n❌ Error saving subtitle file: {e}")
+                return  # Exit if file saving fails
+
+            def start_server(directory, port, surah_name):
+                """Starts an HTTP server serving a custom HTML page with file links."""
+                try:
+                    # Use the directory where the Surah's subtitles are saved.
+                    web_dir = os.path.join(os.path.dirname(__file__), "web")  # Path to web directory
+
+                    class CustomHandler(http.server.SimpleHTTPRequestHandler):
+                        def do_GET(self):
+                            # Force download for .srt files
+                            filepath = os.path.join(directory, self.path[1:])  # Correctly construct file path
+                            if os.path.isfile(filepath) and filepath.endswith(".srt"):
+                                self.send_response(200)
+                                self.send_header('Content-Type', 'application/octet-stream')  # Generic binary stream
+                                self.send_header('Content-Disposition', f'attachment; filename="{os.path.basename(filepath)}"')
+                                self.end_headers()
+
+                                try:
+                                    with open(filepath, 'rb') as f:
+                                        self.wfile.write(f.read())  # Write file content to response
+                                    return
+                                except Exception as e:
+                                    print(Fore.RED + f"❌ Error reading file: {e}")
+                                    self.send_error(500, "Error reading file")  # Internal Server Error
+                                    return
+                            elif self.path == "/":
+                                # Serve the custom index.html
+                                try:
+                                    with open(os.path.join(web_dir, "index.html"), 'rb') as f:  # web_dir here
+                                        content = f.read()
+                                        files = [os.path.basename(f) for f in os.listdir(directory) if
+                                                 os.path.isfile(os.path.join(directory, f))]  # directory here - getting filename only
+
+                                        # Inject the file list and Surah name into the HTML
+                                        files_str = str(files).replace("'", '"')  # Escape quotes for JavaScript
+                                        content = content.replace(b'/*FILE_LIST*/',
+                                                                f'const files = {files_str}; addFileLinks(files);'.encode())
+                                        content = content.replace(b'<!--SURAH_NAME-->',
+                                                                surah_name.encode())  # Surah Tag
+
+                                        self.send_response(200)
+                                        self.send_header('Content-type', 'text/html')
+                                        self.end_headers()
+                                        self.wfile.write(content)
+                                        return
+                                except FileNotFoundError:
+                                    self.send_error(404, "index.html not found")
+                                    return
+
+                            elif self.path.startswith("/web/"):
+                                try:
+                                    filepath = os.path.join(web_dir, self.path[5:])
+                                    with open(filepath, 'rb') as f:
+                                        content = f.read()
+                                        self.send_response(200)
+                                        if self.path.endswith(".css"):
+                                            self.send_header('Content-type', 'text/css')
+                                        else:
+                                            self.send_header('Content-type', 'text/html')  # Default
+                                        self.end_headers()
+                                        self.wfile.write(content)
+                                        return
+                                except FileNotFoundError:
+                                    self.send_error(404, "File not found")
+                                    return
+                            self.send_error(404, "File not found")  # If reach here 404
+
+                    
+
+                    self.httpd = socketserver.TCPServer(("", port), CustomHandler)
+                    print(Fore.GREEN + f"\n🌐 Serving custom webpage from: {Fore.CYAN}{directory} at port {port}. Press CTRL+C to stop." + Fore.WHITE)
+                    self.httpd.serve_forever()
+
+                except OSError as e:
+                    print(Fore.RED + f"❌ Error starting server: {e}")
+
+            def get_primary_ip_address():
+                """Get a single IP Adress"""
+                ip_address = ""
+                try:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    sock.connect(("8.8.8.8", 80))  # Google's public DNS server
+                    ip_address = sock.getsockname()[0]
+                    sock.close()
+                except Exception as e:
+                    print(Fore.RED + f"❌ Could not get local IP address: {e}")
+                return ip_address
+            
+            def stop_server():
+                """Stop the thread."""
+                if self.httpd:
+                    print(Fore.YELLOW + "Stopping server..." + Fore.WHITE)
+                    self.httpd.shutdown()
+                    self.httpd.server_close()
+                    self.httpd = None
+
+            # start the server
+            PORT = 8000 # Change port number to avoid conflict
+
+            # construct the download url
+            ip_address = get_primary_ip_address()
+            print(Fore.GREEN + f"\nShare this link with other devices on the same network to browse and download subtitle files of {surah_info.surah_name}:" + Fore.WHITE)
+            print(Fore.YELLOW + f"   http://{ip_address}:{PORT}"+ Fore.WHITE)
+            #Directory to be accessed.
+            server_thread = threading.Thread(target=start_server, args=(surah_dir, PORT, surah_info.surah_name), daemon=True)
+            server_thread.start()
+
+            while True:
+                user_input = input(Fore.BLUE + "➡️  Type " + Fore.YELLOW + "'open'" + Fore.BLUE + " to open folder, or press " + Fore.CYAN + "Enter" + Fore.BLUE + " to return to menu: " + Fore.WHITE).strip().lower()
+                if user_input == 'open':
+                    try:
+                        if os.name == 'nt':  # Windows
+                            os.startfile(surah_dir)
+                        elif os.name == 'posix':  # macOS and Linux
+                            subprocess.run(['open', surah_dir])
+                        else:
+                            print(Fore.RED + "❌ Unsupported operating system for 'open' command.")
+                    except Exception as e:
+                        print(Fore.RED + f"❌ Error opening folder: {e}")
+                    print(Fore.YELLOW + "Press Enter to continue..." + Fore.WHITE) # Clear indication of what to do.
+                    input() #Just a clear input
+                    break
+                elif user_input == "": #Check if it is "" to proceed to the next selection
+                     stop_server()# stop it
+                     break
+                else:
+                    print(Fore.RED + "❌ Invalid Command. Press Enter or type 'open' and then press Enter")
+                    continue
+        except Exception as e:
+            print(Fore.RED + f"\n❌ An error occurred in subtitle creation: {e}")
 
 
     def generate_srt_content(self, surah_number: int, start_ayah: int, end_ayah: int, ayah_duration: float) -> str:
