@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title id="page-title">Subtitle Downloads</title>
+    <link rel="stylesheet" href="web/style.css">
+</head>
+<body>
+    <h1 id="main-title"><!--SURAH_NAME--> Subtitles</h1>
+    <ul id="file-list">
+        <!-- File links will be dynamically inserted here -->
+    </ul>
+    <script>
+        // JavaScript to dynamically add file links
+        function addFileLinks(files) {
+            const fileList = document.getElementById('file-list');
+            const mainTitle = document.getElementById('main-title');
+            const pageTitle = document.getElementById('page-title');
+
+            //This removes extra file from parts of the name
+            //Update the title elements
+            pageTitle.textContent = mainTitle.textContent;
+
+            files.forEach(file => {
+                const listItem = document.createElement('li');
+                const link = document.createElement('a');
+                link.href = file;
+                link.textContent = file;
+                listItem.appendChild(link);
+                fileList.appendChild(listItem);
+            });
+        }
+        /*FILE_LIST*/
+    </script>
+</body>
+</html>

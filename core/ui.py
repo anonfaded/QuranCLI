@@ -483,22 +483,94 @@ class UI:
                     print(Fore.RED + f"\n❌ Error saving subtitle file: {e}")
                     return  # Exit if file saving fails
 
-                def start_server(directory, port):
-                    """Starts a simple HTTP server that forces .srt files to download."""
+
+
+
+
+
+
+
+                def start_server(directory, port, surah_name):
+                    """Starts an HTTP server serving a custom HTML page with file links."""
                     try:
-                        os.chdir(directory)  # Serve from Surah's directory
+                        # Use the directory where the Surah's subtitles are saved.
+                        web_dir = os.path.join(os.path.dirname(__file__), "web")  # Path to web directory
 
-                        class ForcedDownloadHandler(http.server.SimpleHTTPRequestHandler):
-                            def end_headers(self):
-                                if self.path.endswith(".srt"):
-                                    self.send_header('Content-Disposition', 'attachment; filename="{}"'.format(os.path.basename(self.path)))
-                                super().end_headers()
+                        class CustomHandler(http.server.SimpleHTTPRequestHandler):
+                            def do_GET(self):
+                                filepath = os.path.join(directory, self.path[1:])  # Construct full file path
 
-                        with socketserver.TCPServer(("", port), ForcedDownloadHandler) as httpd:
-                            print(Fore.GREEN + f"\n🌐 Serving subtitle file from: {Fore.CYAN}{directory} at port {port}. Press CTRL+C to stop." + Fore.WHITE)
+                                # Force download for .srt files
+                                if os.path.isfile(filepath) and filepath.endswith(".srt"):
+                                    self.send_response(200)
+                                    self.send_header('Content-Type', 'application/octet-stream')  # Generic binary stream
+                                    self.send_header('Content-Disposition', f'attachment; filename="{os.path.basename(filepath)}"')
+                                    self.end_headers()
+
+                                    try:
+                                        with open(filepath, 'rb') as f:
+                                            self.wfile.write(f.read())  # Write file content to response
+                                        return
+                                    except Exception as e:
+                                        print(Fore.RED + f"❌ Error reading file: {e}")
+                                        self.send_error(500, "Error reading file")  # Internal Server Error
+                                        return
+
+                                if self.path == "/":
+                                    # Serve the custom index.html
+                                    try:
+                                        with open(os.path.join(web_dir, "index.html"), 'rb') as f:  # web_dir here
+                                            content = f.read()
+                                            files = [os.path.basename(f) for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]  # directory here - getting filename only
+
+                                            # Inject the file list and Surah name into the HTML
+                                            files_str = str(files).replace("'", '"')  # Escape quotes for JavaScript
+                                            content = content.replace(b'/*FILE_LIST*/',
+                                                                    f'const files = {files_str}; addFileLinks(files);'.encode())
+                                            content = content.replace(b'<!--SURAH_NAME-->', surah_name.encode())  # Surah Tag
+
+                                            self.send_response(200)
+                                            self.send_header('Content-type', 'text/html')
+                                            self.end_headers()
+                                            self.wfile.write(content)
+                                            return
+                                    except FileNotFoundError:
+                                        self.send_error(404, "index.html not found")
+                                        return
+
+                                elif self.path.startswith("/web/"):
+                                    # Serve static files (CSS, etc.) from the web directory
+                                    try:
+                                        filepath = os.path.join(web_dir, self.path[5:])  # Correct web directory here
+                                        with open(filepath, 'rb') as f:
+                                            content = f.read()
+                                            self.send_response(200)
+                                            if self.path.endswith(".css"):
+                                                self.send_header('Content-type', 'text/css')
+                                            else:
+                                                self.send_header('Content-type', 'text/html')  # Default
+                                            self.end_headers()
+                                            self.wfile.write(content)
+                                            return
+                                    except FileNotFoundError:
+                                        self.send_error(404, "File not found")
+                                        return
+
+                                self.send_error(404, "File not found")  # If reach here 404
+
+                        with socketserver.TCPServer(("", port), CustomHandler) as httpd:
+                            print(Fore.GREEN + f"\n🌐 Serving custom webpage from: {Fore.CYAN}{directory} at port {port}. Press CTRL+C to stop." + Fore.WHITE)
                             httpd.serve_forever()
                     except OSError as e:
                         print(Fore.RED + f"❌ Error starting server: {e}")
+
+
+
+
+
+
+
+
 
                 def get_primary_ip_address():
                     """Get a single IP Adress"""
@@ -514,14 +586,14 @@ class UI:
 
                 # start the server
                 PORT = 8000 # Change port number to avoid conflict
-                server_thread = threading.Thread(target=start_server, args=(surah_dir, PORT), daemon=True)
-                server_thread.start()
 
                 # construct the download url
                 ip_address = get_primary_ip_address()
-                print(Fore.GREEN + "\nShare this link with other devices on the same network to browse and download subtitle files:" + Fore.WHITE)
-                #Removed Url Encode
+                print(Fore.GREEN + f"\nShare this link with other devices on the same network to browse and download subtitle files of {surah_info.surah_name}:" + Fore.WHITE)
                 print(Fore.YELLOW + f"   http://{ip_address}:{PORT}"+ Fore.WHITE)
+                #Directory to be accessed.
+                server_thread = threading.Thread(target=start_server, args=(surah_dir, PORT, surah_info.surah_name), daemon=True)
+                server_thread.start()
 
                 while True:
                     user_input = input(Fore.BLUE + "➡️  Type " + Fore.YELLOW + "'open'" + Fore.BLUE + " to open folder, or press " + Fore.CYAN + "Enter" + Fore.BLUE + " to return to menu: " + Fore.WHITE).strip().lower()
