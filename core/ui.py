@@ -19,6 +19,12 @@ import requests # Add Requests
 from core.github_updater import GithubUpdater  # Import GithubUpdater
 from core.version import VERSION  # Import VERSION
 
+import socket #For Ip Adresses
+import threading #Add threading for server
+import http.server
+import socketserver
+import urllib.parse #for URL Encoding.
+
 class UI:
     def __init__(self, audio_manager: AudioManager, term_size, data_handler, github_updater: Optional[GithubUpdater] = None, preferences: dict = None):
         self.audio_manager = audio_manager
@@ -463,6 +469,9 @@ class UI:
                 date_str = now.strftime("%Y-%m-%d")
                 filename = f"Surah{surah_number:03d}_Ayah{start_ayah:03d}-Ayah{end_ayah:03d}_{date_str}.srt"
                 filepath = os.path.join(surah_dir, filename)
+                
+                #Get filename only for url
+                url_filename = filename
 
                 try:
                     with open(filepath, "w", encoding="utf-8") as f:
@@ -472,6 +481,47 @@ class UI:
 
                 except Exception as e:
                     print(Fore.RED + f"\n❌ Error saving subtitle file: {e}")
+                    return  # Exit if file saving fails
+
+                def start_server(directory, port):
+                    """Starts a simple HTTP server that forces .srt files to download."""
+                    try:
+                        os.chdir(directory)  # Serve from Surah's directory
+
+                        class ForcedDownloadHandler(http.server.SimpleHTTPRequestHandler):
+                            def end_headers(self):
+                                if self.path.endswith(".srt"):
+                                    self.send_header('Content-Disposition', 'attachment; filename="{}"'.format(os.path.basename(self.path)))
+                                super().end_headers()
+
+                        with socketserver.TCPServer(("", port), ForcedDownloadHandler) as httpd:
+                            print(Fore.GREEN + f"\n🌐 Serving subtitle file from: {Fore.CYAN}{directory} at port {port}. Press CTRL+C to stop." + Fore.WHITE)
+                            httpd.serve_forever()
+                    except OSError as e:
+                        print(Fore.RED + f"❌ Error starting server: {e}")
+
+                def get_primary_ip_address():
+                    """Get a single IP Adress"""
+                    ip_address = ""
+                    try:
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        sock.connect(("8.8.8.8", 80))  # Google's public DNS server
+                        ip_address = sock.getsockname()[0]
+                        sock.close()
+                    except Exception as e:
+                        print(Fore.RED + f"❌ Could not get local IP address: {e}")
+                    return ip_address
+
+                # start the server
+                PORT = 8000 # Change port number to avoid conflict
+                server_thread = threading.Thread(target=start_server, args=(surah_dir, PORT), daemon=True)
+                server_thread.start()
+
+                # construct the download url
+                ip_address = get_primary_ip_address()
+                print(Fore.GREEN + "\nShare this link with other devices on the same network to browse and download subtitle files:" + Fore.WHITE)
+                #Removed Url Encode
+                print(Fore.YELLOW + f"   http://{ip_address}:{PORT}"+ Fore.WHITE)
 
                 while True:
                     user_input = input(Fore.BLUE + "➡️  Type " + Fore.YELLOW + "'open'" + Fore.BLUE + " to open folder, or press " + Fore.CYAN + "Enter" + Fore.BLUE + " to return to menu: " + Fore.WHITE).strip().lower()
