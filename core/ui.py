@@ -429,6 +429,15 @@ class UI:
             
             
 
+
+
+
+
+
+
+
+
+ # core/ui.py
     def display_subtitle_menu(self, surah_info: SurahInfo):
         """Handles the subtitle creation process."""
         try:
@@ -437,6 +446,7 @@ class UI:
 
             while True:
                 try:
+                    self.clear_terminal()  # Clear Terminal
                     print(Fore.RED + "\n┌─" + Fore.RED + Style.BRIGHT + f" Subtitle Creation - Surah {surah_info.surah_name} (1-{total_ayah} Ayahs)")
                     print(Fore.RED + "├──╼ " + Fore.GREEN + "Start Ayah" + ":\n", end="")
                     start_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
@@ -452,7 +462,7 @@ class UI:
                     print(Fore.RED + "└──╼ " + "Invalid input. Please enter integers.")
                 except KeyboardInterrupt:
                     print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
-                    return #Return to main menu
+                    return  # Return to main menu
 
             # Generate SRT content
             srt_content = self.generate_srt_content(surah_number, start_ayah, end_ayah, ayah_duration)
@@ -475,12 +485,50 @@ class UI:
                 with open(filepath, "w", encoding="utf-8") as f:
                     f.write(srt_content)
 
-                print(Fore.GREEN + f"\n✅ Subtitle file saved to: {Fore.RED}{filepath}") #Red color.
+                print(Fore.GREEN + f"\n✅ Subtitle file saved to: {Fore.RED}{filepath}")  # Red color.
 
             except Exception as e:
                 print(Fore.RED + f"\n❌ Error saving subtitle file: {e}")
                 return  # Exit if file saving fails
 
+            # Server Information
+            PORT = 8000  # Change port number to avoid conflict
+            ip_address = self.get_primary_ip_address()
+
+            # Start the server here:
+            self.start_server_thread(surah_dir, PORT, surah_info.surah_name)  # Starting server
+
+            while True:
+                self.clear_terminal() #Clear Screen
+                print(Fore.GREEN + "Subtitle Management Console:")#Headin
+                print(Fore.GREEN + f"\nShare this link with other devices on the same network to browse and download subtitle files of {surah_info.surah_name}:" + Fore.WHITE)
+                print(Fore.YELLOW + f"   http://{ip_address}:{PORT}" + Fore.WHITE) #The Link
+                print(Fore.RED + "\nAvailable Commands:")#Command List
+                print(Fore.CYAN + "  open" + Fore.WHITE + ": Open subtitle folder")
+                print(Fore.CYAN + "  back" + Fore.WHITE + ": Return to Surah Selection")
+                user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+
+                if user_input == 'open':
+                    try:
+                        if os.name == 'nt':  # Windows
+                            os.startfile(surah_dir)
+                        elif os.name == 'posix':  # macOS and Linux
+                            subprocess.run(['open', surah_dir])
+                        else:
+                            print(Fore.RED + "❌ Unsupported operating system for 'open' command.")
+                    except Exception as e:
+                        print(Fore.RED + f"❌ Error opening folder: {e}")
+                elif user_input == 'back':
+                    self.stop_server()
+                    break
+                else:
+                    print(Fore.RED + "❌ Invalid Command.")
+        except Exception as e:
+            print(Fore.RED + f"\n❌ An error occurred in subtitle creation: {e}")
+
+    def start_server_thread(self, directory, port, surah_name):
+        """Start the server in a separate thread."""
+        try:
             def start_server(directory, port, surah_name):
                 """Starts an HTTP server serving a custom HTML page with file links."""
                 try:
@@ -547,69 +595,58 @@ class UI:
                                     return
                             self.send_error(404, "File not found")  # If reach here 404
 
-                    
-
+                    # Explicitly set SO_REUSEADDR option
                     self.httpd = socketserver.TCPServer(("", port), CustomHandler)
+                    self.httpd.allow_reuse_address = True  # Allow address reuse
                     print(Fore.GREEN + f"\n🌐 Serving custom webpage from: {Fore.CYAN}{directory} at port {port}. Press CTRL+C to stop." + Fore.WHITE)
                     self.httpd.serve_forever()
 
                 except OSError as e:
                     print(Fore.RED + f"❌ Error starting server: {e}")
 
-            def get_primary_ip_address():
-                """Get a single IP Adress"""
-                ip_address = ""
-                try:
-                    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    sock.connect(("8.8.8.8", 80))  # Google's public DNS server
-                    ip_address = sock.getsockname()[0]
-                    sock.close()
-                except Exception as e:
-                    print(Fore.RED + f"❌ Could not get local IP address: {e}")
-                return ip_address
-            
-            def stop_server():
-                """Stop the thread."""
-                if self.httpd:
-                    print(Fore.YELLOW + "Stopping server..." + Fore.WHITE)
-                    self.httpd.shutdown()
-                    self.httpd.server_close()
-                    self.httpd = None
-
-            # start the server
-            PORT = 8000 # Change port number to avoid conflict
-
             # construct the download url
-            ip_address = get_primary_ip_address()
-            print(Fore.GREEN + f"\nShare this link with other devices on the same network to browse and download subtitle files of {surah_info.surah_name}:" + Fore.WHITE)
-            print(Fore.YELLOW + f"   http://{ip_address}:{PORT}"+ Fore.WHITE)
+            ip_address = self.get_primary_ip_address()
+            print(Fore.GREEN + f"\nShare this link with other devices on the same network to browse and download subtitle files of {surah_name}:" + Fore.WHITE)
+            print(Fore.YELLOW + f"   http://{ip_address}:{port}"+ Fore.WHITE)
             #Directory to be accessed.
-            server_thread = threading.Thread(target=start_server, args=(surah_dir, PORT, surah_info.surah_name), daemon=True)
-            server_thread.start()
-
-            while True:
-                user_input = input(Fore.BLUE + "➡️  Type " + Fore.YELLOW + "'open'" + Fore.BLUE + " to open folder, or press " + Fore.CYAN + "Enter" + Fore.BLUE + " to return to menu: " + Fore.WHITE).strip().lower()
-                if user_input == 'open':
-                    try:
-                        if os.name == 'nt':  # Windows
-                            os.startfile(surah_dir)
-                        elif os.name == 'posix':  # macOS and Linux
-                            subprocess.run(['open', surah_dir])
-                        else:
-                            print(Fore.RED + "❌ Unsupported operating system for 'open' command.")
-                    except Exception as e:
-                        print(Fore.RED + f"❌ Error opening folder: {e}")
-                    print(Fore.YELLOW + "Press Enter to continue..." + Fore.WHITE) # Clear indication of what to do.
-                    input() #Just a clear input
-                    break
-                elif user_input == "": #Check if it is "" to proceed to the next selection
-                     stop_server()# stop it
-                     break
-                else:
-                    print(Fore.RED + "❌ Invalid Command. Press Enter or type 'open' and then press Enter")
-                    continue
+            # Ensure the server thread is correctly managed
+            self.server_thread = threading.Thread(target=start_server, args=(directory, port, surah_name), daemon=True)
+            self.server_thread.start()
         except Exception as e:
-            print(Fore.RED + f"\n❌ An error occurred in subtitle creation: {e}")
+            print(Fore.RED + f"Error starting server thread: {e}")
+
+    def get_primary_ip_address(self):
+        """Get a single IP Address"""
+        ip_address = ""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.connect(("8.8.8.8", 80))  # Google's public DNS server
+            ip_address = sock.getsockname()[0]
+            sock.close()
+        except Exception as e:
+            print(Fore.RED + f"❌ Could not get local IP address: {e}")
+        return ip_address
+
+    def stop_server(self):
+        """Stop the server thread."""
+        if self.httpd:
+            print(Fore.YELLOW + "Stopping server..." + Fore.WHITE)
+            self.httpd.shutdown()  # Properly stop the server
+            self.httpd.server_close()  # Properly close it
+            self.httpd = None  # Reset the server instance
+        if self.server_thread and self.server_thread.is_alive():
+            self.server_thread.join(timeout=2)  # Wait for the server thread to finish
+
+
+
+
+
+
+
+
+
+
+
 
 
     def generate_srt_content(self, surah_number: int, start_ayah: int, end_ayah: int, ayah_duration: float) -> str:
