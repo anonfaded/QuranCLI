@@ -559,7 +559,7 @@ class UI:
                                     with open(os.path.join(web_dir, "index.html"), 'rb') as f:  # web_dir here
                                         content = f.read()
                                         files = [os.path.basename(f) for f in os.listdir(directory) if
-                                                 os.path.isfile(os.path.join(directory, f))]  # directory here - getting filename only
+                                                os.path.isfile(os.path.join(directory, f))]  # directory here - getting filename only
 
                                         # Inject the file list and Surah name into the HTML
                                         files_str = str(files).replace("'", '"')  # Escape quotes for JavaScript
@@ -594,11 +594,16 @@ class UI:
                                     self.send_error(404, "File not found")
                                     return
                             self.send_error(404, "File not found")  # If reach here 404
+                        
+                        # Override the log_message method to suppress logs
+                        def log_message(self, format, *args):
+                            # This method is intentionally empty to suppress log messages
+                            pass
 
                     # Explicitly set SO_REUSEADDR option
                     self.httpd = socketserver.TCPServer(("", port), CustomHandler)
                     self.httpd.allow_reuse_address = True  # Allow address reuse
-                    print(Fore.GREEN + f"\n🌐 Serving custom webpage from: {Fore.CYAN}{directory} at port {port}. Press CTRL+C to stop." + Fore.WHITE)
+                    # print(Fore.GREEN + f"\n🌐 Serving custom webpage from: {Fore.CYAN}{directory} at port {port}. Press CTRL+C to stop." + Fore.WHITE)
                     self.httpd.serve_forever()
 
                 except OSError as e:
