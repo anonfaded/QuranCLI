@@ -233,7 +233,11 @@ class QuranApp:
 
                 # Prompt user for input
                 print(Fore.GREEN + "\nEnter command:" + Style.DIM + Fore.WHITE )
-                user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+                try:
+                    user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+                except KeyboardInterrupt:
+                    print(Fore.YELLOW + "\n\n⚠️  No way out yet, you can't escape now. Try again.")
+                    continue  # Restart the loop instead of exiting
 
                 if user_input in ['quit', 'exit']:
                     print(Fore.RED + "\n✨ Thank you for using " + Fore.WHITE + "QuranCLI" + Fore.RED + "!")

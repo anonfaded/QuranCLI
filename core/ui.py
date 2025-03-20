@@ -15,7 +15,6 @@ from typing import List, Optional
 from colorama import Fore, Style
 from core.models import Ayah, SurahInfo
 from core.audio_manager import AudioManager
-import requests # Add Requests
 from core.github_updater import GithubUpdater  # Import GithubUpdater
 from core.version import VERSION  # Import VERSION
 
@@ -23,7 +22,6 @@ import socket #For Ip Adresses
 import threading #Add threading for server
 import http.server
 import socketserver
-import urllib.parse #for URL Encoding.
 
 class UI:
     def __init__(self, audio_manager: AudioManager, term_size, data_handler, github_updater: Optional[GithubUpdater] = None, preferences: dict = None):
@@ -506,7 +504,11 @@ class UI:
                 print(Fore.RED + "\nAvailable Commands:")#Command List
                 print(Fore.CYAN + "  open" + Fore.WHITE + ": Open subtitle folder")
                 print(Fore.CYAN + "  back" + Fore.WHITE + ": Return to Surah Selection")
-                user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+                try:
+                    user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+                except KeyboardInterrupt:
+                    print(Fore.YELLOW + "\n\n⚠️  Press 'back' and hit Enter to return to the main menu safely.")
+                    continue  # Restart the loop instead of exiting
 
                 if user_input == 'open':
                     try:
@@ -518,9 +520,11 @@ class UI:
                             print(Fore.RED + "❌ Unsupported operating system for 'open' command.")
                     except Exception as e:
                         print(Fore.RED + f"❌ Error opening folder: {e}")
+
                 elif user_input == 'back':
                     self.stop_server()
                     break
+
                 else:
                     print(Fore.RED + "❌ Invalid Command.")
         except Exception as e:
