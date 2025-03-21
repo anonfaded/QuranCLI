@@ -117,33 +117,20 @@
             // File data storage for sorting
             let fileData = [];
             
-            // Surah names mapping
-            const surahNames = {
-                1: "Al-Fatihah",
-                2: "Al-Baqarah",
-                3: "Aal-Imran",
-                4: "An-Nisa",
-                5: "Al-Ma'idah",
-                6: "Al-An'am",
-                7: "Al-A'raf",
-                8: "Al-Anfal",
-                9: "At-Tawbah",
-                10: "Yunus",
-                // Add all 114 surahs here
-                // This is a partial list for example
-                114: "An-Nas"
-            };
-            
             // Check if files exist
             if (files && files.length) {
                 files.forEach((file) => {
                     // Parse file information from the filename
-                    // Example pattern: Surah001_Ayah001-Ayah002_2025-03-19.srt
                     const fileInfo = parseFileName(file);
+                    
+                    // Get the dynamic surah name from the page
+                    const surahTitle = document.querySelector('#main-title').textContent;
+                    const surahName = surahTitle.replace(' Subtitles', '').trim();
+                    
                     fileData.push({
                         fileName: file,
                         surahNum: fileInfo.surahNum,
-                        surahName: surahNames[fileInfo.surahNum] || `Surah ${fileInfo.surahNum}`,
+                        surahName: surahName, // Use the dynamic surah name
                         startAyah: fileInfo.startAyah,
                         endAyah: fileInfo.endAyah,
                         date: fileInfo.date
