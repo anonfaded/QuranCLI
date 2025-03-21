@@ -1,34 +1,125 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">Subtitle Downloads</title>
     <link rel="stylesheet" href="web/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <h1 id="main-title"><!--SURAH_NAME--> Subtitles</h1>
-    <ul id="file-list">
-        <!-- File links will be dynamically inserted here -->
-    </ul>
+    <header>
+        <div class="container">
+            <h1 id="main-title"><!--SURAH_NAME--> Subtitles</h1>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="search-container">
+            <input type="text" id="search-input" class="search-input" placeholder="Search subtitles...">
+            <i class="fas fa-search search-icon"></i>
+        </div>
+        
+        <div class="loader" id="loader"></div>
+        
+        <div class="empty-state" id="empty-state">
+            <div class="empty-state-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="empty-state-text">No subtitle files found</div>
+        </div>
+        
+        <div class="no-results" id="no-results">No matching results found</div>
+        
+        <ul id="file-list">
+            <!-- File links will be dynamically inserted here -->
+        </ul>
+    </div>
+    
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                Made with ❤️ by Faded in 🇵🇰
+            </div>
+        </div>
+    </footer>
+    
     <script>
         // JavaScript to dynamically add file links
         function addFileLinks(files) {
             const fileList = document.getElementById('file-list');
             const mainTitle = document.getElementById('main-title');
             const pageTitle = document.getElementById('page-title');
-
-            //This removes extra file from parts of the name
-            //Update the title elements
+            const loader = document.getElementById('loader');
+            const emptyState = document.getElementById('empty-state');
+            
+            // Update the title elements
             pageTitle.textContent = mainTitle.textContent;
-
-            files.forEach(file => {
-                const listItem = document.createElement('li');
-                const link = document.createElement('a');
-                link.href = file;
-                link.textContent = file;
-                listItem.appendChild(link);
-                fileList.appendChild(listItem);
+            
+            // Show loader
+            loader.style.display = 'block';
+            
+            // Check if files exist
+            if (files && files.length) {
+                files.forEach((file, index) => {
+                    const listItem = document.createElement('li');
+                    listItem.style.animationDelay = `${0.1 + (index * 0.05)}s`;
+                    
+                    const link = document.createElement('a');
+                    link.href = file;
+                    
+                    const downloadIcon = document.createElement('span');
+                    downloadIcon.className = 'download-indicator';
+                    downloadIcon.innerHTML = '<i class="fas fa-download"></i>';
+                    
+                    const fileNameSpan = document.createElement('span');
+                    fileNameSpan.textContent = file;
+                    
+                    link.appendChild(downloadIcon);
+                    link.appendChild(fileNameSpan);
+                    listItem.appendChild(link);
+                    fileList.appendChild(listItem);
+                });
+            } else {
+                emptyState.style.display = 'block';
+            }
+            
+            // Hide loader
+            loader.style.display = 'none';
+            
+            // Setup search functionality
+            setupSearch();
+        }
+        
+        function setupSearch() {
+            const searchInput = document.getElementById('search-input');
+            const fileItems = document.querySelectorAll('#file-list li');
+            const noResults = document.getElementById('no-results');
+            
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                let resultsFound = false;
+                
+                fileItems.forEach(item => {
+                    const fileName = item.textContent.toLowerCase();
+                    if (fileName.includes(searchTerm)) {
+                        item.style.display = 'block';
+                        resultsFound = true;
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+                
+                noResults.style.display = resultsFound ? 'none' : 'block';
             });
         }
+        
+        // Simple animation on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add a subtle entrance animation
+            document.body.classList.add('loaded');
+        });
+        
         /*FILE_LIST*/
     </script>
 </body>
