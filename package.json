@@ -1,0 +1,10 @@
+{
+  "name": "quran-cli",
+  "version": "1.0.0",
+  "scripts": {
+    "build:css": "tailwindcss -i ./core/web/src/input.css -o ./core/web/style.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.3.3"
+  }
+}

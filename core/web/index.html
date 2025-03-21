@@ -6,40 +6,95 @@
     <title id="page-title">Subtitle Downloads</title>
     <link rel="stylesheet" href="web/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap">
+    <style>
+        body {
+            font-family: 'Ubuntu', sans-serif;
+        }
+        
+        .dock-footer {
+            border-radius: 12px;
+            background: rgba(14, 14, 14, 0.95);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+            margin: 0 auto 20px;
+            max-width: 500px;
+            padding: 12px 24px;
+            transform: translateY(0);
+            transition: transform 0.3s ease;
+        }
+        
+        .terminal-icon {
+            color: #e63946;
+            margin-right: 8px;
+        }
+        
+        .header-gradient::before {
+            background: #e63946;
+            height: 3px;
+        }
+        
+        .file-card::before {
+            background: linear-gradient(to bottom right, #800000, #000000);
+        }
+        
+        .file-card:hover .download-icon {
+            color: #ffffff;
+        }
+        
+        .search-helper {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+            text-align: center;
+        }
+    </style>
 </head>
-<body>
-    <header>
-        <div class="container">
-            <h1 id="main-title"><!--SURAH_NAME--> Subtitles</h1>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen flex flex-col">
+    <header class="bg-gray-950 py-5 shadow-md header-gradient">
+        <div class="container-custom">
+            <h1 id="main-title" class="text-3xl font-bold text-center title-underline left-1/2 -translate-x-1/2">
+                <span class="terminal-icon"><i class="fas fa-terminal"></i></span><!--SURAH_NAME--> Subtitles
+            </h1>
         </div>
     </header>
     
-    <div class="container">
-        <div class="search-container">
-            <input type="text" id="search-input" class="search-input" placeholder="Search subtitles...">
-            <i class="fas fa-search search-icon"></i>
+    <div class="container-custom flex-1">
+        <div class="max-w-xl mx-auto relative my-5">
+            <input type="text" id="search-input" class="search-box" placeholder="Search subtitles...">
+            <i class="fas fa-search absolute right-4 top-1/2 -translate-y-1/2 text-red-500"></i>
+            <div class="search-helper">Try searching by "ayah 1", "march 2025", etc.</div>
         </div>
         
-        <div class="loader" id="loader"></div>
+        <div class="flex justify-center gap-2 flex-wrap my-5 md:gap-3">
+            <button class="sort-btn sort-btn-active" data-sort="ayah">
+                <i class="fas fa-sort-up"></i> Ayah
+            </button>
+            <button class="sort-btn" data-sort="date">
+                <i class="fas fa-sort-up"></i> Date
+            </button>
+        </div>
         
-        <div class="empty-state" id="empty-state">
-            <div class="empty-state-icon">
+        <div id="loader" class="loader"></div>
+        
+        <div id="empty-state" class="empty-state">
+            <div class="text-4xl text-red-500 mb-4">
                 <i class="fas fa-file-alt"></i>
             </div>
-            <div class="empty-state-text">No subtitle files found</div>
+            <div class="text-xl text-gray-400">No subtitle files found</div>
         </div>
         
-        <div class="no-results" id="no-results">No matching results found</div>
+        <div id="no-results" class="no-results">No matching results found</div>
         
-        <ul id="file-list">
+        <ul id="file-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 my-6">
             <!-- File links will be dynamically inserted here -->
         </ul>
     </div>
     
-    <footer>
-        <div class="container">
-            <div class="footer-content">
-                Made with ❤️ by Faded in 🇵🇰
+    <footer class="bg-gray-950 py-4 mt-auto">
+        <div class="container-custom">
+            <div class="text-center text-gray-400 hover:text-gray-300 dock-footer">
+                Made with ❤️ by <a href="https://github.com/anonfaded" class="footer-link">Faded</a> in 🇵🇰
             </div>
         </div>
     </footer>
@@ -59,27 +114,47 @@
             // Show loader
             loader.style.display = 'block';
             
+            // File data storage for sorting
+            let fileData = [];
+            
+            // Surah names mapping
+            const surahNames = {
+                1: "Al-Fatihah",
+                2: "Al-Baqarah",
+                3: "Aal-Imran",
+                4: "An-Nisa",
+                5: "Al-Ma'idah",
+                6: "Al-An'am",
+                7: "Al-A'raf",
+                8: "Al-Anfal",
+                9: "At-Tawbah",
+                10: "Yunus",
+                // Add all 114 surahs here
+                // This is a partial list for example
+                114: "An-Nas"
+            };
+            
             // Check if files exist
             if (files && files.length) {
-                files.forEach((file, index) => {
-                    const listItem = document.createElement('li');
-                    listItem.style.animationDelay = `${0.1 + (index * 0.05)}s`;
-                    
-                    const link = document.createElement('a');
-                    link.href = file;
-                    
-                    const downloadIcon = document.createElement('span');
-                    downloadIcon.className = 'download-indicator';
-                    downloadIcon.innerHTML = '<i class="fas fa-download"></i>';
-                    
-                    const fileNameSpan = document.createElement('span');
-                    fileNameSpan.textContent = file;
-                    
-                    link.appendChild(downloadIcon);
-                    link.appendChild(fileNameSpan);
-                    listItem.appendChild(link);
-                    fileList.appendChild(listItem);
+                files.forEach((file) => {
+                    // Parse file information from the filename
+                    // Example pattern: Surah001_Ayah001-Ayah002_2025-03-19.srt
+                    const fileInfo = parseFileName(file);
+                    fileData.push({
+                        fileName: file,
+                        surahNum: fileInfo.surahNum,
+                        surahName: surahNames[fileInfo.surahNum] || `Surah ${fileInfo.surahNum}`,
+                        startAyah: fileInfo.startAyah,
+                        endAyah: fileInfo.endAyah,
+                        date: fileInfo.date
+                    });
                 });
+                
+                // Sort by ayah number initially
+                fileData.sort((a, b) => a.startAyah - b.startAyah);
+                
+                // Render files
+                renderFiles(fileData);
             } else {
                 emptyState.style.display = 'block';
             }
@@ -88,37 +163,304 @@
             loader.style.display = 'none';
             
             // Setup search functionality
-            setupSearch();
+            setupSearch(fileData);
+            
+            // Setup sorting functionality
+            setupSorting(fileData);
         }
         
-        function setupSearch() {
+        function parseFileName(fileName) {
+            // Example pattern: Surah001_Ayah001-Ayah002_2025-03-19.srt
+            const fileNameWithoutExt = fileName.replace('.srt', '');
+            const parts = fileNameWithoutExt.split('_');
+            
+            let surahNum = 0;
+            let startAyah = 0;
+            let endAyah = 0;
+            let date = '';
+            
+            if (parts.length >= 1) {
+                // Extract Surah number
+                const surahPart = parts[0];
+                surahNum = parseInt(surahPart.replace('Surah', '')) || 0;
+            }
+            
+            if (parts.length >= 2) {
+                // Extract Ayah range
+                const ayahPart = parts[1];
+                const ayahRange = ayahPart.split('-');
+                startAyah = parseInt(ayahRange[0].replace('Ayah', '')) || 0;
+                endAyah = ayahRange.length > 1 ? parseInt(ayahRange[1].replace('Ayah', '')) || 0 : startAyah;
+            }
+            
+            if (parts.length >= 3) {
+                // Extract date
+                date = parts[2];
+            }
+            
+            return {
+                surahNum,
+                startAyah,
+                endAyah,
+                date
+            };
+        }
+        
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            
+            // Format: 2025-03-19 to Mar 19, 2025
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                });
+            } catch (e) {
+                return dateStr;
+            }
+        }
+        
+        function getDateRelative(dateStr) {
+            if (!dateStr) return '';
+            
+            try {
+                const date = new Date(dateStr);
+                const now = new Date();
+                
+                // Reset time part for date comparison
+                const dateWithoutTime = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                const nowWithoutTime = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                
+                const diffTime = Math.abs(nowWithoutTime - dateWithoutTime);
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                
+                if (diffDays === 0) {
+                    return 'Today';
+                } else if (diffDays === 1) {
+                    return 'Yesterday';
+                } else if (diffDays < 7) {
+                    return `${diffDays} days ago`;
+                } else if (diffDays < 30) {
+                    const weeks = Math.floor(diffDays / 7);
+                    return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+                } else if (diffDays < 365) {
+                    const months = Math.floor(diffDays / 30);
+                    return months === 1 ? '1 month ago' : `${months} months ago`;
+                } else {
+                    const years = Math.floor(diffDays / 365);
+                    return years === 1 ? '1 year ago' : `${years} years ago`;
+                }
+            } catch (e) {
+                return '';
+            }
+        }
+        
+        function renderFiles(fileData) {
+            const fileList = document.getElementById('file-list');
+            
+            // Clear existing files
+            fileList.innerHTML = '';
+            
+            fileData.forEach((file, index) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'transform opacity-0 transition-all duration-500';
+                listItem.style.animationDelay = `${0.1 + (index * 0.05)}s`;
+                
+                // Use setTimeout to create staggered animation effect
+                setTimeout(() => {
+                    listItem.classList.remove('opacity-0');
+                    listItem.classList.add('opacity-100', 'translate-y-0');
+                }, 50 * index);
+                
+                const link = document.createElement('a');
+                link.href = file.fileName;
+                link.className = 'file-card';
+                
+                const fileInfoDiv = document.createElement('div');
+                fileInfoDiv.className = 'flex flex-col';
+                
+                // Download icon
+                const downloadIcon = document.createElement('span');
+                downloadIcon.className = 'download-icon';
+                downloadIcon.innerHTML = '<i class="fas fa-download"></i>';
+                
+                // Title - Surah name
+                const titleSpan = document.createElement('span');
+                titleSpan.className = 'font-semibold mb-1 text-white';
+                titleSpan.textContent = file.surahName;
+                
+                // Meta information container
+                const metaSpan = document.createElement('div');
+                metaSpan.className = 'flex flex-wrap items-center gap-3 mt-1';
+                
+                // Ayah range
+                const ayahSpan = document.createElement('span');
+                ayahSpan.className = 'meta-tag';
+                ayahSpan.innerHTML = `<i class="fas fa-bookmark"></i> Ayah ${file.startAyah}${file.endAyah > file.startAyah ? `-${file.endAyah}` : ''}`;
+                
+                // Date
+                const dateSpan = document.createElement('span');
+                dateSpan.className = 'meta-tag';
+                dateSpan.innerHTML = `<i class="fas fa-calendar-alt"></i> ${formatDate(file.date)}`;
+                
+                // Time ago tag
+                const timeAgoSpan = document.createElement('span');
+                timeAgoSpan.className = 'time-ago-tag';
+                timeAgoSpan.textContent = getDateRelative(file.date);
+                
+                // Add components to meta container
+                metaSpan.appendChild(ayahSpan);
+                metaSpan.appendChild(dateSpan);
+                
+                // Add elements to file info div
+                const titleContainer = document.createElement('div');
+                titleContainer.className = 'flex items-center justify-between';
+                titleContainer.appendChild(titleSpan);
+                titleContainer.appendChild(downloadIcon);
+                
+                fileInfoDiv.appendChild(titleContainer);
+                fileInfoDiv.appendChild(metaSpan);
+                fileInfoDiv.appendChild(document.createElement('div')).className = 'mt-2';
+                fileInfoDiv.lastChild.appendChild(timeAgoSpan);
+                
+                link.appendChild(fileInfoDiv);
+                listItem.appendChild(link);
+                fileList.appendChild(listItem);
+            });
+        }
+        
+        function setupSearch(fileData) {
             const searchInput = document.getElementById('search-input');
-            const fileItems = document.querySelectorAll('#file-list li');
             const noResults = document.getElementById('no-results');
             
             searchInput.addEventListener('input', function() {
                 const searchTerm = this.value.toLowerCase();
-                let resultsFound = false;
                 
-                fileItems.forEach(item => {
-                    const fileName = item.textContent.toLowerCase();
-                    if (fileName.includes(searchTerm)) {
-                        item.style.display = 'block';
-                        resultsFound = true;
-                    } else {
-                        item.style.display = 'none';
+                // Filter file data based on search term with enhanced search
+                const filteredData = fileData.filter(file => {
+                    // Basic matching
+                    const surahStr = file.surahName.toLowerCase();
+                    const surahNumStr = `surah ${file.surahNum.toString().padStart(3, '0')}`.toLowerCase();
+                    const ayahStr = `ayah ${file.startAyah}${file.endAyah > file.startAyah ? `-${file.endAyah}` : ''}`.toLowerCase();
+                    const dateStr = formatDate(file.date).toLowerCase();
+                    
+                    // Direct matches
+                    if (file.fileName.toLowerCase().includes(searchTerm) ||
+                        surahStr.includes(searchTerm) ||
+                        surahNumStr.includes(searchTerm) ||
+                        ayahStr.includes(searchTerm) ||
+                        dateStr.includes(searchTerm)) {
+                        return true;
                     }
+                    
+                    // More human-friendly search patterns
+                    // Match "ayah 1" to "ayah001"
+                    if (searchTerm.includes('ayah')) {
+                        const ayahNumber = searchTerm.match(/ayah\s+(\d+)/i);
+                        if (ayahNumber && ayahNumber[1]) {
+                            const num = parseInt(ayahNumber[1]);
+                            return file.startAyah <= num && (file.endAyah >= num || file.startAyah === num);
+                        }
+                    }
+                    
+                    // Match month names
+                    const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+                    const monthAbbr = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+                    
+                    for (let i = 0; i < months.length; i++) {
+                        if (searchTerm.includes(months[i]) || searchTerm.includes(monthAbbr[i])) {
+                            const monthNum = i + 1;
+                            const dateMonth = new Date(file.date).getMonth() + 1;
+                            return monthNum === dateMonth;
+                        }
+                    }
+                    
+                    // Match years
+                    const yearMatch = searchTerm.match(/\b(20\d{2})\b/);
+                    if (yearMatch && yearMatch[1]) {
+                        const yearStr = yearMatch[1];
+                        return file.date.includes(yearStr);
+                    }
+                    
+                    return false;
                 });
                 
-                noResults.style.display = resultsFound ? 'none' : 'block';
+                // Show no results message if needed
+                noResults.style.display = filteredData.length === 0 ? 'block' : 'none';
+                
+                // Render filtered files
+                renderFiles(filteredData);
             });
         }
         
-        // Simple animation on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            // Add a subtle entrance animation
-            document.body.classList.add('loaded');
-        });
+        function setupSorting(fileData) {
+            const sortButtons = document.querySelectorAll('.sort-btn');
+            let currentSort = 'ayah';
+            let isDescending = false;
+            
+            sortButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const sortBy = this.getAttribute('data-sort');
+                    
+                    // If clicking the same button, toggle direction
+                    if (currentSort === sortBy) {
+                        isDescending = !isDescending;
+                    } else {
+                        // New sort criteria
+                        currentSort = sortBy;
+                        isDescending = false;
+                    }
+                    
+                    // Remove active class from all buttons
+                    sortButtons.forEach(btn => {
+                        btn.classList.remove('sort-btn-active');
+                        btn.querySelector('i').className = 'fas fa-sort';
+                    });
+                    
+                    // Add active class to clicked button
+                    this.classList.add('sort-btn-active');
+                    
+                    // Update sort icon
+                    const icon = this.querySelector('i');
+                    icon.className = isDescending ? 'fas fa-sort-down' : 'fas fa-sort-up';
+                    
+                    // Sort file data
+                    sortFiles(fileData, sortBy, isDescending);
+                    
+                    // Render sorted files
+                    renderFiles(fileData);
+                });
+            });
+        }
+        
+        function sortFiles(fileData, sortBy, isDescending) {
+            fileData.sort((a, b) => {
+                let valueA, valueB;
+                
+                switch (sortBy) {
+                    case 'ayah':
+                        valueA = a.startAyah;
+                        valueB = b.startAyah;
+                        break;
+                    case 'date':
+                        valueA = new Date(a.date || '1970-01-01').getTime();
+                        valueB = new Date(b.date || '1970-01-01').getTime();
+                        break;
+                    default:
+                        valueA = a.startAyah;
+                        valueB = b.startAyah;
+                }
+                
+                // Compare values
+                if (isDescending) {
+                    return valueB - valueA;
+                } else {
+                    return valueA - valueB;
+                }
+            });
+        }
         
         /*FILE_LIST*/
     </script>

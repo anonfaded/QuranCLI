@@ -10,3 +10,4 @@ repomix-output.md
 .repomix/bundles.json
 repomix.config.json
 /core/preferences.json
+node_modules/
