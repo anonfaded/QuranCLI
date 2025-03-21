@@ -67,11 +67,11 @@
         </div>
         
         <div class="flex justify-center gap-2 flex-wrap my-5 md:gap-3">
-            <button class="sort-btn sort-btn-active" data-sort="ayah">
-                <i class="fas fa-sort-up"></i> Ayah
+            <button class="sort-btn" data-sort="ayah">
+                <i class="fas fa-sort"></i> Ayah
             </button>
-            <button class="sort-btn" data-sort="date">
-                <i class="fas fa-sort-up"></i> Date
+            <button class="sort-btn sort-btn-active" data-sort="date">
+                <i class="fas fa-sort-down"></i> Date
             </button>
         </div>
         
@@ -137,8 +137,12 @@
                     });
                 });
                 
-                // Sort by ayah number initially
-                fileData.sort((a, b) => a.startAyah - b.startAyah);
+                // Sort by date initially (newest first)
+                fileData.sort((a, b) => {
+                    const dateA = new Date(a.date || '1970-01-01').getTime();
+                    const dateB = new Date(b.date || '1970-01-01').getTime();
+                    return dateB - dateA; // Descending order
+                });
                 
                 // Render files
                 renderFiles(fileData);
@@ -384,8 +388,8 @@
         
         function setupSorting(fileData) {
             const sortButtons = document.querySelectorAll('.sort-btn');
-            let currentSort = 'ayah';
-            let isDescending = false;
+            let currentSort = 'date'; // Change default sort
+            let isDescending = true;  // Set to true for newest first
             
             sortButtons.forEach(button => {
                 button.addEventListener('click', function() {
