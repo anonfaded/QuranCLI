@@ -275,10 +275,12 @@ class QuranApp:
                 close_matches = difflib.get_close_matches(user_input, self.surah_names.values(), n=5, cutoff=0.5)
 
                 if close_matches:
-                    print(Fore.YELLOW + "Did you mean one of these?" + Fore.WHITE + '\n')
+                    print("\n")
+                    print( Fore.RED + "╭─" + Style.BRIGHT + Fore.MAGENTA + "🤔 Did you mean one of these?")
                     for idx, match in enumerate(close_matches, 1):
                         surah_number = [num for num, name in self.surah_names.items() if name == match][0]
-                        print(Fore.WHITE + f" {idx}. " + Fore.CYAN + f"(Surah {surah_number}) "+ Fore.WHITE + f"{match} \n")
+                        print(f"{Fore.RED}├ {Fore.GREEN}{idx}. {Fore.CYAN}{match} {Style.DIM}{Fore.WHITE}(Surah {surah_number})")
+                    print(Fore.RED + "╰" + separator + '\n')    
 
                     # Ask user to select a Surah from the suggestions
                     while True:
