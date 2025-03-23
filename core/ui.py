@@ -245,7 +245,7 @@ class UI:
                 while True:  # Add loop for reciter selection
                     self.clear_terminal()  # Clear before showing options
                     print(Style.BRIGHT + Fore.RED + "\nAudio Player - " +
-                        Fore.WHITE + f"{surah_info.surah_name}")
+                        Fore.CYAN + f"{surah_info.surah_name}")
 
                     print(Fore.CYAN + "\nAvailable Reciters:")
                     reciter_options = []
@@ -369,7 +369,7 @@ class UI:
         """Get current audio display with input hints"""
         output = []
         output.append(Style.BRIGHT + Fore.RED + "\nAudio Player - " +
-                    Fore.WHITE + f"{surah_info.surah_name}")
+                    Fore.CYAN + f"{surah_info.surah_name}")
 
         # Check if audio file exists locally
         audio_file_exists = False
