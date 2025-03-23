@@ -119,18 +119,15 @@ class UI:
             print(f"Page {current_page}/{total_pages}")
             print(Style.BRIGHT + Fore.RED + "=" * self.term_size.columns)
 
-            # Arabic display information
-            if self.data_handler.arabic_reversed:
-                print(Style.DIM + Fore.YELLOW + "Arabic display is now FORCE reversed for reading in terminal.")
-                print(Style.DIM + Fore.YELLOW + "If copying, type 'reverse' again to revert to correct copy order.\n")
-            else:
-                print(Style.DIM + Fore.YELLOW + "Arabic text may appear reversed but will be correct when copied\n")
+            # Arabic display information - CONCISE NOTE
+            print(Style.DIM + Fore.YELLOW + "Arabic text is formatted for correct reading. If reversed or copying gives reversed output, use 'reverse' command, then 'q' and re-enter the input.")
 
             # Display ayahs for current page
             start_idx = (current_page - 1) * page_size
             end_idx = min(start_idx + page_size, len(ayahs))
 
-            for ayah in ayahs[start_idx:end_idx]:
+            local_ayahs = ayahs[start_idx:end_idx]
+            for ayah in local_ayahs:
                 self.display_single_ayah(ayah)
 
             # Navigation Menu
@@ -149,7 +146,6 @@ class UI:
             # User input prompt (aligned with box)
             choice = input(Fore.RED + "  ❯ " + Fore.WHITE).lower()
 
-
             if choice == 'n' and current_page < total_pages:
                 current_page += 1
             elif choice == 'p' and current_page > 1:
@@ -160,7 +156,7 @@ class UI:
                 self.data_handler.toggle_arabic_reversal()
             elif choice == 'q':
                 return
-            elif not choice:  # Enter was pressed
+            elif not choice:
                 if current_page < total_pages:
                     current_page += 1
                 else:
