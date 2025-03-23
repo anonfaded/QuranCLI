@@ -394,25 +394,34 @@ class QuranApp:
                     total_size += os.path.getsize(fp)
 
             total_size_mb = total_size / (1024 * 1024)  # Convert to MB
-
-            # Confirm deletion
-            if self.ui.ask_yes_no(f"{Fore.YELLOW}Are you sure you want to clear the audio cache ({total_size_mb:.2f} MB)? (y/n): {Fore.WHITE}"):
-                for filename in os.listdir(audio_cache_dir):
-                    file_path = os.path.join(audio_cache_dir, filename)
-                    try:
-                        if os.path.isfile(file_path) or os.path.islink(file_path):
-                            os.unlink(file_path)
-                        elif os.path.isdir(file_path):
-                            shutil.rmtree(file_path)
-                    except Exception as e:
-                        print(Fore.RED + f'Failed to delete {file_path}. Reason: {e}')
-                print(Fore.GREEN + "Audio cache cleared successfully.")
+            
+            if total_size_mb > 0: #If there are files proceed
+                # Confirm deletion
+                if self.ui.ask_yes_no(f"{Fore.YELLOW}Are you sure you want to clear the audio cache ({total_size_mb:.2f} MB)? (y/n): {Fore.WHITE}"):
+                    for filename in os.listdir(audio_cache_dir):
+                        file_path = os.path.join(audio_cache_dir, filename)
+                        try:
+                            if os.path.isfile(file_path) or os.path.islink(file_path):
+                                os.unlink(file_path)
+                            elif os.path.isdir(file_path):
+                                shutil.rmtree(file_path)
+                        except Exception as e:
+                            print(Fore.RED + f'Failed to delete {file_path}. Reason: {e}')
+                    print(Fore.GREEN + "Audio cache cleared successfully.")
+                    input(Fore.GREEN + "Press Enter to continue...")  # Pause
+                else:
+                    print(Fore.CYAN + "Audio cache clearing cancelled.")
+                    input(Fore.GREEN + "Press Enter to continue...")  # Pause
             else:
-                print(Fore.CYAN + "Audio cache clearing cancelled.")
+                print(Fore.CYAN + "No audio files found in cache. They will be available after downloading")
+                input(Fore.GREEN + "Press Enter to continue...")  # Pause
         except FileNotFoundError:
             print(Fore.YELLOW + "Audio cache directory not found.")
+            input(Fore.GREEN + "Press Enter to continue...")  # Pause
         except OSError as e:
             print(Fore.RED + f"Error while clearing audio cache: {e}")
+            input(Fore.GREEN + "Press Enter to continue...")  # Pause
+
 
 if __name__ == "__main__":
     # Wrap the entire app execution in a try-except block

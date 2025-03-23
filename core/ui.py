@@ -316,14 +316,19 @@ class UI:
 
         try:
             keyboard.unhook_all()  # Clean up any existing hooks
-            last_display = ""
+        except Exception as e:
+            print(Fore.RED + f"\nWarning: Keyboard shortcuts not available: {e}")
+
+        last_display = ""
+
+        try:
             while True:
                 try:
                     if msvcrt.kbhit():
                         try:
                             key_byte = msvcrt.getch()
-                            # Skip arrow keys
-                            if key_byte == b'\xe0':  # Special key prefix for arrow keys
+                            # Skip special keys
+                            if key_byte == b'\xe0':
                                 msvcrt.getch()  # Consume the second byte
                                 continue
                             
@@ -340,32 +345,31 @@ class UI:
                                 self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 30))
                             else:
                                 self.handle_audio_choice(choice, surah_info)
-                            
+                                    
                         except UnicodeDecodeError:
-                            continue  # Skip invalid characters
+                            continue
 
-                        # Update display only if changed
-                        current_display = self.get_audio_display(surah_info)
-                        if current_display != last_display:
-                            self.clear_terminal()
-                            print(current_display, end='', flush=True)
-                            last_display = current_display
-                            sys.stdout.flush()  # Ensure cursor is at the correct position
+                    # Update display only if changed
+                    current_display = self.get_audio_display(surah_info)
+                    if current_display != last_display:
+                        self.clear_terminal()
+                        print(current_display, end='', flush=True)
+                        last_display = current_display
+                        sys.stdout.flush()
 
-                        time.sleep(0.1)  # Prevent high CPU usage
-
+                    time.sleep(0.1)
+                    continue  # Continue instead of break to keep player running
                 except Exception as e:
                     print(Fore.RED + f"\nError in audio control loop: {e}")
                     time.sleep(1)
-                    continue  # Continue instead of break to keep player running
-
+                    continue
         finally:
             try:
                 keyboard.unhook_all()
                 self.audio_manager.stop_audio()
             except Exception:
                 pass
-
+        
     def get_audio_display(self, surah_info: SurahInfo) -> str:
         """Get current audio display with input hints"""
         output = []
