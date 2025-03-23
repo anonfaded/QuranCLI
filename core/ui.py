@@ -454,10 +454,10 @@ class UI:
             while True:
                 try:
                     self.clear_terminal()  # Clear Terminal
-                    print(Fore.RED + "\n┌─" + Fore.RED + Style.BRIGHT + f" Subtitle Creation - Surah {surah_info.surah_name} (1-{total_ayah} Ayahs)")
-                    print(Fore.RED + "├──╼ " + Fore.GREEN + "Start Ayah" + ":\n", end="")
+                    print(Fore.RED + "\n┌─" + Fore.GREEN + Style.BRIGHT + f" Subtitle Creation - Surah {surah_info.surah_name} (1-{total_ayah} Ayahs)")
+                    print(Fore.RED + "├──╼ " + Fore.MAGENTA + "Start Ayah" + ":\n", end="")
                     start_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
-                    print(Fore.RED + "├──╼ " + Fore.GREEN + "End Ayah" + ":\n", end="")
+                    print(Fore.RED + "├──╼ " + Fore.MAGENTA + "End Ayah" + ":\n", end="")
                     end_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
                     ayah_duration = 5.0
 
