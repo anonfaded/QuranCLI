@@ -134,7 +134,7 @@ class UI:
             box_width = 26  # Adjust width if needed
             separator = "─" * box_width
 
-            print(Style.BRIGHT + Fore.RED + "\n╭─ " + Fore.WHITE + "🧭 Navigation")
+            print(Style.BRIGHT + Fore.RED + "\n╭─ " + Fore.GREEN + "🧭 Navigation")
             if total_pages > 1:
                 print(Fore.RED + "│ → " + Fore.CYAN + "n " + Fore.WHITE + ": Next page")
                 print(Fore.RED + "│ → " + Fore.CYAN + "p " + Fore.WHITE + ": Previous page")
@@ -408,14 +408,37 @@ class UI:
             if state == "Audio finished":#show only if that is the state
                 output.append(Style.DIM + Fore.YELLOW + "\nPress 's' to stop and reset")
 
-        output.append(Style.BRIGHT + Fore.RED + "\n\nControls:")
-        output.append(Fore.GREEN + "p" + Fore.WHITE + ": Play/Pause")
-        output.append(Fore.CYAN + "← / →" + Fore.WHITE + ": Seek 5s")
-        output.append(Fore.CYAN + "Ctrl + ← / →" + Fore.WHITE + ": Seek 30s")
-        output.append(Fore.RED + "s" + Fore.WHITE + ": Stop")
-        output.append(Fore.YELLOW + "r" + Fore.WHITE + ": Change Reciter")
-        output.append(Fore.MAGENTA + "q" + Fore.WHITE + ": Return")
+        # Navigation Menu
+        box_width = 26  # Adjust width if needed
+        separator = "─" * box_width
+            
+        output.append(Style.BRIGHT + Fore.RED + "\n╭─ " + Fore.GREEN + "🎛️  Audio Controls")
+        output.append(Fore.RED + "│ • " + Fore.CYAN + "p " + Fore.WHITE + ": Play/Pause")
+        output.append(Fore.RED + "│ • " + Fore.GREEN + "← / → " + Fore.WHITE + ": Seek 5s")
+        output.append(Fore.RED + "│ • " + Fore.MAGENTA + "Ctrl + ← / → " + Fore.WHITE + ": Seek 30s")
+        output.append(Fore.RED + "│ • " + Fore.YELLOW + "s " + Fore.WHITE + ": Stop")
+        output.append(Fore.RED + "│ • " + Fore.RED + "r " + Fore.WHITE + ": Change Reciter")
+        output.append(Fore.RED + "│ • " + Fore.BLUE + "q " + Fore.WHITE + ": Return")
+        output.append(Fore.RED + "╰" + separator)
 
+
+
+            # Navigation Menu
+            # box_width = 26  # Adjust width if needed
+            # separator = "─" * box_width
+
+            # print(Style.BRIGHT + Fore.RED + "\n╭─ " + Fore.GREEN + "🎛️ Audio Controls")
+            # # if total_pages > 1:
+            # print(Fore.RED + "│ → " + Fore.CYAN + "p " + Fore.WHITE + ": Play/Pause")
+            # print(Fore.RED + "│ → " + Fore.CYAN + "← / → " + Fore.WHITE + ": Seek 5s")
+            # print(Fore.RED + "│ → " + Fore.MAGENTA + "Ctrl + ← / → " + Fore.WHITE + ": Seek 30s")
+            # print(Fore.RED + "│ → " + Fore.YELLOW + "s " + Fore.WHITE + ": Stop")
+            # print(Fore.RED + "│ → " + Fore.RED + "r " + Fore.WHITE + ": Change Reciter")
+            # print(Fore.RED + "│ → " + Fore.RED + "q " + Fore.WHITE + ": Return")
+            # print(Fore.RED + "╰" + separator)
+            
+            
+            
         # Add dim input hint
         output.append(Style.DIM + Fore.WHITE + "\nPress any key to execute command (no Enter needed)")
         output.append(Fore.RED + "└──╼ " + Fore.WHITE)

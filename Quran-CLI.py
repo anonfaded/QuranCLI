@@ -155,11 +155,11 @@ class QuranApp:
                     box_width = 52  # Adjust width if needed
                     separator = "─" * box_width
 
-                    print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.RED + "📜 Surah Information")
-                    print(Fore.RED + f"│ • {Fore.WHITE}Name:       {Fore.CYAN}{surah_info.surah_name}")
-                    print(Fore.RED + f"│ • {Fore.WHITE}Arabic:     {Fore.CYAN}{surah_info.surah_name_arabic}")
-                    print(Fore.RED + f"│ • {Fore.WHITE}Revelation: {Fore.CYAN}{surah_info.revelation_place}")
-                    print(Fore.RED + f"│ • {Fore.WHITE}Total Ayahs:{Fore.CYAN} {surah_info.total_ayah}")
+                    print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.GREEN + "📜 Surah Information")
+                    print(Fore.RED + f"│ • {Fore.CYAN}Name:       {Fore.WHITE}{surah_info.surah_name}")
+                    print(Fore.RED + f"│ • {Fore.CYAN}Arabic:     {Fore.WHITE}{surah_info.surah_name_arabic}")
+                    print(Fore.RED + f"│ • {Fore.CYAN}Revelation: {Fore.WHITE}{surah_info.revelation_place}")
+                    print(Fore.RED + f"│ • {Fore.CYAN}Total Ayahs:{Fore.WHITE} {surah_info.total_ayah}")
                     print(Fore.RED + "╰" + separator)
 
                     # Note Section
@@ -197,7 +197,7 @@ class QuranApp:
         columns = 5  # Adjust number of columns based on terminal width
         surahs_per_column = (num_surahs + columns - 1) // columns  # Ceiling division
 
-        print(Fore.RED + Style.BRIGHT + "Quran - List of Surahs:")
+        print(Fore.GREEN + Style.BRIGHT + "Quran - List of Surahs:")
         print(Fore.CYAN + "-" * 25)
 
         for i in range(surahs_per_column):
@@ -232,7 +232,7 @@ class QuranApp:
                 # Descriptive command list with colors
                 print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.GREEN + "📜 Available Commands")
                 print(Fore.RED + f"│ • {Fore.CYAN}1-114{Fore.WHITE}: Select Surah by number")
-                print(Fore.RED + f"│ • {Fore.CYAN}Surah Name{Fore.WHITE}: Search Surah (e.g., 'Rahman')")
+                print(Fore.RED + f"│ • {Fore.CYAN}Surah Name{Fore.WHITE}: Search Surah {Style.DIM}(e.g., 'Rahman')")
                 print(Fore.RED + f"│ • {Fore.CYAN}list{Fore.WHITE}: Display list of Surahs")
                 print(Fore.RED + f"│ • {Fore.CYAN}sub{Fore.WHITE}: Create subtitles for Ayahs")
                 print(Fore.RED + f"│ • {Fore.CYAN}quit{Fore.WHITE}: Exit the application")
@@ -243,7 +243,7 @@ class QuranApp:
                 print(Style.DIM + Fore.WHITE + "\nType any of the above commands and press Enter.")
 
                 # Prompt user for input
-                print(Fore.GREEN + "\nEnter command:" + Style.DIM + Fore.WHITE )
+                print(Style.BRIGHT + Fore.GREEN + "\nEnter command:" + Style.DIM + Fore.WHITE )
                 try:
                     user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
                 except KeyboardInterrupt:
@@ -351,10 +351,10 @@ class QuranApp:
     def _get_ayah_range(self, total_ayah: int) -> tuple:
         while True:
             try:
-                print(Fore.RED + "\n┌─" + Fore.RED + Style.BRIGHT + f" Ayah Selection (1-{total_ayah})")
-                print(Fore.RED + "├──╼ " + Fore.GREEN + "Start" + ":\n" , end="")
+                print(Fore.RED + "\n┌─" + Fore.GREEN + Style.BRIGHT + f" Ayah Selection (1-{total_ayah})")
+                print(Fore.RED + "├──╼ " + Fore.MAGENTA + "Start" + ":\n" , end="")
                 start = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
-                print(Fore.RED + "├──╼ " + Fore.GREEN + "End" + ":\n" , end="")
+                print(Fore.RED + "├──╼ " + Fore.MAGENTA + "End" + ":\n" , end="")
                 end = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
                 if 1 <= start <= end <= total_ayah:
                     return start, end
