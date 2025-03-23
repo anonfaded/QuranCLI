@@ -17,6 +17,7 @@ from core.models import Ayah, SurahInfo
 from core.audio_manager import AudioManager
 from core.github_updater import GithubUpdater  # Import GithubUpdater
 from core.version import VERSION  # Import VERSION
+from core.quran_data_handler import QuranDataHandler
 
 import socket #For Ip Adresses
 import threading #Add threading for server
@@ -24,7 +25,7 @@ import http.server
 import socketserver
 
 class UI:
-    def __init__(self, audio_manager: AudioManager, term_size, data_handler, github_updater: Optional[GithubUpdater] = None, preferences: dict = None):
+    def __init__(self, audio_manager: AudioManager, term_size, data_handler: QuranDataHandler, github_updater: Optional[GithubUpdater] = None, preferences: dict = None):
         self.audio_manager = audio_manager
         self.term_size = term_size
         self.data_handler = data_handler  # Store data_handler
@@ -117,7 +118,13 @@ class UI:
             print(f"📖 {surah_info.surah_name} ({surah_info.surah_name_arabic}) • {surah_info.revelation_place} • {surah_info.total_ayah} Ayahs")
             print(f"Page {current_page}/{total_pages}")
             print(Style.BRIGHT + Fore.RED + "=" * self.term_size.columns)
-            print(Style.DIM + Fore.YELLOW + "Note: Arabic text may appear reversed but will be correct when copied\n")
+
+            # Arabic display information
+            if self.data_handler.arabic_reversed:
+                print(Style.DIM + Fore.YELLOW + "Arabic display is now FORCE reversed for reading in terminal.")
+                print(Style.DIM + Fore.YELLOW + "If copying, type 'reverse' again to revert to correct copy order.\n")
+            else:
+                print(Style.DIM + Fore.YELLOW + "Arabic text may appear reversed but will be correct when copied\n")
 
             # Display ayahs for current page
             start_idx = (current_page - 1) * page_size
@@ -134,6 +141,7 @@ class UI:
             if total_pages > 1:
                 print(Fore.RED + "│ → " + Fore.CYAN + "n " + Fore.WHITE + ": Next page")
                 print(Fore.RED + "│ → " + Fore.CYAN + "p " + Fore.WHITE + ": Previous page")
+            print(Fore.RED + "│ → " + Fore.MAGENTA + "reverse " + Fore.WHITE + ": Toggle Arabic reversal")
             print(Fore.RED + "│ → " + Fore.YELLOW + "a " + Fore.WHITE + ": Play audio")
             print(Fore.RED + "│ → " + Fore.RED + "q " + Fore.WHITE + ": Return")
             print(Fore.RED + "╰" + separator)
@@ -148,6 +156,8 @@ class UI:
                 current_page -= 1
             elif choice == 'a':
                 self.display_audio_controls(surah_info)
+            elif choice == 'reverse':
+                self.data_handler.toggle_arabic_reversal()
             elif choice == 'q':
                 return
             elif not choice:  # Enter was pressed

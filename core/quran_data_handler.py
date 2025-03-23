@@ -8,12 +8,20 @@ from core.quran_cache import QuranCache
 class QuranDataHandler:
     def __init__(self, cache: QuranCache):
         self.cache = cache
+        self.arabic_reversed = False  # Flag to track if Arabic is reversed for display
 
-    @staticmethod
-    def fix_arabic_text(text: str) -> str:
+    def toggle_arabic_reversal(self):
+        """Toggles the arabic_reversed flag."""
+        self.arabic_reversed = not self.arabic_reversed
+
+    def fix_arabic_text(self, text: str) -> str:
+        """Fixes Arabic text based on the current reversal setting."""
         reshaped_text = arabic_reshaper.reshape(text)
         bidi_text = get_display(reshaped_text)
-        return "".join(reversed(bidi_text))  # Ensure correct order when copying
+        if self.arabic_reversed:
+            return "".join(reversed(text))
+        else:
+            return str(bidi_text)
 
     def get_surah_info(self, surah_number: int) -> SurahInfo:
         """Get surah info from cache or download if missing"""
