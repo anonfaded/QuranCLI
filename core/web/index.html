@@ -10,28 +10,30 @@
     <style>
         body {
             font-family: 'Ubuntu', sans-serif;
+            background: #000000;
         }
         
         .dock-footer {
             border-radius: 12px;
-            background: rgba(14, 14, 14, 0.95);
+            background: rgba(18, 18, 18, 0.8);
             backdrop-filter: blur(8px);
-            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
             margin: 0 auto 20px;
             max-width: 500px;
             padding: 12px 24px;
-            transform: translateY(0);
-            transition: transform 0.3s ease;
         }
         
         .terminal-icon {
-            color: #e63946;
+            color: #FF1744;
             margin-right: 8px;
+            text-shadow: 0 0 10px rgba(255, 23, 68, 0.3);
         }
         
         .header-gradient::before {
-            background: #e63946;
-            height: 3px;
+            background: linear-gradient(90deg, #FF1744, #FF4081);
+            height: 2px;
+            box-shadow: 0 0 20px rgba(255, 23, 68, 0.5);
         }
         
         .file-card::before {
@@ -50,8 +52,8 @@
         }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 font-sans min-h-screen flex flex-col">
-    <header class="bg-gray-950 py-5 shadow-md header-gradient">
+<body class="bg-gray-950 text-gray-100 font-sans min-h-screen flex flex-col">
+    <header class="bg-gray-900/50 py-5 shadow-md header-gradient backdrop-blur-sm">
         <div class="container-custom">
             <h1 id="main-title" class="text-3xl font-bold text-center title-underline left-1/2 -translate-x-1/2">
                 <span class="terminal-icon"><i class="fas fa-terminal"></i></span><!--SURAH_NAME--> Subtitles
@@ -60,9 +62,9 @@
     </header>
     
     <div class="container-custom flex-1">
-        <div class="max-w-xl mx-auto relative my-5">
+        <div class="max-w-xl mx-auto relative my-3">
             <div class="search-icon-wrapper">
-                <i class="fas fa-search text-red-500 mb-5"></i>
+                <i class="fas fa-search"></i>
             </div>
             <input type="text" id="search-input" class="search-box cursor-pointer" placeholder="Search subtitles...">
             <div class="search-helper">Try searching by "ayah 1", "march 2025", etc.</div>
@@ -94,10 +96,8 @@
     </div>
     
     <footer class="bg-gray-950 py-4 mt-auto">
-        <div class="container-custom">
-            <div class="text-center text-gray-400 hover:text-gray-300 dock-footer">
-                Made with ❤️ by <a href="https://github.com/anonfaded" class="footer-link">Faded</a> in 🇵🇰
-            </div>
+        <div class="dock-footer">
+            Made with ❤️ by <a href="https://github.com/anonfaded" class="footer-link">Faded</a> in 🇵🇰
         </div>
     </footer>
     

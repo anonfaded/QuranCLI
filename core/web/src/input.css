@@ -27,27 +27,47 @@
   
   .search-box {
     @apply w-full h-12 pl-12 pr-4 text-base border-none rounded-lg bg-gray-800 text-gray-100 shadow-md focus:outline-none focus:ring-2 focus:ring-red-600;
+    background: rgba(18, 18, 18, 0.8);
+    backdrop-filter: blur(8px);
   }
 
   .search-icon-wrapper {
-    @apply absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none;
+    @apply absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none z-10;
+  }
+
+  .search-icon-wrapper i {
+    @apply text-red-600 mb-5;
+    color: #FF1744; /* Force bright red */
+    filter: none; /* Remove any blur effects */
   }
   
   .sort-btn {
     @apply py-2 px-4 bg-gray-800 border-none rounded-md text-gray-100 cursor-pointer flex items-center gap-1.5 text-sm hover:bg-gray-700 transition-colors;
+    background: rgba(18, 18, 18, 0.8);
   }
   
   .sort-btn-active {
     @apply bg-red-600 text-white;
+    text-shadow: 0 0 10px rgba(255, 23, 68, 0.5);
   }
   
   .file-card {
-    @apply block p-4 bg-gray-800 rounded-lg transition-all shadow-md hover:shadow-lg hover:-translate-y-1 hover:bg-gray-700 relative overflow-hidden;
+    @apply block p-4 rounded-lg transition-all shadow-md hover:shadow-lg hover:-translate-y-1 relative overflow-hidden;
+    background: rgba(18, 18, 18, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  
+  .file-card:hover {
+    background: rgba(26, 26, 26, 0.9);
+    border-color: rgba(255, 23, 68, 0.3);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
   }
   
   .file-card::before {
+    @apply absolute -inset-0.5 rounded-lg opacity-0 transition-opacity -z-10;
     content: "";
-    @apply absolute -inset-0.5 bg-gradient-to-br from-red-600 to-red-400 rounded-lg opacity-0 transition-opacity -z-10;
+    background: linear-gradient(45deg, rgba(255, 23, 68, 0.5), transparent);
   }
   
   .file-card:hover::before {
@@ -64,7 +84,13 @@
   }
   
   .download-icon {
-    @apply inline-block mr-2 text-red-500 text-lg;
+    @apply inline-block mr-2 text-lg;
+    color: #FF1744; /* Force brighter red */
+  }
+
+  .file-card:hover .download-icon {
+    @apply text-white transition-colors;
+    text-shadow: 0 0 10px rgba(255, 23, 68, 0.5);
   }
   
   .meta-tag {
@@ -76,7 +102,8 @@
   }
   
   .footer-link {
-    @apply text-red-500 font-semibold no-underline hover:underline inline bg-transparent p-0 shadow-none;
+    @apply text-red-600 font-semibold no-underline hover:underline inline bg-transparent p-0 shadow-none;
+    color: #FF1744; /* Force consistent red */
   }
   
   .empty-state {
@@ -89,6 +116,22 @@
   
   .no-results {
     @apply text-center my-10 text-lg text-gray-400 hidden;
+  }
+
+  footer {
+    @apply py-8 mt-auto border-t border-gray-800/50;
+  }
+
+  .dock-footer {
+    @apply text-center text-gray-400 hover:text-gray-300 transition-all;
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 12px 24px;
+    border-radius: 12px;
+    background: rgba(18, 18, 18, 0.8);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }
 }
 

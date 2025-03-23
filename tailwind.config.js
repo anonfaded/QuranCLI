@@ -4,15 +4,15 @@ module.exports = {
       extend: {
         colors: {
           gray: {
-            950: '#0a0a0a',
-            900: '#121212',
-            800: '#1e1e1e',
-            700: '#252525',
+            950: '#000000', // Pure black for AMOLED
+            900: '#0A0A0A', // Slightly lighter black
+            800: '#121212', // Card background
+            700: '#1A1A1A', // Hover states
           },
           red: {
-            600: '#e63946',
-            500: '#f94144',
-            400: '#ffccd5',
+            600: '#FF1744', // Brighter red for better contrast
+            500: '#FF4081', // Secondary red
+            400: '#FF80AB', // Accent red
           }
         },
         animation: {
