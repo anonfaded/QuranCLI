@@ -163,8 +163,8 @@ class QuranApp:
                     print(Fore.RED + "╰" + separator)
 
                     # Note Section
-                    print(Style.DIM + Fore.YELLOW + "⚠ Note: Arabic text may appear reversed but will copy correctly.")
-                    print(Style.BRIGHT + Fore.RED + separator)
+                    # print(Style.DIM + Fore.YELLOW + "⚠ Note: Arabic text may appear reversed but will copy correctly.")
+                    # print(Style.BRIGHT + Fore.RED + separator)
 
                     while True:
                         try:
@@ -217,20 +217,28 @@ class QuranApp:
         self._display_header()
 
     def _get_surah_number(self) -> Optional[int]:
+        # Navigation Menu
+        box_width = 26  # Adjust width if needed
+        separator = "─" * box_width
+
         while True:
             try:
                 # Clear terminal and display header before prompt
                 self._clear_terminal()
                 self._display_header()
+                box_width = 26  # Adjust width if needed
+                separator = "─" * box_width
 
                 # Descriptive command list with colors
-                print(Fore.GREEN + "Available Commands:")
-                print(Fore.CYAN + "  1-114" + Fore.WHITE + ": Select Surah by number")
-                print(Fore.CYAN + "  Surah Name" + Fore.WHITE + ": Search Surah (e.g., 'Rahman')")
-                print(Fore.CYAN + "  list" + Fore.WHITE + ": Display list of Surahs")
-                print(Fore.CYAN + "  sub" + Fore.WHITE + ": Create subtitles for Ayahs")
-                print(Fore.CYAN + "  quit" + Fore.WHITE + ": Exit the application")
-
+                print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.GREEN + "📜 Available Commands")
+                print(Fore.RED + f"│ • {Fore.CYAN}1-114{Fore.WHITE}: Select Surah by number")
+                print(Fore.RED + f"│ • {Fore.CYAN}Surah Name{Fore.WHITE}: Search Surah (e.g., 'Rahman')")
+                print(Fore.RED + f"│ • {Fore.CYAN}list{Fore.WHITE}: Display list of Surahs")
+                print(Fore.RED + f"│ • {Fore.CYAN}sub{Fore.WHITE}: Create subtitles for Ayahs")
+                print(Fore.RED + f"│ • {Fore.CYAN}quit{Fore.WHITE}: Exit the application")
+                print(Fore.RED + "╰" + separator)
+                    
+                    
                 # Helper Text
                 print(Style.DIM + Fore.WHITE + "\nType any of the above commands and press Enter.")
 

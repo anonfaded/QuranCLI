@@ -120,7 +120,7 @@ class UI:
             print(Style.BRIGHT + Fore.RED + "=" * self.term_size.columns)
 
             # Arabic display information - CONCISE NOTE
-            print(Style.DIM + Fore.YELLOW + "Arabic text is formatted for correct reading. If reversed or copying gives reversed output, use 'reverse' command, then 'q' and re-enter the input.")
+            print(Style.DIM + Fore.YELLOW + "⚠ Note: Arabic text is formatted for correct reading. If reversed or copying gives reversed output, use 'reverse' command, then 'q' and re-enter the input.")
 
             # Display ayahs for current page
             start_idx = (current_page - 1) * page_size
