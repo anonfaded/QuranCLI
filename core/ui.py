@@ -504,12 +504,27 @@ class UI:
 
             while True:
                 self.clear_terminal() #Clear Screen
-                print(Fore.GREEN + "Subtitle Management Console:")#Headin
-                print(Fore.GREEN + f"\nShare this link with other devices on the same network to browse and download subtitle files of {surah_info.surah_name}:" + Fore.WHITE)
-                print(Fore.YELLOW + f"   http://{ip_address}:{PORT}" + Fore.WHITE) #The Link
-                print(Fore.RED + "\nAvailable Commands:")#Command List
-                print(Fore.CYAN + "  open" + Fore.WHITE + ": Open subtitle folder")
-                print(Fore.CYAN + "  back" + Fore.WHITE + ": Return to Surah Selection")
+                print(Fore.RED + "Subtitle Management Console:") #Heading
+                print(Fore.MAGENTA + "      Subtitle file generated!") #description
+                print(Fore.GREEN + f"\nShare this link with other devices on the same network to browse and download subtitle files of {Fore.MAGENTA}{surah_info.surah_name}:" + Fore.WHITE)
+                print(" ")
+                print(Fore.YELLOW + f"      🚀✨  http://{ip_address}:{PORT} ✨🚀" + Fore.WHITE) #The Link
+                
+                box_width = 26  # Adjust width if needed
+                separator = "─" * box_width
+
+                # Descriptive command list with colors
+                print(" ")
+                print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.GREEN + "📜 Available Commands")
+                print(Fore.RED + f"│ • {Fore.CYAN}open{Fore.WHITE}: Open subtitle folder")
+                print(Fore.RED + f"│ • {Fore.CYAN}back{Fore.WHITE}: Return to Surah Selection")
+                print(Fore.RED + "╰" + separator)
+                    
+                # Helper Text
+                print(Style.DIM + Fore.WHITE + "\nType any of the above commands and press Enter.")
+                print(" ")
+                
+                
                 try:
                     user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
                 except KeyboardInterrupt:
