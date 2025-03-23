@@ -312,10 +312,15 @@ class QuranApp:
                     self._clear_terminal()
                     self._display_header()
 
-                    print(Fore.GREEN + "Available Commands (Subtitle Creation):")
-                    print(Fore.CYAN + "  1-114" + Fore.WHITE + ": Select Surah by number")
-                    print(Fore.CYAN + "  q" + Fore.WHITE + ": Return to main menu")
+                    box_width = 26  # Adjust width if needed
+                    separator = "─" * box_width
 
+                    # Descriptive command list with colors
+                    print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.GREEN + "📜 Available Commands (Subtitle Creation)")
+                    print(Fore.RED + f"│ • {Fore.CYAN}1-114{Fore.WHITE}: Select Surah by number")
+                    print(Fore.RED + f"│ • {Fore.CYAN}q{Fore.WHITE}: Return to main menu")
+                    print(Fore.RED + "╰" + separator)
+                        
                     # Helper Text
                     print(Style.DIM + Fore.WHITE + "\nType any of the above commands and press Enter.")
 
