@@ -315,6 +315,7 @@ class UI:
             return
 
         try:
+            keyboard.unhook_all()  # Clean up any existing hooks
             last_display = ""
             while True:
                 try:
@@ -343,15 +344,15 @@ class UI:
                         except UnicodeDecodeError:
                             continue  # Skip invalid characters
 
-                    # Update display only if changed
-                    current_display = self.get_audio_display(surah_info)
-                    if current_display != last_display:
-                        self.clear_terminal()
-                        print(current_display, end='', flush=True)
-                        last_display = current_display
-                        sys.stdout.flush()  # Ensure cursor is at the correct position
+                        # Update display only if changed
+                        current_display = self.get_audio_display(surah_info)
+                        if current_display != last_display:
+                            self.clear_terminal()
+                            print(current_display, end='', flush=True)
+                            last_display = current_display
+                            sys.stdout.flush()  # Ensure cursor is at the correct position
 
-                    time.sleep(0.1)  # Prevent high CPU usage
+                        time.sleep(0.1)  # Prevent high CPU usage
 
                 except Exception as e:
                     print(Fore.RED + f"\nError in audio control loop: {e}")
@@ -433,11 +434,6 @@ class UI:
             if choice in ['n', 'no']:
                 return False
             print(Fore.RED + "Invalid input. Please enter 'y' or 'n'.")
-            
-            
-
-
-
 
 
 

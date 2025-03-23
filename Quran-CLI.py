@@ -1,4 +1,5 @@
 # Quran-CLI.py
+
 import sys
 import os
 import subprocess
@@ -115,7 +116,6 @@ class QuranApp:
                  json.dump(self.preferences, f, ensure_ascii=False, indent=2)
          except Exception as e:
              print(Fore.RED + f"Error saving preferences: {e}")
-
 
     def _load_surah_names(self):
         surah_names = {}
@@ -235,6 +235,7 @@ class QuranApp:
                 print(Fore.RED + f"│ • {Fore.CYAN}Surah Name{Fore.WHITE}: Search Surah {Style.DIM}(e.g., 'Rahman')")
                 print(Fore.RED + f"│ • {Fore.CYAN}list{Fore.WHITE}: Display list of Surahs")
                 print(Fore.RED + f"│ • {Fore.CYAN}sub{Fore.WHITE}: Create subtitles for Ayahs")
+                print(Fore.RED + f"│ • {Fore.CYAN}clearaudio{Fore.WHITE}: Clear audio cache")
                 print(Fore.RED + f"│ • {Fore.CYAN}quit{Fore.WHITE}: Exit the application")
                 print(Fore.RED + "╰" + separator)
                     
@@ -264,6 +265,9 @@ class QuranApp:
                     surah_info = self.data_handler.get_surah_info(surah_number)
                     self.ui.display_subtitle_menu(surah_info)
                     continue # After subtitle, return to main
+                elif user_input == 'clearaudio':
+                    self._clear_audio_cache()
+                    continue
                 # Check if input is a number
                 elif user_input.isdigit():
                     number = int(user_input)
@@ -378,6 +382,37 @@ class QuranApp:
             except KeyboardInterrupt: # Add this to handle control + c during input
                 print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to surah selection.")
                 return False  # Treat as 'no' and return to surah selection.
+
+    def _clear_audio_cache(self):
+        """Clears the audio cache directory."""
+        audio_cache_dir = self.audio_manager.audio_dir
+        try:
+            total_size = 0
+            for dirpath, dirnames, filenames in os.walk(audio_cache_dir):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    total_size += os.path.getsize(fp)
+
+            total_size_mb = total_size / (1024 * 1024)  # Convert to MB
+
+            # Confirm deletion
+            if self.ui.ask_yes_no(f"{Fore.YELLOW}Are you sure you want to clear the audio cache ({total_size_mb:.2f} MB)? (y/n): {Fore.WHITE}"):
+                for filename in os.listdir(audio_cache_dir):
+                    file_path = os.path.join(audio_cache_dir, filename)
+                    try:
+                        if os.path.isfile(file_path) or os.path.islink(file_path):
+                            os.unlink(file_path)
+                        elif os.path.isdir(file_path):
+                            shutil.rmtree(file_path)
+                    except Exception as e:
+                        print(Fore.RED + f'Failed to delete {file_path}. Reason: {e}')
+                print(Fore.GREEN + "Audio cache cleared successfully.")
+            else:
+                print(Fore.CYAN + "Audio cache clearing cancelled.")
+        except FileNotFoundError:
+            print(Fore.YELLOW + "Audio cache directory not found.")
+        except OSError as e:
+            print(Fore.RED + f"Error while clearing audio cache: {e}")
 
 if __name__ == "__main__":
     # Wrap the entire app execution in a try-except block
