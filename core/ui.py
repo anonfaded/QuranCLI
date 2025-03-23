@@ -315,34 +315,31 @@ class UI:
             return
 
         try:
-            # Register safe keyboard shortcuts with error handling
-            try:
-                keyboard.unhook_all()  # Clean up any existing hooks
-                keyboard.add_hotkey('left', lambda: self.audio_manager.seek(max(0, self.audio_manager.current_position - 5)))
-                keyboard.add_hotkey('right', lambda: self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 5)))
-                keyboard.add_hotkey('ctrl+left', lambda: self.audio_manager.seek(max(0, self.audio_manager.current_position - 30)))
-                keyboard.add_hotkey('ctrl+right', lambda: self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 30)))
-            except Exception as e:
-                print(Fore.RED + f"\nWarning: Keyboard shortcuts not available: {e}")
-
             last_display = ""
             while True:
                 try:
                     if msvcrt.kbhit():
                         try:
                             key_byte = msvcrt.getch()
-                            # Handle arrow keys
-                            if key_byte == b'\xe0':  # Special key prefix
-                                arrow = msvcrt.getch()
-                                if arrow == b'K':  # Left arrow
-                                    self.audio_manager.seek(max(0, self.audio_manager.current_position - 5))
-                                elif arrow == b'M':  # Right arrow
-                                    self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 5))
+                            # Skip arrow keys
+                            if key_byte == b'\xe0':  # Special key prefix for arrow keys
+                                msvcrt.getch()  # Consume the second byte
+                                continue
+                            
+                            choice = key_byte.decode('ascii', errors='ignore').lower()
+                            if choice == 'q':
+                                break
+                            elif choice == '[':
+                                self.audio_manager.seek(max(0, self.audio_manager.current_position - 5))
+                            elif choice == ']':
+                                self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 5))
+                            elif choice == 'j':
+                                self.audio_manager.seek(max(0, self.audio_manager.current_position - 30))
+                            elif choice == 'k':
+                                self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 30))
                             else:
-                                choice = key_byte.decode('ascii', errors='ignore').lower()
-                                if choice == 'q':
-                                    break
                                 self.handle_audio_choice(choice, surah_info)
+                            
                         except UnicodeDecodeError:
                             continue  # Skip invalid characters
 
@@ -414,30 +411,13 @@ class UI:
             
         output.append(Style.BRIGHT + Fore.RED + "\n╭─ " + Fore.GREEN + "🎛️  Audio Controls")
         output.append(Fore.RED + "│ • " + Fore.CYAN + "p " + Fore.WHITE + ": Play/Pause")
-        output.append(Fore.RED + "│ • " + Fore.GREEN + "← / → " + Fore.WHITE + ": Seek 5s")
-        output.append(Fore.RED + "│ • " + Fore.MAGENTA + "Ctrl + ← / → " + Fore.WHITE + ": Seek 30s")
+        output.append(Fore.RED + "│ • " + Fore.GREEN + "[ / ] " + Fore.WHITE + ": Seek 5s")
+        output.append(Fore.RED + "│ • " + Fore.MAGENTA + "j / k " + Fore.WHITE + ": Seek 30s")
         output.append(Fore.RED + "│ • " + Fore.YELLOW + "s " + Fore.WHITE + ": Stop")
         output.append(Fore.RED + "│ • " + Fore.RED + "r " + Fore.WHITE + ": Change Reciter")
         output.append(Fore.RED + "│ • " + Fore.BLUE + "q " + Fore.WHITE + ": Return")
         output.append(Fore.RED + "╰" + separator)
 
-
-
-            # Navigation Menu
-            # box_width = 26  # Adjust width if needed
-            # separator = "─" * box_width
-
-            # print(Style.BRIGHT + Fore.RED + "\n╭─ " + Fore.GREEN + "🎛️ Audio Controls")
-            # # if total_pages > 1:
-            # print(Fore.RED + "│ → " + Fore.CYAN + "p " + Fore.WHITE + ": Play/Pause")
-            # print(Fore.RED + "│ → " + Fore.CYAN + "← / → " + Fore.WHITE + ": Seek 5s")
-            # print(Fore.RED + "│ → " + Fore.MAGENTA + "Ctrl + ← / → " + Fore.WHITE + ": Seek 30s")
-            # print(Fore.RED + "│ → " + Fore.YELLOW + "s " + Fore.WHITE + ": Stop")
-            # print(Fore.RED + "│ → " + Fore.RED + "r " + Fore.WHITE + ": Change Reciter")
-            # print(Fore.RED + "│ → " + Fore.RED + "q " + Fore.WHITE + ": Return")
-            # print(Fore.RED + "╰" + separator)
-            
-            
             
         # Add dim input hint
         output.append(Style.DIM + Fore.WHITE + "\nPress any key to execute command (no Enter needed)")
@@ -464,7 +444,7 @@ class UI:
 
 
 
- # core/ui.py
+
     def display_subtitle_menu(self, surah_info: SurahInfo):
         """Handles the subtitle creation process."""
         try:
