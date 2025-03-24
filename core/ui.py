@@ -683,9 +683,9 @@ class UI:
 
 
     def generate_srt_content(self, surah_number: int, start_ayah: int, end_ayah: int, ayah_duration: float) -> str:
-        """Generates the SRT content."""
+        """Generates the SRT content with original Arabic text."""
         try:
-            ayahs = self.data_handler.get_ayahs(surah_number, start_ayah, end_ayah)
+            ayahs = self.data_handler.get_ayahs_raw(surah_number, start_ayah, end_ayah)  # Use raw ayahs
             srt_content = ""
             start_time = 0.0
 
@@ -693,8 +693,8 @@ class UI:
                 end_time = start_time + ayah_duration
                 srt_content += f"{i+1}\n"
                 srt_content += f"{self.format_time_srt(start_time)} --> {self.format_time_srt(end_time)}\n"
-                srt_content += f"{ayah.arabic_uthmani}\n"
-                srt_content += f"{ayah.text}\n\n"  # English Translation.
+                srt_content += f"{ayah.arabic_uthmani}\n"  # Use raw Arabic text
+                srt_content += f"{ayah.text}\n\n"  # English Translation
                 start_time = end_time
 
             return srt_content

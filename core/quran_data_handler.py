@@ -59,3 +59,23 @@ class QuranDataHandler:
             )
             for idx in range(start - 1, end)
         ]
+        
+    def get_ayahs_raw(self, surah_number: int, start: int, end: int) -> List[Ayah]:
+        """Get ayahs with raw Arabic text without any text processing"""
+        data = self.cache.get_surah(surah_number)
+        if not data:
+            raise ValueError("Surah data not found in cache")
+
+        total_ayah = data.get("totalAyah", 0)
+        if not (1 <= start <= end <= total_ayah):
+            raise ValueError("Invalid ayah range")
+
+        return [
+            Ayah(
+                number=idx + 1,
+                text=data.get("english", [""] * total_ayah)[idx],
+                arabic_simple=data.get("arabic2", [""] * total_ayah)[idx],  # Raw text
+                arabic_uthmani=data.get("arabic1", [""] * total_ayah)[idx]  # Raw text
+            )
+            for idx in range(start - 1, end)
+        ]        
