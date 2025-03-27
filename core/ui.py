@@ -71,9 +71,9 @@ class UI:
         print(Fore.RED + "│ " + Style.BRIGHT + "Author: " + Style.NORMAL + "https://github.com/anonfaded".ljust(41) + "│")
         print(Fore.RED + "├" + "─" * 50 + "┤")
         print(Fore.RED + "│ " + Style.BRIGHT + "Instructions:".ljust(49) + Style.NORMAL + "│")
-        print(Fore.RED + "│ • " + Fore.WHITE + "Type 'quit' or 'exit' to close".ljust(47) + Fore.RED + "│")
-        print(Fore.RED + "│ • " + Fore.WHITE + "Press Ctrl+C to cancel".ljust(47) + Fore.RED + "│")
-        print(Fore.RED + "│ • " + Fore.WHITE + "Arabic text copies correctly".ljust(47) + Fore.RED + "│")
+        print(Fore.RED + "│ • " + Fore.WHITE + "Type " + Fore.RED + "'quit'" + Fore.WHITE + " or " + Fore.RED + "'exit'" + Fore.WHITE + " to close the program".ljust(26) + Fore.RED + "│")
+        print(Fore.RED + "│ • " + Fore.WHITE + "Press" + Fore.RED + " Ctrl+C" + Fore.WHITE + " to cancel current action".ljust(35) + Fore.RED + "│")
+        print(Fore.RED + "│ • " + Fore.MAGENTA + "Confused?" + Fore.WHITE + " Type " + Fore.RED + "'info'" + Fore.WHITE + " to see help page".ljust(26) + Fore.RED + "│")
         print(Fore.RED + "╰" + "─" * 50 + "╯\n")
 
 
