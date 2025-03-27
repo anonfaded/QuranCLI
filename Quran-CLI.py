@@ -216,6 +216,63 @@ class QuranApp:
         self._clear_terminal()
         self._display_header()
 
+
+# In Quran-CLI.py, inside the QuranApp class (e.g., after _display_surah_list)
+
+    def _display_info(self):
+        """Displays detailed information about the application and commands."""
+        self._clear_terminal()
+        self._display_header()
+
+        box_width = self.term_size.columns - 4 if self.term_size.columns > 10 else 60 # Adjust width dynamically
+        separator_major = "═" * box_width
+        separator_minor = "─" * box_width
+
+        print(Fore.RED + Style.BRIGHT + separator_major)
+        print(Fore.GREEN + Style.BRIGHT + "QuranCLI - Information".center(box_width))
+        print(Fore.RED + Style.BRIGHT + separator_major)
+
+        # Description
+        print(Fore.WHITE + "\nA powerful terminal-based tool for interacting with the Holy Quran.")
+        print(Fore.CYAN + "Read, listen to recitations, and generate video subtitles (captions).")
+        print(Fore.GREEN + "\nGitHub Repository:")
+        print(Fore.MAGENTA + Style.BRIGHT + "https://github.com/anonfaded/QuranCLI" + Style.RESET_ALL)
+
+        print("\n" + Fore.RED + separator_minor)
+        print(Fore.GREEN + Style.BRIGHT + "Available Commands".center(box_width))
+        print(Fore.RED + separator_minor)
+
+        # Command Explanations (using a list for easier management)
+        commands_info = [
+            (Fore.CYAN + "1-114", Fore.WHITE + ": Select a Surah directly by its number."),
+            (Fore.CYAN + "Surah Name", Fore.WHITE + ": Search for a Surah by name (e.g., 'Fatiha', 'Rahman'). Provides suggestions if unsure."),
+            (Fore.CYAN + "list", Fore.WHITE + ": Display a list of all 114 Surahs with their numbers."),
+            (Fore.CYAN + "sub", Fore.WHITE + ": Generate subtitle files (.srt format) for a specific range of Ayahs."),
+            (Fore.YELLOW + "  ↳ Use Case:", Fore.WHITE + "Ideal for video editors creating Quran recitation videos."),
+            (Fore.YELLOW + "  ↳ How it works:", Fore.WHITE + "Creates timestamped Arabic and English text captions."),
+            (Fore.YELLOW + "  ↳ Example:", Fore.WHITE + "Import the .srt file into video editors (like CapCut's caption import) to automatically add overlays."),
+            (Fore.CYAN + "clearaudio", Fore.WHITE + ": Delete all downloaded audio files from the cache to free up space."),
+            (Fore.CYAN + "info", Fore.WHITE + ": Display this help and information screen."),
+            (Fore.CYAN + "quit / exit", Fore.WHITE + ": Close the QuranCLI application.")
+        ]
+
+        for cmd, desc in commands_info:
+            # Basic wrapping for description part
+            prefix_len = 18 # Approximate length of command part like "  ↳ How it works: "
+            desc_lines = self.ui.wrap_text(desc, box_width - prefix_len).split('\n')
+            print(f"{cmd.ljust(15)}{Fore.WHITE}{desc_lines[0]}")
+            for line in desc_lines[1:]:
+                print(f"{' '.ljust(15)}{Fore.WHITE}{line}") # Indent subsequent lines
+            if cmd.startswith(Fore.CYAN + "sub"): # Add a small space after sub explanation
+                print("")
+
+
+        print("\n" + Fore.RED + separator_minor)
+        input(Fore.YELLOW + "\nPress Enter to return to the main menu..." + Style.RESET_ALL)
+        # Clear terminal before returning to main menu prompt
+        self._clear_terminal()
+        self._display_header()
+
     def _get_surah_number(self) -> Optional[int]:
         # Navigation Menu
         box_width = 26  # Adjust width if needed
@@ -236,6 +293,7 @@ class QuranApp:
                 print(Fore.RED + f"│ • {Fore.CYAN}list{Fore.WHITE}: Display list of Surahs")
                 print(Fore.RED + f"│ • {Fore.CYAN}sub{Fore.WHITE}: Create subtitles for Ayahs")
                 print(Fore.RED + f"│ • {Fore.CYAN}clearaudio{Fore.WHITE}: Clear audio cache")
+                print(Fore.RED + f"│ • {Fore.CYAN}info{Fore.WHITE}: Show help and information")
                 print(Fore.RED + f"│ • {Fore.CYAN}quit{Fore.WHITE}: Exit the application")
                 print(Fore.RED + "╰" + separator)
                     
@@ -268,6 +326,10 @@ class QuranApp:
                 elif user_input == 'clearaudio':
                     self._clear_audio_cache()
                     continue
+                elif user_input == 'info': # Handle the 'info' command
+                    self._display_info()
+                    continue # Go back to the start of the loop to show the prompt again
+            
                 # Check if input is a number
                 elif user_input.isdigit():
                     number = int(user_input)
