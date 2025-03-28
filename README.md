@@ -13,7 +13,7 @@
 [![Discord](https://img.shields.io/discord/1263384048194027520?label=Join%20Us%20on%20Discord&logo=discord)](https://discord.gg/kvAZvdkuuN )
 
 
- <img src="https://github.com/user-attachments/assets/a7de16d4-eba6-4645-b5a5-8e9c7978ded3" alt="Demo" width="550">
+ <img src="https://github.com/user-attachments/assets/a7de16d4-eba6-4645-b5a5-8e9c7978ded3" alt="Demo" width="800">
 
 
 
