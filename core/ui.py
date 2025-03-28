@@ -12,7 +12,9 @@ import platformdirs
 if sys.platform == "win32":
     import msvcrt
     
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
+if TYPE_CHECKING: # Avoid circular import issues for type hints
+    from core.download_counter import DownloadCounter
 from colorama import Fore, Style, Back
 from core.models import Ayah, SurahInfo
 from core.audio_manager import AudioManager
@@ -29,7 +31,7 @@ import socketserver
 class UI:
 
 
-    def __init__(self, audio_manager: AudioManager, term_size, data_handler: QuranDataHandler, github_updater: Optional[GithubUpdater] = None, preferences: dict = None, preferences_file_path: str = None):
+    def __init__(self, audio_manager: AudioManager, term_size, data_handler: QuranDataHandler, github_updater: Optional[GithubUpdater] = None, preferences: dict = None, preferences_file_path: str = None, download_counter: Optional['DownloadCounter'] = None):
         """
         Initialize the UI.
 
@@ -45,6 +47,7 @@ class UI:
         self.term_size = term_size
         self.data_handler = data_handler
         self.github_updater = github_updater
+        self.download_counter = download_counter 
         self.update_message = self._get_update_message()
         # Store the externally determined path for saving
         self.preferences_file = preferences_file_path
@@ -101,11 +104,29 @@ class UI:
 
         if update_message:
             print(update_message)  # Print directly instead of wrapping
+            
 
+        # --- Fetch Download Count ---
+        download_count_str = "N/A" # Default
+        if self.download_counter:
+            count = self.download_counter.get_total_downloads()
+            if count is not None and count >= 0:
+                try:
+                     download_count_str = f"{count:,}" # Format with commas
+                except ValueError: # Handle potential formatting errors
+                     download_count_str = str(count)
+        # --- End Fetch ---
+
+        box_width = 53 # Keep consistent width
+        
         print(Fore.RED + "╭──" + Style.BRIGHT + Fore.GREEN + "✨ As-salamu alaykum! " + Fore.RED + Style.NORMAL + "─" * 26 + "╮")
         print(Fore.RED + "│ " + Fore.LIGHTMAGENTA_EX + "QuranCLI – Read, Listen & Generate Captions".ljust(49) + Fore.RED + "│")
         print(Fore.RED + "├" + "─" * 50 + "┤")
         print(Fore.RED + "│ " + Style.BRIGHT + "Version: " + Style.NORMAL + f"v{VERSION}".ljust(40) + "│")
+        # --- Add Downloads Line ---
+        downloads_line = f"{Style.BRIGHT}Downloads: {Style.NORMAL}{Fore.MAGENTA}{download_count_str}✨"
+        print(Fore.RED + "│ " + downloads_line.ljust(box_width + len(Style.BRIGHT+Style.NORMAL)) + Fore.RED + "│" + Style.RESET_ALL)
+        # --- End Add ---
         print(Fore.RED + "│ " + Style.BRIGHT + "Author: " + Style.NORMAL + "https://github.com/anonfaded".ljust(41) + "│")
         print(Fore.RED + "├" + "─" * 50 + "┤")
         print(Fore.RED + "│ " + Style.BRIGHT + "Instructions:".ljust(49) + Style.NORMAL + "│")

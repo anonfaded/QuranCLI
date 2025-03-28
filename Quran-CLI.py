@@ -89,6 +89,7 @@ else:
     from core.audio_manager import AudioManager
     from core.ui import UI
     from core.github_updater import GithubUpdater
+    from core.download_counter import DownloadCounter
     from core.version import VERSION
 
     from typing import  Optional
@@ -123,6 +124,9 @@ class QuranApp:
 
         # Initialize GithubUpdater
         self.updater = GithubUpdater("anonfaded", "QuranCLI", VERSION)
+        
+        # --- Create DownloadCounter Instance ---
+        self.download_counter = DownloadCounter(repo_owner="anonfaded", repo_name="QuranCLI")
 
         # --- Initialize UI ONCE, passing necessary arguments ---
         self.ui = UI(
@@ -131,7 +135,8 @@ class QuranApp:
             data_handler=self.data_handler,
             github_updater=self.updater,
             preferences=self.preferences, # Pass loaded preferences dict
-            preferences_file_path=self.preferences_file # Pass the path string
+            preferences_file_path=self.preferences_file, # Pass the path string
+            download_counter=self.download_counter # Pass the download counter instance
         )
         # --- End UI Initialization ---
 
