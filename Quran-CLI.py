@@ -330,7 +330,7 @@ class QuranApp:
                 separator = "─" * box_width
 
                 # Descriptive command list with colors
-                print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.GREEN + "📜 Available Commands")
+                print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📜 Available Commands")
                 print(Fore.RED + f"│ • {Fore.CYAN}1-114{Fore.WHITE}: Select Surah by number")
                 print(Fore.RED + f"│ • {Fore.CYAN}Surah Name{Fore.WHITE}: Search Surah {Style.DIM}(e.g., 'Rahman')")
                 print(Fore.RED + f"│ • {Fore.CYAN}list{Fore.WHITE}: Display list of Surahs")

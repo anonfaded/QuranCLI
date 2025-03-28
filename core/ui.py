@@ -13,7 +13,7 @@ if sys.platform == "win32":
     import msvcrt
     
 from typing import List, Optional
-from colorama import Fore, Style
+from colorama import Fore, Style, Back
 from core.models import Ayah, SurahInfo
 from core.audio_manager import AudioManager
 from core.github_updater import GithubUpdater  # Import GithubUpdater
@@ -693,13 +693,21 @@ class UI:
 
                 if server_running:
                     print(Fore.GREEN + f"\nShare link on your network:")
-                    print(Fore.YELLOW + f"      🚀✨ http://{ip_address}:{PORT} ✨🚀")
+                    print(f"      🚀✨ " + Back.MAGENTA + Fore.WHITE + f" http://{ip_address}:{PORT} " + Style.RESET_ALL + " ✨🚀      ")
+                    print(Fore.WHITE + Style.DIM + "\n   Open this link in your browser to view and manage your subtitle files with a better UI.\n   You can also access it from your phone or any device connected to the same Wi-Fi network to download files easily.")
+                    
+                    print(Fore.CYAN + Style.BRIGHT + "\n📌 Next Steps: Adding Captions to your Video" + Fore.WHITE + Style.DIM + " (e.g., in CapCut) ")
+                    print("    1️⃣  Download the .srt subtitle file on your phone.")
+                    print("    2️⃣  Open CapCut and load your video.")
+                    print("    3️⃣  Go to the 'Captions' section.")
+                    print("    4️⃣  Click on 'Import Captions' and select the downloaded .srt file.")
+                    print("    5️⃣  The captions will be auto-added! 🎉 You can now adjust and sync them manually.")
                 else:
                     print(Fore.YELLOW + "\nWeb sharing disabled/failed.")
 
                 box_width = 26
                 separator = "─" * box_width
-                print("\n" + Style.BRIGHT + Fore.RED + "╭─ " + Fore.GREEN + "📜 Commands")
+                print("\n" + Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📜 Available Commands")
                 print(Fore.RED + f"│ • {Fore.CYAN}open{Fore.WHITE}: Open folder containing subtitle")
                 print(Fore.RED + f"│ • {Fore.CYAN}back{Fore.WHITE}: Return to Main Menu")
                 print(Fore.RED + "╰" + separator)
