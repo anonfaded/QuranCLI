@@ -1,0 +1,27 @@
+--------------------------------------------------
+✨ As-salamu alaykum! Welcome to the QuranCLI Setup Wizard! ✨
+--------------------------------------------------
+
+This wizard will guide you through the installation of QuranCLI.
+
+QuranCLI is your powerful command-line companion for interacting with the Holy Quran, allowing you to:
+
+  * 📖 Read the Quran with Simple and Uthmani scripts.
+  * 🎧 Listen to beautiful recitations from various reciters.
+  * 🎬 Generate timestamped subtitle files (.srt) for video editing.
+  * 💾 Work offline with cached Quran text and audio.
+  * ✨ Automatically check for application updates.
+
+--------------------------------------------------
+Important Notes:
+--------------------------------------------------
+
+ * Installation Location: You will be asked where to install QuranCLI.
+ * Data Storage:
+    - Cache (Quran text, audio), configuration, and logs will be stored in the same folder where you install QuranCLI.
+    - Generated Subtitle files (.srt) will be saved in your Documents folder under "QuranCLI Subtitles".
+ * No separate Python installation is required to run this application.
+
+--------------------------------------------------
+
+Thank you for choosing QuranCLI!

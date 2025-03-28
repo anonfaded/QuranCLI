@@ -1,0 +1,38 @@
+--------------------------------------------------
+ QuranCLI Installation Complete! ✅
+--------------------------------------------------
+
+QuranCLI has been successfully installed on your computer.
+
+--------------------------------------------------
+ How to Run QuranCLI:
+--------------------------------------------------
+
+You can start QuranCLI in the following ways:
+
+ * From your Start Menu (Look for a "QuranCLI" entry).
+ * Using the Desktop shortcut (if you chose to create one during setup).
+
+Once the application starts in its terminal window:
+
+ * Type 'info' and press Enter to see a detailed list of commands and credits.
+ * Type 'quit' or 'exit' and press Enter to close the application.
+
+--------------------------------------------------
+ Subtitle Files Location:
+--------------------------------------------------
+
+ * Remember, any subtitle (.srt) files you generate using the 'sub' command will be saved in your Documents folder, inside a directory named "QuranCLI Subtitles".
+
+--------------------------------------------------
+ Support & Feedback:
+--------------------------------------------------
+
+ * Found a bug? Have a great idea for a new feature?
+ * Please open an issue on our GitHub page:
+   https://github.com/anonfaded/QuranCLI/issues
+
+--------------------------------------------------
+
+Thank you for installing QuranCLI! I hope you find it beneficial.
+

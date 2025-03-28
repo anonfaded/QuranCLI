@@ -15,3 +15,5 @@ dist/
 build/
 preferences.json
 download_cache.json
+QuranCLI-Setup.exe
+cache/quran_data.json
