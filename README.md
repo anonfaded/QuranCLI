@@ -106,10 +106,13 @@ QuranCLI brings the Quran to your Windows command line with a rich set of featur
 
 ### Option 1: Windows Installer (Recommended)
 
+[<img src="https://raw.githubusercontent.com/vadret/android/master/assets/get-github.png" alt="Get it on GitHub" height="70">](https://github.com/anonfaded/QuranCLI/releases)
+
 1.  Go to the **[Releases Page](https://github.com/anonfaded/QuranCLI/releases)**.
 2.  Download the latest `QuranCLI-Setup.exe` file.
 3.  Run the installer and follow the on-screen instructions.
 4.  Launch QuranCLI from your Start Menu or Desktop shortcut!
+
 
 ### Option 2: From Source (Developers / Other Platforms)
 
