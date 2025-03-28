@@ -11,3 +11,5 @@ repomix-output.md
 repomix.config.json
 /core/preferences.json
 node_modules/
+dist/
+build/
