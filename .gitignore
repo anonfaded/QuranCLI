@@ -13,3 +13,4 @@ repomix.config.json
 node_modules/
 dist/
 build/
+preferences.json
