@@ -9,5 +9,4 @@ aiohttp
 aiofiles
 keyboard
 mutagen
-shutil
-difflib
+platformdirs

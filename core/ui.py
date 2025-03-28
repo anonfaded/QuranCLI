@@ -7,6 +7,7 @@ import keyboard
 import json
 import os
 import datetime
+import platformdirs
 
 if sys.platform == "win32":
     import msvcrt
@@ -18,6 +19,7 @@ from core.audio_manager import AudioManager
 from core.github_updater import GithubUpdater  # Import GithubUpdater
 from core.version import VERSION  # Import VERSION
 from core.quran_data_handler import QuranDataHandler
+from .utils import get_app_path # Keep this for web assets
 
 import socket #For Ip Adresses
 import threading #Add threading for server
@@ -25,18 +27,54 @@ import http.server
 import socketserver
 
 class UI:
-    def __init__(self, audio_manager: AudioManager, term_size, data_handler: QuranDataHandler, github_updater: Optional[GithubUpdater] = None, preferences: dict = None):
+
+
+    def __init__(self, audio_manager: AudioManager, term_size, data_handler: QuranDataHandler, github_updater: Optional[GithubUpdater] = None, preferences: dict = None, preferences_file_path: str = None):
+        """
+        Initialize the UI.
+
+        Args:
+            audio_manager: Instance for handling audio.
+            term_size: Terminal size information.
+            data_handler: Instance for handling Quran data.
+            github_updater: Instance for checking updates.
+            preferences: Dictionary containing loaded preferences.
+            preferences_file_path: The absolute path to the preferences file (determined externally).
+        """
         self.audio_manager = audio_manager
         self.term_size = term_size
-        self.data_handler = data_handler  # Store data_handler
-        self.github_updater = github_updater  # Store GithubUpdater
-        self.update_message = self._get_update_message() # Get the update message during initialization
-        self.preferences = preferences or {} # Load preferences
-        self.preferences_file = os.path.join(os.path.dirname(__file__), 'preferences.json') # Preferences file location
-        self.httpd = None #Add HTTPServer
-        
-    def save_preferences(self):
+        self.data_handler = data_handler
+        self.github_updater = github_updater
+        self.update_message = self._get_update_message()
+        # Store the externally determined path for saving
+        self.preferences_file = preferences_file_path
+        # Use the already loaded preferences
+        self.preferences = preferences if preferences is not None else self._load_preferences() # Keep fallback loading just in case
+        self.httpd = None
+        self.server_thread = None # Initialize server_thread attribute
+
+    def _load_preferences(self) -> dict:
+        """Fallback method to load preferences if not provided or path is missing."""
+        if not self.preferences_file or not os.path.exists(self.preferences_file):
+            # print(Fore.YELLOW + "Preferences file path not set or file not found.") # Optional logging
+            return {}
         try:
+            with open(self.preferences_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
+            # print(Fore.RED + f"Error loading preferences in UI fallback: {e}") # Optional logging
+            return {}
+        
+
+
+    def save_preferences(self):
+        """Saves the current preferences dictionary to the file."""
+        if not self.preferences_file:
+            print(Fore.RED + "\nError: Preferences file path not set. Cannot save.")
+            return
+        try:
+            # Ensure the directory exists (belt-and-suspenders, might be handled elsewhere)
+            os.makedirs(os.path.dirname(self.preferences_file), exist_ok=True)
             with open(self.preferences_file, 'w', encoding='utf-8') as f:
                 json.dump(self.preferences, f, ensure_ascii=False, indent=2)
         except Exception as e:
@@ -204,97 +242,138 @@ class UI:
 
 
 
+# core/ui.py (inside class UI)
+
     def handle_audio_choice(self, choice: str, surah_info: SurahInfo):
-        """Handle audio control input"""
+        """Handle audio control input and force display refresh after load/action."""
+        needs_redraw = False # Flag to indicate if redraw is needed at the end
         try:
             if choice == 'p':
-                surah_num = surah_info.surah_number # Get surah number
-                if not self.audio_manager.current_audio or self.audio_manager.current_surah != surah_num:
-                    # Reset audio state for new surah
+                surah_num = surah_info.surah_number
+                load_new = (not self.audio_manager.current_audio or
+                            self.audio_manager.current_surah != surah_num)
+
+                if load_new:
                     self.audio_manager.stop_audio(reset_state=True)
-                    print(Fore.YELLOW + "\nℹ Loading default reciter...")
-
-                    # Use saved reciter if available
-                    if str(surah_num) in self.preferences:
-                        reciter_data = self.preferences[str(surah_num)]
-                        print(Fore.GREEN + f"\n✅ Using saved reciter for Surah {surah_num}: {reciter_data['reciter_name']}")
-                        audio_url = reciter_data["reciter_url"]
-                        reciter_name = reciter_data["reciter_name"]
-
-                    else:
-                        # Fallback to default reciter
+                    print(Fore.YELLOW + "\nℹ Loading default reciter...") # Show status before potential long wait
+                    reciter_pref = self.preferences.get(str(surah_num))
+                    # ... (logic to determine audio_url and reciter_name - keep as before) ...
+                    if reciter_pref and "reciter_url" in reciter_pref and "reciter_name" in reciter_pref:
+                        audio_url, reciter_name = reciter_pref["reciter_url"], reciter_pref["reciter_name"]
+                        print(Fore.GREEN + f" ✅ Using saved reciter: {reciter_name}")
+                    elif surah_info.audio:
                         reciter_id = next(iter(surah_info.audio))
-                        audio_url = surah_info.audio[reciter_id]["url"]
-                        reciter_name = surah_info.audio[reciter_id]["reciter"]
+                        audio_url, reciter_name = surah_info.audio[reciter_id]["url"], surah_info.audio[reciter_id]["reciter"]
+                        print(Fore.YELLOW + f" ⚠️ No preference saved, using default: {reciter_name}")
+                    else:
+                        print(Fore.RED + "\n❌ No audio data found."); return
 
+                    # --- Run download and play ---
                     asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_name))
+                    # --- Directly redraw after async call completes ---
+                    self._redraw_audio_ui(surah_info) # Call the redraw helper
+                    # --- End Direct Redraw ---
+
                 elif self.audio_manager.is_playing:
                     self.audio_manager.pause_audio()
+                    needs_redraw = True # Redraw after pause
                 else:
                     self.audio_manager.resume_audio()
+                    needs_redraw = True # Redraw after resume
 
             elif choice == 's':
                 self.audio_manager.stop_audio(reset_state=True)
+                print(Fore.RED + "⏹ Audio stopped and reset.")
+                needs_redraw = True # Redraw after stop
 
-            elif choice == 'r':
-                surah_num = surah_info.surah_number  # Get surah number
+            elif choice == 'r': # Change Reciter
+                surah_num = surah_info.surah_number
                 if not surah_info.audio:
-                    print(Fore.RED + "\nNo reciters available")
-                    return
+                    print(Fore.RED + "\n❌ No reciters available."); return
 
-                while True:  # Add loop for reciter selection
-                    self.clear_terminal()  # Clear before showing options
-                    print(Style.BRIGHT + Fore.RED + "\nAudio Player - " +
-                        Fore.CYAN + f"{surah_info.surah_name}")
+                original_display_needs_restore = True
+                while True: # Reciter selection loop
+                    self.clear_terminal()
+                    print(Style.BRIGHT + Fore.RED + "\nAudio Player - Select Reciter" + Style.RESET_ALL)
+                    # ... (display reciter options - keep as before) ...
+                    reciter_options = list(surah_info.audio.items())
+                    for i, (rid, info) in enumerate(reciter_options): print(f"{Fore.GREEN}{i+1}{Fore.WHITE}: {info['reciter']}")
 
-                    print(Fore.CYAN + "\nAvailable Reciters:")
-                    reciter_options = []
-                    for rid, info in surah_info.audio.items():
-                        print(f"{Fore.GREEN}{rid}{Fore.WHITE}: {info['reciter']}")
-                        reciter_options.append((rid, info))
-
-                    print(Fore.WHITE + "\nEnter reciter number" +
-                        Fore.YELLOW + " (or 'q' to cancel)" +
-                        Fore.WHITE + ": ", end="", flush=True)
+                    print(Fore.WHITE + "\nEnter number ('q' to cancel): ", end="", flush=True)
 
                     try:
-                        reciter_input = msvcrt.getch().decode()
+                         reciter_input = input().strip().lower()
+                         if reciter_input == 'q': break
 
-                        if reciter_input.lower() == 'q':
-                            # Clear and restore audio player display
-                            self.clear_terminal()
-                            print(self.get_audio_display(surah_info), end='', flush=True)
-                            break
+                         if reciter_input.isdigit():
+                             choice_idx = int(reciter_input) - 1
+                             if 0 <= choice_idx < len(reciter_options):
+                                 # ... (get selected reciter info - keep as before) ...
+                                 selected_id, selected_info = reciter_options[choice_idx]
+                                 audio_url, reciter_name = selected_info["url"], selected_info["reciter"]
 
-                        selected_reciter_info = surah_info.audio.get(reciter_input)
+                                 print(f"\n{Fore.CYAN}Selected: {reciter_name}")
+                                 self.audio_manager.stop_audio(reset_state=True)
 
-                        if selected_reciter_info:
-                            audio_url = selected_reciter_info["url"]
-                            reciter_name = selected_reciter_info["reciter"]
-                            self.audio_manager.stop_audio()  # Stop current audio before changing
-                            asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_name))
+                                 # --- Run download and play ---
+                                 asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_name))
+                                 # --- Directly redraw after async call ---
+                                 self._redraw_audio_ui(surah_info)
+                                 # --- End Direct Redraw ---
 
-                            # Save reciter preference
-                            self.preferences[str(surah_num)] = {
-                                "reciter_name": reciter_name,
-                                "reciter_url": audio_url
-                            }
-                            self.save_preferences()
-                            break
-                        else:
-                            print(Fore.RED + "\nInvalid selection. Please choose a valid reciter number.")
-                            time.sleep(1.5)
-                            continue
+                                 # Save preference
+                                 self.preferences[str(surah_num)] = {"reciter_name": reciter_name, "reciter_url": audio_url}
+                                 self.save_preferences()
+                                 print(Fore.GREEN + " Preference saved.") # Add space
+                                 original_display_needs_restore = False
+                                 time.sleep(1.0) # Shorter pause
+                                 break # Exit selection loop successfully
+                             else: print(Fore.RED + "\nInvalid number.")
+                         else: print(Fore.RED + "\nInvalid input.")
 
-                    except (UnicodeDecodeError, AttributeError):
-                        print(Fore.RED + "\nInvalid input. Please try again.")
-                        time.sleep(1.5)
-                        continue
+                    except ValueError: print(Fore.RED + "\nInvalid number input.")
+                    except KeyboardInterrupt: print(Fore.YELLOW + "\nSelection cancelled."); break
+                    except Exception as e_sel: print(Fore.RED + f"\nError during selection: {e_sel}")
+                    time.sleep(1.5)
+                # End reciter selection loop
+
+                # Only redraw main UI if user cancelled or selection failed before loading new audio
+                if original_display_needs_restore:
+                    needs_redraw = True
+
+            # If any action indicated a redraw is needed (pause, resume, stop, cancel reciter select)
+            if needs_redraw:
+                 self._redraw_audio_ui(surah_info)
+
 
         except Exception as e:
-            print(Fore.RED + f"\nError handling audio command: {e}")
+            print(Fore.RED + f"\nError handling audio command '{choice}': {e}")
             time.sleep(1)
+            # Try to redraw even on error to restore some UI state
+            self._redraw_audio_ui(surah_info)
 
+# core/ui.py (inside class UI)
+
+    def _redraw_audio_ui(self, surah_info: SurahInfo):
+        """Helper function to clear terminal and redraw the audio UI."""
+        try:
+            # Get the latest display string
+            display_string = self.get_audio_display(surah_info)
+            # --- ALWAYS CLEAR ---
+            self.clear_terminal()
+            # --- END ALWAYS CLEAR ---
+            # Print the display string
+            print(display_string, end='', flush=True)
+            # Return the string that was printed, can be used for last_display
+            return display_string
+        except Exception as e:
+            # Fallback if redraw fails
+            # Avoid recursion if clear_terminal itself fails
+            try: self.clear_terminal()
+            except: pass
+            print(f"\n{Fore.RED}Error during redraw: {e}{Style.RESET_ALL}")
+            return None # Indicate failure
+        
     async def handle_audio_playback(self, url: str, surah_num: int, reciter: str):
         """Handle audio download and playback"""
         try:
@@ -310,6 +389,8 @@ class UI:
 
     def display_audio_controls(self, surah_info: SurahInfo):
         """Display audio controls with real-time updates"""
+
+        
         if not surah_info.audio:
             print(Fore.RED + "\n❌ Audio not available for this surah")
             return
@@ -320,113 +401,178 @@ class UI:
             print(Fore.RED + f"\nWarning: Keyboard shortcuts not available: {e}")
 
         last_display = ""
-
+        running = True
+        # --- REMOVED error_logged flag and force_redraw_flag ---
         try:
-            while True:
-                try:
-                    if msvcrt.kbhit():
-                        try:
-                            key_byte = msvcrt.getch()
-                            # Skip special keys
-                            if key_byte == b'\xe0':
-                                msvcrt.getch()  # Consume the second byte
-                                continue
-                            
-                            choice = key_byte.decode('ascii', errors='ignore').lower()
-                            if choice == 'q':
-                                break
-                            elif choice == '[':
-                                self.audio_manager.seek(max(0, self.audio_manager.current_position - 5))
-                            elif choice == ']':
-                                self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 5))
-                            elif choice == 'j':
-                                self.audio_manager.seek(max(0, self.audio_manager.current_position - 30))
-                            elif choice == 'k':
-                                self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 30))
-                            else:
-                                self.handle_audio_choice(choice, surah_info)
-                                    
-                        except UnicodeDecodeError:
-                            continue
+            # --- Initial Draw ---
+            # Perform an initial draw when entering the controls
+            last_display = self._redraw_audio_ui(surah_info) or ""
+            # --- End Initial Draw ---
 
-                    # Update display only if changed
-                    current_display = self.get_audio_display(surah_info)
-                    if current_display != last_display:
-                        self.clear_terminal()
-                        print(current_display, end='', flush=True)
-                        last_display = current_display
-                        sys.stdout.flush()
+            while running:
+                # --- Input Handling (Keep existing msvcrt logic) ---
+                choice = None
+                if sys.platform == "win32" and msvcrt.kbhit():
+                    try:
+                        key_byte = msvcrt.getch()
+                        if key_byte == b'\x00' or key_byte == b'\xe0': msvcrt.getch(); continue
+                        else: choice = key_byte.decode('ascii', errors='ignore').lower()
+                    except (UnicodeDecodeError, Exception): continue
+                # --- End Input Handling ---
 
-                    time.sleep(0.1)
-                    continue  # Continue instead of break to keep player running
-                except Exception as e:
-                    print(Fore.RED + f"\nError in audio control loop: {e}")
-                    time.sleep(1)
-                    continue
+                # --- Process Input Choice (Directly call redraw for seek) ---
+                if choice:
+                    if choice == 'q': running = False
+                    elif choice == '[': self.audio_manager.seek(max(0, self.audio_manager.current_position - 5)); last_display = self._redraw_audio_ui(surah_info) or last_display # Redraw after seek, no full clear
+                    elif choice == ']': self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 5)); last_display = self._redraw_audio_ui(surah_info) or last_display
+                    elif choice == 'j': self.audio_manager.seek(max(0, self.audio_manager.current_position - 30)); last_display = self._redraw_audio_ui(surah_info) or last_display
+                    elif choice == 'k': self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 30)); last_display = self._redraw_audio_ui(surah_info) or last_display
+                    elif choice in ['p', 's', 'r']:
+                        # handle_audio_choice now handles redraw for these actions
+                        self.handle_audio_choice(choice, surah_info)
+                        # We might need to update last_display *after* handle_audio_choice redraws
+                        # Let's get the latest state again for comparison
+                        current_state_str = self.get_audio_display(surah_info) # Get potentially updated string
+                        last_display = current_state_str # Assume redraw happened, update last_display
+
+                    # Reset error state? Maybe not needed if redraw works
+                    # error_logged = False
+                # --- End Process Input Choice ---
+
+                # --- Normal Display Update (less frequent) ---
+                # Only redraw based on time if no key was pressed and audio is playing
+                elif not choice and self.audio_manager.is_playing:
+                    try:
+                        current_display = self.get_audio_display(surah_info)
+                        if current_display != last_display:
+                             # Use redraw helper, but don't force full clear for minor updates
+                            last_display = self._redraw_audio_ui(surah_info) or last_display
+                    except Exception as e:
+                        # Simplified error handling for regular updates
+                        # print(f"Minor display update error: {e}") # Debug only
+                        pass # Ignore minor update errors silently
+                # --- End Normal Display Update ---
+
+
+                # --- Check if audio finished playing naturally ---
+                # This check might now be less critical if redraws happen correctly, but keep it
+                if (not self.audio_manager.is_playing and self.audio_manager.current_audio and
+                   self.audio_manager.duration > 0 and
+                   self.audio_manager.current_position >= self.audio_manager.duration - 0.1):
+                     # Check if display *needs* update (might already show finished)
+                     current_state_str_check = self.get_audio_display(surah_info)
+                     if last_display != current_state_str_check:
+                         last_display = self._redraw_audio_ui(surah_info) or last_display
+
+                time.sleep(0.1) # Main loop delay
+
+        except KeyboardInterrupt:
+             print(Fore.YELLOW + "\nAudio controls interrupted.")
         finally:
-            try:
-                keyboard.unhook_all()
-                self.audio_manager.stop_audio()
-            except Exception:
-                pass
+             print(Fore.YELLOW + "\nExiting audio player.")
+             self.audio_manager.stop_audio(reset_state=True)
         
+# core/ui.py (inside class UI)
+
     def get_audio_display(self, surah_info: SurahInfo) -> str:
-        """Get current audio display with input hints"""
+        """Get current audio display string with controls (Defensive Version)."""
+        # --- Try to import and get references ---
+        _Style, _Fore, _RESET = None, None, ""
+        try:
+            # Import locally within the function call
+            from colorama import Fore as ColoramaFore, Style as ColoramaStyle
+            _Fore = ColoramaFore
+            _Style = ColoramaStyle
+            _RESET = _Style.RESET_ALL
+        except (ImportError, NameError):
+            # Fallback if colorama itself is missing or failed basic import
+            # --- CORRECTED BLOCK ---
+            class DummyColor:
+                # Define __getattr__ with proper indentation
+                def __getattr__(self, name):
+                    return "" # Return empty string for any attribute
+            # --- END CORRECTED BLOCK ---
+            _Fore = _Style = DummyColor() # Assign instance of the dummy class
+            _RESET = ""
+            # print("DEBUG: Failed to import colorama in get_audio_display") # Optional Debug
+
+        # --- Helper function to safely get attributes ---
+        def safe_style(attr_name, fallback=""):
+            if not _Style: return fallback
+            try: return getattr(_Style, attr_name, fallback)
+            except Exception: return fallback
+
+        def safe_fore(attr_name, fallback=""):
+            if not _Fore: return fallback
+            try: return getattr(_Fore, attr_name, fallback)
+            except Exception: return fallback
+
+        # --- Use safe accessors ---
+        _Style_BRIGHT = safe_style("BRIGHT")
+        _Fore_RED = safe_fore("RED")
+        _Fore_CYAN = safe_fore("CYAN")
+        _Fore_GREEN = safe_fore("GREEN")
+        _Fore_YELLOW = safe_fore("YELLOW")
+        _Fore_WHITE = safe_fore("WHITE")
+        _Fore_MAGENTA = safe_fore("MAGENTA")
+        _Fore_BLUE = safe_fore("BLUE")
+        # --- Try DIM again, safely ---
+        _Style_DIM = safe_style("DIM")
+
         output = []
-        output.append(Style.BRIGHT + Fore.RED + "\nAudio Player - " +
-                    Fore.CYAN + f"{surah_info.surah_name}")
+        output.append(_Style_BRIGHT + _Fore_RED + "\nAudio Player - " +
+                      _Fore_CYAN + f"{surah_info.surah_name}" + _RESET)
 
-        # Check if audio file exists locally
-        audio_file_exists = False
-        if surah_info.audio:
-            reciter_id = next(iter(surah_info.audio))  # Get first reciter
-            audio_url = surah_info.audio[reciter_id]["url"]
-            reciter_name = surah_info.audio[reciter_id]["reciter"]
-            audio_file_path = self.audio_manager.get_audio_path(surah_info.surah_number, reciter_name)
-            audio_file_exists = audio_file_path.exists()
+        # Determine state (same logic as before)
+        state = "⏹ Stopped"
+        state_color = _Fore_RED
+        reciter_name = self.audio_manager.current_reciter or "None"
+        if self.audio_manager.is_playing: state, state_color = "▶ Playing", _Fore_GREEN
+        elif self.audio_manager.current_audio:
+            is_finished = (self.audio_manager.duration > 0 and
+                           self.audio_manager.current_position >= self.audio_manager.duration - 0.1)
+            if is_finished: state, state_color = "✅ Finished", _Fore_YELLOW
+            else: state, state_color = "⏸ Paused", _Fore_YELLOW
+        else: state, state_color, reciter_name = "ℹ Not Loaded", _Fore_YELLOW, "None"
+        current_reciter_display = self.audio_manager.current_reciter or reciter_name
 
-        # Only show audio info if it matches current surah
-        if (not self.audio_manager.current_audio or
-            self.audio_manager.current_surah != surah_info.surah_number) and not audio_file_exists:
-            output.append(Style.BRIGHT + Fore.YELLOW + "\n\nℹ Press 'p' to download and play audio")
-        else:
-            if self.audio_manager.is_playing and self.audio_manager.current_position < self.audio_manager.duration:
-                state = "▶ Playing"
-                state_color = Fore.GREEN
-            elif self.audio_manager.current_audio and self.audio_manager.current_position >= self.audio_manager.duration: # check audip and position
-                state = "Audio finished"
-                state_color = Fore.YELLOW
-            else:
-                state = "⏸ Paused"
-                state_color = Fore.YELLOW
+        output.append(f"\nState  : {state_color}{state}{_RESET}")
+        output.append(f"Reciter: {_Fore_CYAN}{current_reciter_display}{_RESET}")
 
-            output.append(f"\nState: {state_color}{state}")
-            output.append(f"Reciter: {Fore.CYAN}{self.audio_manager.current_reciter}")
+        # Progress Bar
+        if self.audio_manager.duration > 0:
+            output.append("\nProgress:")
+            # Assume get_progress_bar is also defensive or works
+            output.append(self.audio_manager.get_progress_bar())
+        elif state not in ["ℹ Not Loaded"]:
+             # Use safe DIM
+            output.append("\nProgress: " + _Style_DIM + "N/A" + _RESET)
 
-            if self.audio_manager.duration:
-                output.append("\nProgress:")
-                output.append(self.audio_manager.get_progress_bar())
+        # Hints
+        if state == "ℹ Not Loaded": output.append(_Fore_YELLOW + "\nPress 'p' to download and play." + _RESET)
+        if state == "✅ Finished": output.append(_Fore_YELLOW + "\nPress 's' to stop/reset or 'p' to replay." + _RESET)
 
-            if state == "Audio finished":#show only if that is the state
-                output.append(Style.DIM + Fore.YELLOW + "\nPress 's' to stop and reset")
-
-        # Navigation Menu
-        box_width = 26  # Adjust width if needed
+        # Controls Menu
+        box_width = 26
         separator = "─" * box_width
-            
-        output.append(Style.BRIGHT + Fore.RED + "\n╭─ " + Fore.GREEN + "🎛️  Audio Controls")
-        output.append(Fore.RED + "│ • " + Fore.CYAN + "p " + Fore.WHITE + ": Play/Pause")
-        output.append(Fore.RED + "│ • " + Fore.GREEN + "[ / ] " + Fore.WHITE + ": Seek 5s")
-        output.append(Fore.RED + "│ • " + Fore.MAGENTA + "j / k " + Fore.WHITE + ": Seek 30s")
-        output.append(Fore.RED + "│ • " + Fore.YELLOW + "s " + Fore.WHITE + ": Stop")
-        output.append(Fore.RED + "│ • " + Fore.RED + "r " + Fore.WHITE + ": Change Reciter")
-        output.append(Fore.RED + "│ • " + Fore.BLUE + "q " + Fore.WHITE + ": Return")
-        output.append(Fore.RED + "╰" + separator)
+        output.append(_Style_BRIGHT + _Fore_RED + "\n╭─ " + _Fore_GREEN + "🎛️  Audio Controls" + _RESET)
+        output.append(_Fore_RED + "│ • " + _Fore_CYAN + "p " + _Fore_WHITE + ": Play/Pause/Replay" + _RESET)
+        output.append(_Fore_RED + "│ • " + _Fore_YELLOW + "s " + _Fore_WHITE + ": Stop & Reset" + _RESET)
+        # ... (rest of controls using safe variables) ...
+        output.append(_Fore_RED + "│ • " + _Fore_RED + "r " + _Fore_WHITE + ": Change Reciter" + _RESET)
+        output.append(_Fore_RED + "│ • " + _Fore_GREEN + "[ " + _Fore_WHITE + ": Seek Back 5s" + _RESET)
+        output.append(_Fore_RED + "│ • " + _Fore_GREEN + "] " + _Fore_WHITE + ": Seek Fwd 5s" + _RESET)
+        output.append(_Fore_RED + "│ • " + _Fore_MAGENTA + "j " + _Fore_WHITE + ": Seek Back 30s" + _RESET)
+        output.append(_Fore_RED + "│ • " + _Fore_MAGENTA + "k " + _Fore_WHITE + ": Seek Fwd 30s" + _RESET)
+        output.append(_Fore_RED + "│ • " + _Fore_BLUE + "q " + _Fore_WHITE + ": Quit Audio Player" + _RESET)
+        output.append(_Fore_RED + "╰" + separator + _RESET)
 
-            
-        # Add dim input hint
-        output.append(Style.DIM + Fore.WHITE + "\nPress any key to execute command (no Enter needed)")
-        output.append(Fore.RED + "└──╼ " + Fore.WHITE)
+        # Input Hint - Use safe DIM
+        if sys.platform == "win32":
+             output.append(_Style_DIM + _Fore_WHITE + "\nPress key directly (no Enter needed)" + _RESET)
+        else:
+             output.append(_Style_DIM + _Fore_WHITE + "\nType command (p,s,r,q) and press Enter" + _RESET)
+        output.append(_Fore_RED + "└──╼ " + _Fore_WHITE)
 
         return '\n'.join(output)
 
@@ -446,207 +592,278 @@ class UI:
 
 
     def display_subtitle_menu(self, surah_info: SurahInfo):
-        """Handles the subtitle creation process."""
+        """Handles the subtitle creation process, saving to Documents."""
         try:
             surah_number = surah_info.surah_number
             total_ayah = surah_info.total_ayah
 
+            # Ayah range input loop
             while True:
                 try:
-                    self.clear_terminal()  # Clear Terminal
+                    self.clear_terminal()
                     print(Fore.RED + "\n┌─" + Fore.GREEN + Style.BRIGHT + f" Subtitle Creation - Surah {surah_info.surah_name} (1-{total_ayah} Ayahs)")
                     print(Fore.RED + "├──╼ " + Fore.MAGENTA + "Start Ayah" + ":\n", end="")
-                    start_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
+                    start_ayah_str = input(Fore.RED + "│ ❯ " + Fore.WHITE)
                     print(Fore.RED + "├──╼ " + Fore.MAGENTA + "End Ayah" + ":\n", end="")
-                    end_ayah = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
-                    ayah_duration = 5.0
-
+                    end_ayah_str = input(Fore.RED + "│ ❯ " + Fore.WHITE)
+                    start_ayah = int(start_ayah_str)
+                    end_ayah = int(end_ayah_str)
+                    ayah_duration = 5.0 # Default duration
                     if 1 <= start_ayah <= end_ayah <= total_ayah:
                         break
                     else:
-                        print(Fore.RED + "└──╼ " + "Invalid ayah range. Please try again.")
+                        print(Fore.RED + "└──╼ " + Style.BRIGHT + "Invalid ayah range. Please try again.")
+                        time.sleep(1.5)
                 except ValueError:
-                    print(Fore.RED + "└──╼ " + "Invalid input. Please enter integers.")
+                    print(Fore.RED + "└──╼ " + Style.BRIGHT + "Invalid input. Please enter numbers.")
+                    time.sleep(1.5)
                 except KeyboardInterrupt:
                     print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
-                    return  # Return to main menu
+                    return
 
             # Generate SRT content
             srt_content = self.generate_srt_content(surah_number, start_ayah, end_ayah, ayah_duration)
+            if not srt_content:
+                print(Fore.RED + "❌ Failed to generate SRT content. Returning.")
+                return
 
-            # Save the SRT file
-            documents_dir = os.path.join(os.path.expanduser("~"), "Documents")
-            quran_dir = os.path.join(documents_dir, "QuranCLI Subtitles")
-            surah_dir = os.path.join(quran_dir, surah_info.surah_name)
+            # Determine Save Path using platformdirs
+            try:
+                documents_dir = platformdirs.user_documents_dir()
+                quran_dir = os.path.join(documents_dir, "QuranCLI Subtitles")
+                surah_dir = os.path.join(quran_dir, surah_info.surah_name)
+                os.makedirs(surah_dir, exist_ok=True) # Ensure directories exist
+            except Exception as e:
+                print(Fore.RED + f"\n❌ Error accessing Documents directory: {e}")
+                print(Fore.YELLOW + "Cannot save subtitle file.")
+                return
 
-            # Ensure the directories exist
-            os.makedirs(surah_dir, exist_ok=True)
-
-            # Create filename
+            # Create Filename and Save
             now = datetime.datetime.now()
             date_str = now.strftime("%Y-%m-%d")
-            filename = f"Surah{surah_number:03d}_Ayah{start_ayah:03d}-Ayah{end_ayah:03d}_{date_str}.srt"
+            filename = f"Surah{surah_number:03d}_Ayah{start_ayah:03d}-{end_ayah:03d}_{date_str}.srt"
             filepath = os.path.join(surah_dir, filename)
-
             try:
                 with open(filepath, "w", encoding="utf-8") as f:
                     f.write(srt_content)
-
-                print(Fore.GREEN + f"\n✅ Subtitle file saved to: {Fore.RED}{filepath}")  # Red color.
-
+                print(Fore.GREEN + f"\n✅ Subtitle file saved to: {Fore.CYAN}{filepath}")
             except Exception as e:
                 print(Fore.RED + f"\n❌ Error saving subtitle file: {e}")
-                return  # Exit if file saving fails
+                return
 
-            # Server Information
-            PORT = 8000  # Change port number to avoid conflict
+            # --- Get Bundled Web Assets Path using get_app_path ---
+            web_assets_dir = None
+            try:
+                # Use writable=False (default) to get path relative to _MEIPASS/script root
+                web_assets_dir = get_app_path('core/web')
+                if not os.path.exists(os.path.join(web_assets_dir, 'index.html')):
+                     print(Fore.RED + "\n❌ Web server assets (index.html) not found!")
+                     web_assets_dir = None
+            except Exception as e:
+                 print(Fore.RED + f"\n❌ Error finding web assets: {e}")
+                 web_assets_dir = None
+            # --- End Get Bundled Web Assets Path ---
+
+            # Start Server (if assets found)
+            PORT = 8000
             ip_address = self.get_primary_ip_address()
+            server_running = False
+            if web_assets_dir and ip_address:
+                print(Fore.GREEN + f"\nStarting web server to share subtitles...")
+                self.start_server_thread(surah_dir, web_assets_dir, PORT, surah_info.surah_name)
+                # Small delay to allow server thread to potentially print errors
+                time.sleep(0.5)
+                # Check if server actually started (httpd attribute would be set)
+                if self.httpd:
+                    server_running = True
+                else:
+                    print(Fore.YELLOW + "Web server failed to start (check console for errors).")
 
-            # Start the server here:
-            self.start_server_thread(surah_dir, PORT, surah_info.surah_name)  # Starting server
+            else:
+                 print(Fore.YELLOW + "\nWeb server cannot be started (Assets missing or IP not found).")
 
+
+            # Management Console Loop
             while True:
-                self.clear_terminal() #Clear Screen
-                print(Fore.RED + "Subtitle Management Console:") #Heading
-                print(Fore.MAGENTA + "      Subtitle file generated!") #description
-                print(Fore.GREEN + f"\nShare this link with other devices on the same network to browse and download subtitle files of {Fore.MAGENTA}{surah_info.surah_name}:" + Fore.WHITE)
-                print(" ")
-                print(Fore.YELLOW + f"      🚀✨  http://{ip_address}:{PORT} ✨🚀" + Fore.WHITE) #The Link
-                
-                box_width = 26  # Adjust width if needed
-                separator = "─" * box_width
+                self.clear_terminal()
+                print(Fore.RED + Style.BRIGHT + "Subtitle Management Console:")
+                print(Fore.MAGENTA + f"      Subtitle generated for Surah {surah_info.surah_name}!")
+                print(Fore.GREEN + f"\nFile saved in Documents folder:")
+                print(Fore.CYAN + f"      {filepath}")
 
-                # Descriptive command list with colors
-                print(" ")
-                print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.GREEN + "📜 Available Commands")
-                print(Fore.RED + f"│ • {Fore.CYAN}open{Fore.WHITE}: Open subtitle folder")
-                print(Fore.RED + f"│ • {Fore.CYAN}back{Fore.WHITE}: Return to Surah Selection")
+                if server_running:
+                    print(Fore.GREEN + f"\nShare link on your network:")
+                    print(Fore.YELLOW + f"      🚀✨ http://{ip_address}:{PORT} ✨🚀")
+                else:
+                    print(Fore.YELLOW + "\nWeb sharing disabled/failed.")
+
+                box_width = 26
+                separator = "─" * box_width
+                print("\n" + Style.BRIGHT + Fore.RED + "╭─ " + Fore.GREEN + "📜 Commands")
+                print(Fore.RED + f"│ • {Fore.CYAN}open{Fore.WHITE}: Open folder containing subtitle")
+                print(Fore.RED + f"│ • {Fore.CYAN}back{Fore.WHITE}: Return to Main Menu")
                 print(Fore.RED + "╰" + separator)
-                    
-                # Helper Text
-                print(Style.DIM + Fore.WHITE + "\nType any of the above commands and press Enter.")
+                print(Style.DIM + Fore.WHITE + "\nType command and press Enter.")
                 print(" ")
-                
-                
+
                 try:
                     user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
                 except KeyboardInterrupt:
-                    print(Fore.YELLOW + "\n\n⚠️  Press 'back' and hit Enter to return to the main menu safely.")
-                    continue  # Restart the loop instead of exiting
+                    print(Fore.YELLOW + "\n\n⚠️ Please type 'back' and press Enter to return safely.")
+                    continue
 
                 if user_input == 'open':
                     try:
-                        if os.name == 'nt':  # Windows
-                            os.startfile(surah_dir)
-                        elif os.name == 'posix':  # macOS and Linux
-                            subprocess.run(['open', surah_dir])
-                        else:
-                            print(Fore.RED + "❌ Unsupported operating system for 'open' command.")
+                        folder_to_open = os.path.normpath(surah_dir)
+                        print(f"\nAttempting to open folder: {folder_to_open}")
+                        if sys.platform == "win32": os.startfile(folder_to_open)
+                        elif sys.platform == "darwin": subprocess.run(['open', folder_to_open], check=True)
+                        else: subprocess.run(['xdg-open', folder_to_open], check=True)
+                    except FileNotFoundError:
+                         print(Fore.RED + f"❌ Error: Could not find command to open folder.")
                     except Exception as e:
                         print(Fore.RED + f"❌ Error opening folder: {e}")
+                    input(Fore.YELLOW + "\nPress Enter to continue...") # Pause
 
                 elif user_input == 'back':
-                    self.stop_server()
-                    break
-
+                    if server_running: self.stop_server()
+                    break # Exit management loop
                 else:
                     print(Fore.RED + "❌ Invalid Command.")
+                    time.sleep(1)
+
         except Exception as e:
-            print(Fore.RED + f"\n❌ An error occurred in subtitle creation: {e}")
+            print(Fore.RED + f"\n❌ An unexpected error occurred in subtitle menu: {e}")
+            self.stop_server() # Attempt cleanup
+            input(Fore.YELLOW + "\nPress Enter to return to main menu...")
 
-    def start_server_thread(self, directory, port, surah_name):
-        """Start the server in a separate thread."""
+
+
+    def start_server_thread(self, subtitle_dir: str, web_assets_dir: str, port: int, surah_name: str):
+        """Starts the HTTP server in a separate thread."""
+        self.stop_server() # Ensure any previous server is stopped
+
         try:
-            def start_server(directory, port, surah_name):
-                """Starts an HTTP server serving a custom HTML page with file links."""
-                try:
-                    # Use the directory where the Surah's subtitles are saved.
-                    web_dir = os.path.join(os.path.dirname(__file__), "web")  # Path to web directory
+            def start_server(sub_dir, assets_dir, port_inner, name_inner):
+                # Define Handler inside the thread function to access correct paths
+                class CustomHandler(http.server.SimpleHTTPRequestHandler):
+                    static_web_dir = assets_dir
+                    dynamic_subtitle_dir = sub_dir
 
-                    class CustomHandler(http.server.SimpleHTTPRequestHandler):
-                        def do_GET(self):
-                            # Force download for .srt files
-                            filepath = os.path.join(directory, self.path[1:])  # Correctly construct file path
-                            if os.path.isfile(filepath) and filepath.endswith(".srt"):
+                    def do_GET(self):
+                        try:
+                            requested_path = self.path.lstrip('/')
+                            # Prevent directory traversal
+                            if ".." in requested_path:
+                                self.send_error(403, "Forbidden")
+                                return
+
+                            # 1. Serve SRT file from dynamic subtitle directory
+                            srt_filepath = os.path.join(self.dynamic_subtitle_dir, requested_path)
+                            # Check it's within the intended dir and ends with .srt
+                            if (os.path.abspath(srt_filepath).startswith(os.path.abspath(self.dynamic_subtitle_dir)) and
+                                os.path.isfile(srt_filepath) and requested_path.endswith(".srt")):
                                 self.send_response(200)
-                                self.send_header('Content-Type', 'application/octet-stream')  # Generic binary stream
-                                self.send_header('Content-Disposition', f'attachment; filename="{os.path.basename(filepath)}"')
+                                self.send_header('Content-Type', 'application/octet-stream')
+                                self.send_header('Content-Disposition', f'attachment; filename="{os.path.basename(srt_filepath)}"')
                                 self.end_headers()
+                                with open(srt_filepath, 'rb') as f:
+                                    self.wfile.write(f.read())
+                                return
 
-                                try:
-                                    with open(filepath, 'rb') as f:
-                                        self.wfile.write(f.read())  # Write file content to response
-                                    return
-                                except Exception as e:
-                                    print(Fore.RED + f"❌ Error reading file: {e}")
-                                    self.send_error(500, "Error reading file")  # Internal Server Error
-                                    return
+                            # 2. Serve index.html from static web assets directory
                             elif self.path == "/":
-                                # Serve the custom index.html
-                                try:
-                                    with open(os.path.join(web_dir, "index.html"), 'rb') as f:  # web_dir here
-                                        content = f.read()
-                                        files = [os.path.basename(f) for f in os.listdir(directory) if
-                                                os.path.isfile(os.path.join(directory, f))]  # directory here - getting filename only
-
-                                        # Inject the file list and Surah name into the HTML
-                                        files_str = str(files).replace("'", '"')  # Escape quotes for JavaScript
-                                        content = content.replace(b'/*FILE_LIST*/',
-                                                                f'const files = {files_str}; addFileLinks(files);'.encode())
-                                        content = content.replace(b'<!--SURAH_NAME-->',
-                                                                surah_name.encode())  # Surah Tag
-
-                                        self.send_response(200)
-                                        self.send_header('Content-type', 'text/html')
-                                        self.end_headers()
-                                        self.wfile.write(content)
-                                        return
-                                except FileNotFoundError:
+                                index_path = os.path.join(self.static_web_dir, "index.html")
+                                if not os.path.isfile(index_path):
                                     self.send_error(404, "index.html not found")
                                     return
+                                with open(index_path, 'rb') as f:
+                                    content = f.read()
+                                    # Inject dynamic file list and surah name
+                                    try:
+                                        files = [f for f in os.listdir(self.dynamic_subtitle_dir) if os.path.isfile(os.path.join(self.dynamic_subtitle_dir, f)) and f.endswith('.srt')]
+                                    except FileNotFoundError:
+                                         files = [] # Handle case where dir might vanish
+                                    files_str = json.dumps(files)
+                                    content = content.replace(b'/*FILE_LIST*/', f'const files = {files_str}; addFileLinks(files);'.encode('utf-8'))
+                                    content = content.replace(b'<!--SURAH_NAME-->', name_inner.encode('utf-8'))
+                                self.send_response(200)
+                                self.send_header('Content-type', 'text/html; charset=utf-8')
+                                self.end_headers()
+                                self.wfile.write(content)
+                                return
 
-                            elif self.path.startswith("/web/"):
-                                try:
-                                    filepath = os.path.join(web_dir, self.path[5:])
-                                    with open(filepath, 'rb') as f:
-                                        content = f.read()
-                                        self.send_response(200)
-                                        if self.path.endswith(".css"):
-                                            self.send_header('Content-type', 'text/css')
-                                        else:
-                                            self.send_header('Content-type', 'text/html')  # Default
-                                        self.end_headers()
-                                        self.wfile.write(content)
-                                        return
-                                except FileNotFoundError:
-                                    self.send_error(404, "File not found")
-                                    return
-                            self.send_error(404, "File not found")  # If reach here 404
-                        
-                        # Override the log_message method to suppress logs
-                        def log_message(self, format, *args):
-                            # This method is intentionally empty to suppress log messages
-                            pass
+                            # 3. Serve style.css from static web assets directory
+                            elif requested_path == "style.css":
+                                asset_path = os.path.join(self.static_web_dir, requested_path)
+                                if not os.path.isfile(asset_path):
+                                     self.send_error(404, "style.css not found")
+                                     return
+                                self.send_response(200)
+                                self.send_header('Content-type', 'text/css; charset=utf-8')
+                                # Add caching headers? Optional.
+                                self.end_headers()
+                                with open(asset_path, 'rb') as f:
+                                    self.wfile.write(f.read())
+                                return
 
-                    # Explicitly set SO_REUSEADDR option
-                    self.httpd = socketserver.TCPServer(("", port), CustomHandler)
-                    self.httpd.allow_reuse_address = True  # Allow address reuse
-                    # print(Fore.GREEN + f"\n🌐 Serving custom webpage from: {Fore.CYAN}{directory} at port {port}. Press CTRL+C to stop." + Fore.WHITE)
-                    self.httpd.serve_forever()
+                            # 4. Anything else is 404
+                            else:
+                                self.send_error(404, "File Not Found")
 
-                except OSError as e:
-                    print(Fore.RED + f"❌ Error starting server: {e}")
+                        except Exception as handler_e:
+                             print(Fore.RED + f"❌ HTTP Handler Error: {handler_e}")
+                             # Try to send 500 if possible
+                             try:
+                                 if not self.headers_sent: self.send_error(500, "Internal Server Error")
+                             except: pass
 
-            # construct the download url
-            ip_address = self.get_primary_ip_address()
-            print(Fore.GREEN + f"\nShare this link with other devices on the same network to browse and download subtitle files of {surah_name}:" + Fore.WHITE)
-            print(Fore.YELLOW + f"   http://{ip_address}:{port}"+ Fore.WHITE)
-            #Directory to be accessed.
-            # Ensure the server thread is correctly managed
-            self.server_thread = threading.Thread(target=start_server, args=(directory, port, surah_name), daemon=True)
+                    # Suppress standard request logging
+                    def log_message(self, format, *args):
+                        pass
+                # --- End Custom Handler ---
+
+                httpd_server = None
+                try:
+                    socketserver.TCPServer.allow_reuse_address = True
+                    httpd_server = socketserver.TCPServer(("", port_inner), CustomHandler)
+                    # Store reference ONLY if server starts successfully
+                    outer_instance = self # Capture 'self' from outer scope
+                    outer_instance.httpd = httpd_server
+                    # print(Fore.GREEN + f"🌐 Server thread started, serving on port {port_inner}")
+                    httpd_server.serve_forever() # Blocking call
+                except OSError as os_e:
+                    if "address already in use" in str(os_e).lower():
+                         print(Fore.RED + f"❌ Error: Port {port_inner} is already in use.")
+                    else:
+                         print(Fore.RED + f"❌ OS Error starting server: {os_e}")
+                    # Ensure httpd reference is cleared if server failed to start
+                    if 'outer_instance' in locals(): outer_instance.httpd = None
+                except Exception as e:
+                    print(Fore.RED + f"❌ Unexpected error in server thread: {e}")
+                    if 'outer_instance' in locals(): outer_instance.httpd = None
+                finally:
+                    # This block runs when serve_forever stops (due to shutdown) or an error occurs
+                    if httpd_server:
+                         httpd_server.server_close() # Ensure socket is closed
+                    # Clear reference on the main UI instance when thread exits
+                    if 'outer_instance' in locals(): outer_instance.httpd = None
+                    print(Fore.YELLOW + "Server thread finished.")
+
+            # --- End Inner Function ---
+
+            # Create and start the thread
+            self.server_thread = threading.Thread(
+                target=start_server,
+                args=(subtitle_dir, web_assets_dir, port, surah_name),
+                daemon=True
+            )
             self.server_thread.start()
+
         except Exception as e:
-            print(Fore.RED + f"Error starting server thread: {e}")
+            print(Fore.RED + f"Error preparing server thread: {e}")
+            self.httpd = None
+            self.server_thread = None
 
     def get_primary_ip_address(self):
         """Get a single IP Address"""
@@ -660,15 +877,31 @@ class UI:
             print(Fore.RED + f"❌ Could not get local IP address: {e}")
         return ip_address
 
+
+
     def stop_server(self):
-        """Stop the server thread."""
-        if self.httpd:
-            print(Fore.YELLOW + "Stopping server..." + Fore.WHITE)
-            self.httpd.shutdown()  # Properly stop the server
-            self.httpd.server_close()  # Properly close it
-            self.httpd = None  # Reset the server instance
-        if self.server_thread and self.server_thread.is_alive():
-            self.server_thread.join(timeout=2)  # Wait for the server thread to finish
+        """Stop the running HTTP server thread safely."""
+        httpd_ref = self.httpd # Get current reference
+        server_thread_ref = self.server_thread
+
+        if httpd_ref:
+            print(Fore.YELLOW + "\nStopping web server...")
+            try:
+                httpd_ref.shutdown() # Signal serve_forever to stop
+            except Exception as e:
+                print(Fore.RED + f"Error during server shutdown signal: {e}")
+            # Don't call server_close here, let the thread do it in finally block
+            self.httpd = None # Clear main reference immediately
+
+        if server_thread_ref and server_thread_ref.is_alive():
+            try:
+                # Wait for the thread to exit gracefully
+                server_thread_ref.join(timeout=2.0)
+                if server_thread_ref.is_alive():
+                     print(Fore.YELLOW + "Server thread did not stop within timeout.")
+            except Exception as e:
+                 print(Fore.RED + f"Error joining server thread: {e}")
+            self.server_thread = None # Clear thread reference
 
 
 

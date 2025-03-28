@@ -4,6 +4,39 @@ import sys
 import os
 import subprocess
 import json
+from time import sleep
+
+# --- Add Path Hook for PyInstaller ---
+try:
+    # Attempt import relative to potential bundled structure
+    from core.utils import add_core_to_path_if_frozen, get_app_path
+    add_core_to_path_if_frozen() # IMPORTANT: Call this early
+except ImportError:
+    # Fallback if utils isn't found immediately (less likely with correct structure)
+    try:
+        # Try assuming Quran-CLI.py is project root
+        from core.utils import add_core_to_path_if_frozen, get_app_path
+        add_core_to_path_if_frozen()
+    except ImportError:
+        print("Fatal: Could not find core.utils. Path setup failed.", file=sys.stderr)
+        sys.exit(1)
+# --- End Path Hook ---
+
+
+# --- Now import colorama and Initialize EARLY ---
+try:
+    from colorama import Fore, Back, Style, init
+    # Initialize Colorama for the whole application run
+    init(autoreset=True)
+except ImportError:
+    print("Warning: colorama not found. Colored output will be disabled.")
+    # Define dummy Fore, Back, Style classes if colorama is missing
+    class DummyColorama:
+        def __getattr__(self, name): return "" # Return empty string for any attribute
+    Fore = Back = Style = DummyColorama()
+    def init(autoreset=True): pass # Dummy init function
+# --- End Colorama Init ---
+
 
 def get_termux_architecture():
     try:
@@ -83,15 +116,26 @@ class QuranApp:
         self.audio_manager = AudioManager()
         self.data_handler = QuranDataHandler(self.client.cache)
 
-        # Load preferences
-        self.preferences_file = os.path.join(os.path.dirname(__file__), 'core', 'preferences.json')
+        # Define preference file path (next to exe)
+        self.preferences_file = get_app_path('preferences.json', writable=True)
+        # Load preferences using the defined path
         self.preferences = self._load_preferences()
 
-        self.ui = UI(self.audio_manager, self.term_size, self.data_handler, preferences=self.preferences)  # Create UI and pass preferences
+        # Initialize GithubUpdater
+        self.updater = GithubUpdater("anonfaded", "QuranCLI", VERSION)
 
-        self.updater = GithubUpdater("anonfaded", "QuranCLI", VERSION)#Replace owner and name
-        self.ui = UI(self.audio_manager, self.term_size, self.data_handler, self.updater, self.preferences)  # <---  Pass updater to UI
-        self._clear_terminal()  # Calling it here, so the program clears the terminal on startup
+        # --- Initialize UI ONCE, passing necessary arguments ---
+        self.ui = UI(
+            audio_manager=self.audio_manager,
+            term_size=self.term_size,
+            data_handler=self.data_handler,
+            github_updater=self.updater,
+            preferences=self.preferences, # Pass loaded preferences dict
+            preferences_file_path=self.preferences_file # Pass the path string
+        )
+        # --- End UI Initialization ---
+
+        self._clear_terminal()
         self.surah_names = self._load_surah_names()
 
     def _load_preferences(self):
@@ -186,8 +230,7 @@ class QuranApp:
             except KeyboardInterrupt:
                 # Allow KeyboardInterrupt to propagate to the top level handler
                 raise
-        # Removed this duplicate thank you message that appears when control c is pressed on first input 
-        # print(Fore.RED + "\n✨ Thank you for using " + Fore.WHITE + "QuranCLI" + Fore.RED + "!") # Print exit message after loop ends
+
 
     def _display_surah_list(self):
         """Display surah names in multiple columns."""
@@ -309,8 +352,17 @@ class QuranApp:
                     print(Fore.YELLOW + "\n\n⚠️  No way out yet, you can't escape now. Try again.")
                     continue  # Restart the loop instead of exiting
 
+                def typewriter_print(self, text: str, delay: float = 0.05):
+                    """Print text with typewriter effect"""
+                    for char in text:
+                        print(Fore.RED + char, end='', flush=True)
+                        sleep(delay)
+                    print()  # New line at the end
+        
                 if user_input in ['quit', 'exit']:
-                    print(Fore.RED + "\n✨ Thank you for using " + Fore.WHITE + "QuranCLI" + Fore.RED + "!")
+                    message = "\n✨ As-salamu alaykum! Thank you for using QuranCLI!"
+                    typewriter_print(self,message)
+                    sleep(3.0)  # Shorter pause after typewriter effect
                     return None
                 elif user_input == 'list':
                     self._display_surah_list()
@@ -373,6 +425,8 @@ class QuranApp:
             except KeyboardInterrupt:  # Add this to handle control + c during input
                 print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
                 break # Return to main menu immediately, *without exiting app*.
+
+    
     def _get_surah_number_for_subtitle(self) -> Optional[int]:
             """Helper function to get surah number specifically for subtitle generation."""
             while True:
@@ -497,3 +551,11 @@ if __name__ == "__main__":
         os.system('cls' if os.name == 'nt' else 'clear')  # Clear terminal
         print(Style.BRIGHT + Fore.YELLOW + "⚠ To exit, please type 'quit' or 'exit'")
         sys.exit(1) # Exit with error code
+    except Exception as e:
+        # Catch unexpected errors during startup or run
+        print(Fore.RED + Style.BRIGHT + "\n--- UNEXPECTED ERROR ---")
+        import traceback
+        traceback.print_exc() # Print detailed traceback
+        print("-----------------------" + Style.RESET_ALL)
+        input("Press Enter to exit.") # Keep console open
+        sys.exit(1)
