@@ -260,61 +260,100 @@ class QuranApp:
         self._display_header()
 
 
-# In Quran-CLI.py, inside the QuranApp class (e.g., after _display_surah_list)
 
     def _display_info(self):
         """Displays detailed information about the application and commands."""
         self._clear_terminal()
-        self._display_header()
+        # Assuming self._display_header() is called before this in the main loop is sufficient
+        # Or call it here if needed: self._display_header()
 
-        box_width = self.term_size.columns - 4 if self.term_size.columns > 10 else 60 # Adjust width dynamically
-        separator_major = "═" * box_width
-        separator_minor = "─" * box_width
+        # Use terminal width for dynamic sizing, fallback for very small terminals
+        box_width = self.term_size.columns - 4 if self.term_size.columns > 40 else 60
+        separator_major = Fore.RED + Style.BRIGHT + "═" * box_width + Style.RESET_ALL
+        separator_minor = Fore.RED + "─" * box_width + Style.RESET_ALL
 
-        print(Fore.RED + Style.BRIGHT + separator_major)
-        print(Fore.GREEN + Style.BRIGHT + "QuranCLI - Information".center(box_width))
-        print(Fore.RED + Style.BRIGHT + separator_major)
+        print(separator_major)
+        print(Fore.GREEN + Style.BRIGHT + "QuranCLI - Information & Help".center(box_width + len(Fore.GREEN + Style.BRIGHT))) # Adjust center for color codes
+        print(separator_major)
 
-        # Description
+        # --- Description ---
         print(Fore.WHITE + "\nA powerful terminal-based tool for interacting with the Holy Quran.")
         print(Fore.CYAN + "Read, listen to recitations, and generate video subtitles (captions).")
         print(Fore.GREEN + "\nGitHub Repository:")
         print(Fore.MAGENTA + Style.BRIGHT + "https://github.com/anonfaded/QuranCLI" + Style.RESET_ALL)
 
-        print("\n" + Fore.RED + separator_minor)
-        print(Fore.GREEN + Style.BRIGHT + "Available Commands".center(box_width))
-        print(Fore.RED + separator_minor)
+        # --- Commands ---
+        print("\n" + separator_minor)
+        print(Fore.GREEN + Style.BRIGHT + "Available Commands".center(box_width + len(Fore.GREEN + Style.BRIGHT)))
+        print(separator_minor)
 
-        # Command Explanations (using a list for easier management)
         commands_info = [
             (Fore.CYAN + "1-114", Fore.WHITE + ": Select a Surah directly by its number."),
-            (Fore.CYAN + "Surah Name", Fore.WHITE + ": Search for a Surah by name (e.g., 'Fatiha', 'Rahman'). Provides suggestions if unsure."),
+            (Fore.CYAN + "Surah Name", Fore.WHITE + ": Search for a Surah by name (e.g., 'Fatiha', 'Rahman'). Provides suggestions."),
             (Fore.CYAN + "list", Fore.WHITE + ": Display a list of all 114 Surahs with their numbers."),
-            (Fore.CYAN + "sub", Fore.WHITE + ": Generate subtitle files (.srt format) for a specific range of Ayahs."),
-            (Fore.YELLOW + "  ↳ Use Case:", Fore.WHITE + "Ideal for video editors creating Quran recitation videos."),
-            (Fore.YELLOW + "  ↳ How it works:", Fore.WHITE + "Creates timestamped Arabic and English text captions."),
-            (Fore.YELLOW + "  ↳ Example:", Fore.WHITE + "Import the .srt file into video editors (like CapCut's caption import) to automatically add overlays."),
-            (Fore.CYAN + "clearaudio", Fore.WHITE + ": Delete all downloaded audio files from the cache to free up space."),
+            (Fore.CYAN + "sub", Fore.WHITE + ": Generate subtitle files (.srt format) for a range of Ayahs."),
+            (Fore.YELLOW + "  ↳ Use Case:", Fore.WHITE + "Ideal for video editors needing Quran captions."),
+            (Fore.YELLOW + "  ↳ How:", Fore.WHITE + "Creates timestamped Arabic/English text for import into editors (e.g., CapCut)."),
+            (Fore.CYAN + "clearaudio", Fore.WHITE + ": Delete all downloaded audio files from the cache."),
+            (Fore.CYAN + "reverse", Fore.WHITE + ": Toggle Arabic text display direction within the Ayah reader."),
+            (Fore.YELLOW + "  ↳ Use Case:", Fore.WHITE + "Fixes display issues on some terminals where Arabic appears reversed."),
+            (Fore.YELLOW + "  ↳ Note:", Fore.WHITE + "Copied text should generally be correct regardless of display."),
             (Fore.CYAN + "info", Fore.WHITE + ": Display this help and information screen."),
             (Fore.CYAN + "quit / exit", Fore.WHITE + ": Close the QuranCLI application.")
         ]
 
+        cmd_col_width = 15 # Width for the command name part
+        desc_col_width = box_width - cmd_col_width - 1 # Remaining width for description
+
         for cmd, desc in commands_info:
-            # Basic wrapping for description part
-            prefix_len = 18 # Approximate length of command part like "  ↳ How it works: "
-            desc_lines = self.ui.wrap_text(desc, box_width - prefix_len).split('\n')
-            print(f"{cmd.ljust(15)}{Fore.WHITE}{desc_lines[0]}")
+            cmd_part = f"{cmd}".ljust(cmd_col_width + len(cmd) - len(cmd.replace('\033[','').split('m')[-1])) # Adjust ljust for color codes
+
+            # Use the UI's wrap_text method if available and needed
+            if hasattr(self.ui, 'wrap_text') and desc_col_width > 10:
+                 desc_lines = self.ui.wrap_text(desc, desc_col_width).split('\n')
+            else: # Basic fallback wrapping
+                 desc_lines = [desc[i:i+desc_col_width] for i in range(0, len(desc), desc_col_width)]
+
+            # Print first line
+            print(f"{cmd_part}{Fore.WHITE}{desc_lines[0]}")
+            # Print subsequent lines indented
             for line in desc_lines[1:]:
-                print(f"{' '.ljust(15)}{Fore.WHITE}{line}") # Indent subsequent lines
-            if cmd.startswith(Fore.CYAN + "sub"): # Add a small space after sub explanation
-                print("")
+                print(f"{' '.ljust(cmd_col_width)}{Fore.WHITE}{line}")
+
+            # Add spacing after multi-line descriptions (like sub and reverse)
+            if cmd.startswith(Fore.CYAN + "sub") or cmd.startswith(Fore.CYAN + "reverse"):
+                 print("")
+
+        # --- Credits ---
+        print("\n" + separator_minor)
+        print(Fore.GREEN + Style.BRIGHT + "Credits".center(box_width + len(Fore.GREEN + Style.BRIGHT)))
+        print(separator_minor)
+
+        print(Fore.WHITE + "  Quran Data & Audio API provided by:")
+        print(f"    {Fore.CYAN}The Quran Project{Fore.WHITE} ({Fore.MAGENTA}https://github.com/The-Quran-Project/Quran-API{Fore.WHITE})")
+        print(f"      {Fore.YELLOW}(API has no rate limit)")
+
+        print(Fore.WHITE + "\n  Application Icon sourced from Flaticon:")
+        print(f"    {Fore.CYAN}Holy icons created by Atif Arshad - Flaticon{Fore.WHITE}")
+        print(f"      ({Fore.MAGENTA}https://www.flaticon.com/free-icons/holy{Fore.WHITE})")
 
 
-        print("\n" + Fore.RED + separator_minor)
+        # --- Feedback / Bug Reports ---
+        print("\n" + separator_minor)
+        print(Fore.GREEN + Style.BRIGHT + "Feedback & Bug Reports".center(box_width + len(Fore.GREEN + Style.BRIGHT)))
+        print(separator_minor)
+
+        print(Fore.WHITE + "  Found an issue or have a feature request?")
+        print(Fore.WHITE + "  Please open an issue on GitHub:")
+        print(f"    {Fore.MAGENTA}{Style.BRIGHT}https://github.com/anonfaded/QuranCLI/issues{Style.RESET_ALL}")
+
+
+        # --- Footer ---
+        print("\n" + separator_major)
         input(Fore.YELLOW + "\nPress Enter to return to the main menu..." + Style.RESET_ALL)
-        # Clear terminal before returning to main menu prompt
-        self._clear_terminal()
-        self._display_header()
+        # No need to clear here, the main loop will handle it before the next prompt
+        # self._clear_terminal()
+        # self._display_header()
 
     def _get_surah_number(self) -> Optional[int]:
         # Navigation Menu
