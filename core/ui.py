@@ -172,7 +172,7 @@ class UI:
             box_width = 26  # Adjust width if needed
             separator = "─" * box_width
 
-            print(Style.BRIGHT + Fore.RED + "\n╭─ " + Fore.GREEN + "🧭 Navigation")
+            print(Fore.RED + "\n╭─ " + Style.BRIGHT + Fore.GREEN + "🧭 Navigation")
             if total_pages > 1:
                 print(Fore.RED + "│ → " + Fore.CYAN + "n " + Fore.WHITE + ": Next page")
                 print(Fore.RED + "│ → " + Fore.CYAN + "p " + Fore.WHITE + ": Previous page")
@@ -555,15 +555,15 @@ class UI:
         # Controls Menu
         box_width = 26
         separator = "─" * box_width
-        output.append(_Style_BRIGHT + _Fore_RED + "\n╭─ " + _Fore_GREEN + "🎛️  Audio Controls" + _RESET)
+        output.append(_Fore_RED + "\n╭─ " + _Style_BRIGHT + _Fore_GREEN + "🎛️  Audio Controls" + _RESET)
         output.append(_Fore_RED + "│ • " + _Fore_CYAN + "p " + _Fore_WHITE + ": Play/Pause/Replay" + _RESET)
         output.append(_Fore_RED + "│ • " + _Fore_YELLOW + "s " + _Fore_WHITE + ": Stop & Reset" + _RESET)
         # ... (rest of controls using safe variables) ...
         output.append(_Fore_RED + "│ • " + _Fore_RED + "r " + _Fore_WHITE + ": Change Reciter" + _RESET)
         output.append(_Fore_RED + "│ • " + _Fore_GREEN + "[ " + _Fore_WHITE + ": Seek Back 5s" + _RESET)
-        output.append(_Fore_RED + "│ • " + _Fore_GREEN + "] " + _Fore_WHITE + ": Seek Fwd 5s" + _RESET)
+        output.append(_Fore_RED + "│ • " + _Fore_GREEN + "] " + _Fore_WHITE + ": Seek Forward 5s" + _RESET)
         output.append(_Fore_RED + "│ • " + _Fore_MAGENTA + "j " + _Fore_WHITE + ": Seek Back 30s" + _RESET)
-        output.append(_Fore_RED + "│ • " + _Fore_MAGENTA + "k " + _Fore_WHITE + ": Seek Fwd 30s" + _RESET)
+        output.append(_Fore_RED + "│ • " + _Fore_MAGENTA + "k " + _Fore_WHITE + ": Seek Forward 30s" + _RESET)
         output.append(_Fore_RED + "│ • " + _Fore_BLUE + "q " + _Fore_WHITE + ": Quit Audio Player" + _RESET)
         output.append(_Fore_RED + "╰" + separator + _RESET)
 

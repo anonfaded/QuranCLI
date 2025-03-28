@@ -199,7 +199,7 @@ class QuranApp:
                     box_width = 52  # Adjust width if needed
                     separator = "─" * box_width
 
-                    print(Style.BRIGHT + Fore.RED + "╭─ " + Fore.GREEN + "📜 Surah Information")
+                    print(Fore.RED + "╭─ " + Style.BRIGHT +  Fore.GREEN + "📜 Surah Information")
                     print(Fore.RED + f"│ • {Fore.CYAN}Name:       {Fore.WHITE}{surah_info.surah_name}")
                     print(Fore.RED + f"│ • {Fore.CYAN}Arabic:     {Fore.WHITE}{surah_info.surah_name_arabic}")
                     print(Fore.RED + f"│ • {Fore.CYAN}Revelation: {Fore.WHITE}{surah_info.revelation_place}")
@@ -489,7 +489,7 @@ class QuranApp:
     def _ask_yes_no(self, surah_name:str) -> bool:
         while True:
             try:
-                choice = input(Fore.BLUE + f"Select another range for {Fore.GREEN}{surah_name}{Fore.LIGHTBLACK_EX} (y/n){Fore.WHITE}: ").strip().lower()
+                choice = input(Fore.MAGENTA + f"Select another range for {Fore.GREEN}{surah_name}{Fore.LIGHTBLACK_EX} (y/n){Fore.WHITE}: ").strip().lower()
                 if choice in ['y', 'yes']:
                     return True
                 if choice in ['n', 'no']:
