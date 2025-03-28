@@ -103,7 +103,7 @@ class UI:
             print(update_message)  # Print directly instead of wrapping
 
         print(Fore.RED + "╭──" + Style.BRIGHT + Fore.GREEN + "✨ As-salamu alaykum! " + Fore.RED + Style.NORMAL + "─" * 26 + "╮")
-        print(Fore.RED + "│ " + Fore.LIGHTMAGENTA_EX + "QuranCLI - Your Digital Quran Companion".ljust(49) + Fore.RED + "│")
+        print(Fore.RED + "│ " + Fore.LIGHTMAGENTA_EX + "QuranCLI – Read, Listen & Generate Captions".ljust(49) + Fore.RED + "│")
         print(Fore.RED + "├" + "─" * 50 + "┤")
         print(Fore.RED + "│ " + Style.BRIGHT + "Version: " + Style.NORMAL + f"v{VERSION}".ljust(40) + "│")
         print(Fore.RED + "│ " + Style.BRIGHT + "Author: " + Style.NORMAL + "https://github.com/anonfaded".ljust(41) + "│")
