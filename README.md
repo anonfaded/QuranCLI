@@ -13,8 +13,9 @@
 [![Discord](https://img.shields.io/discord/1263384048194027520?label=Join%20Us%20on%20Discord&logo=discord)](https://discord.gg/kvAZvdkuuN )
 
 
+ <img src="https://github.com/user-attachments/assets/a7de16d4-eba6-4645-b5a5-8e9c7978ded3" alt="Demo" width="550">
 
-![demo](https://github.com/user-attachments/assets/a7de16d4-eba6-4645-b5a5-8e9c7978ded3)
+
 
 </div>
 
@@ -41,29 +42,63 @@ QuranCLI brings the Quran to your Windows command line with a rich set of featur
 
 ## 🎬 Demo & Screenshots
 
-![image](https://github.com/user-attachments/assets/be3ae1e9-ca4d-4d8d-abee-7a4d3e854450)
-_reader mode_
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/be3ae1e9-ca4d-4d8d-abee-7a4d3e854450" alt="Reading View" width="550">
+  <p><em>Reading View (Simple & Uthmani Scripts + Translation)</em></p>
+</div>
 
-![image](https://github.com/user-attachments/assets/a60fd008-24df-4e41-90cb-92f77e6ffba6)
-_audio player mode_
+<br>
 
-![image](https://github.com/user-attachments/assets/3b03bcc3-8a6e-4895-9a89-d6c6963c5b17)
-_recitor selection_
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/a60fd008-24df-4e41-90cb-92f77e6ffba6" alt="Audio Player" width="550">
+  <p><em>Audio Player (with Progress Bar & Controls)</em></p>
+</div>
 
-![image](https://github.com/user-attachments/assets/b879b4d3-67b7-4fb6-9a86-81bcd25a8edb)
-_listing of surahs_
+<br>
 
-![image](https://github.com/user-attachments/assets/63d4c123-1a86-48cf-b622-c8edcf6c9b0a)
-_smart search engion_
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/3b03bcc3-8a6e-4895-9a89-d6c6963c5b17" alt="Reciter Selection" width="550">
+  <p><em>Reciter Selection Menu</em></p>
+</div>
 
-![image](https://github.com/user-attachments/assets/7ce2b6e0-eff8-4180-8ca3-2587c7549f0b)
-_info guide page_
+<br>
 
-![image](https://github.com/user-attachments/assets/5499387f-8907-43a0-a0e3-a6cbe4cf46cc)
-_subtitle management console_
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/b879b4d3-67b7-4fb6-9a86-81bcd25a8edb" alt="Surah List" width="550">
+  <p><em>Full Surah List (`list` command)</em></p>
+</div>
 
-![image](https://github.com/user-attachments/assets/fa1d8b3c-d6d2-41fa-9722-f4b36848aecd)
-_inbuilt web server for hosting files locally on same wifi for access on all devices through private ip address_
+<br>
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/63d4c123-1a86-48cf-b622-c8edcf6c9b0a" alt="Smart Search" width="550">
+  <p><em>Smart Surah Search (Suggestions for "rehman")</em></p>
+</div>
+
+<br>
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/7ce2b6e0-eff8-4180-8ca3-2587c7549f0b" alt="Info Page" width="550">
+  <p><em>Information / Help Page (`info` command)</em></p>
+</div>
+
+<br>
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/5499387f-8907-43a0-a0e3-a6cbe4cf46cc" alt="Subtitle Management" width="550">
+  <p><em>Subtitle Management & Sharing (`sub` command)</em></p>
+</div>
+
+<br>
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/fa1d8b3c-d6d2-41fa-9722-f4b36848aecd" alt="Web Server Interface" width="550">
+  <p><em>Subtitle Web Server Interface (Accessible on Local Network)</em></p>
+</div>
+
+<br>
+
+
 
 
 
