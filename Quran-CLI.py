@@ -347,7 +347,13 @@ class QuranApp:
         print("\n" + separator_minor)
         print(Fore.GREEN + Style.BRIGHT + "Feedback & Bug Reports".center(box_width + len(Fore.GREEN + Style.BRIGHT)))
         print(separator_minor)
-
+        print(f"""{Fore.RED + Style.BRIGHT}                          
+                                      
+ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ▒▒▒▒▒▒ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒         
+ ▓▓▓▓▓▓▓ ▓▓   ▓▓▓▓    ▓▓▒▒▒▒▒▒       ▒▒ ▒▒      ▓    ▓  
+ ▓▓      ▓▓▓▓▓▓▓▓▓    ▓▓      ▒▒     ▒▒ ▒▒      ▓ ▓▓ ▓▓ 
+ ▓▓      ▓▓   ▓▓▓▓▓▓▓▓▓ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒         
+              """.center(box_width + len(Fore.RED + Style.BRIGHT)) + Style.RESET_ALL)
         print(Fore.WHITE + "  Found an issue or have a feature request?")
         print(Fore.WHITE + "  Please open an issue on GitHub:")
         print(f"    {Fore.MAGENTA}{Style.BRIGHT}https://github.com/anonfaded/QuranCLI/issues{Style.RESET_ALL}")
