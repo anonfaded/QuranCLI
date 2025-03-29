@@ -128,6 +128,10 @@ class UI:
         print(Fore.RED + "│ " + downloads_line.ljust(box_width + len(Style.BRIGHT+Style.NORMAL)) + Fore.RED + "│" + Style.RESET_ALL)
         # --- End Add ---
         print(Fore.RED + "│ " + Style.BRIGHT + "Author: " + Style.NORMAL + "https://github.com/anonfaded".ljust(41) + "│")
+        # --- Add Discord Line ---
+        print(Fore.RED + "│ " + Fore.LIGHTMAGENTA_EX + Style.BRIGHT + "Tried FadCam & FadCrypt apps?".ljust(49) + Style.NORMAL + Fore.RED + "│")
+        print(Fore.RED + "│ " + Style.NORMAL + "  Join us! " + Fore.CYAN + "https://discord.gg/kvAZvdkuuN".ljust(38) + Fore.RED + "│" + Style.RESET_ALL)
+        # --- End Discord Line ---
         print(Fore.RED + "├" + "─" * 50 + "┤")
         print(Fore.RED + "│ " + Style.BRIGHT + "Instructions:".ljust(49) + Style.NORMAL + "│")
         print(Fore.RED + "│ • " + Fore.WHITE + "Type " + Fore.RED + "'quit'" + Fore.WHITE + " or " + Fore.RED + "'exit'" + Fore.WHITE + " to close the program".ljust(26) + Fore.RED + "│")
