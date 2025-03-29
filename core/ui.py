@@ -129,8 +129,8 @@ class UI:
         # --- End Add ---
         print(Fore.RED + "│ " + Style.BRIGHT + "Author: " + Style.NORMAL + "https://github.com/anonfaded".ljust(41) + "│")
         # --- Add Discord Line ---
-        print(Fore.RED + "│ " + Fore.LIGHTMAGENTA_EX + Style.BRIGHT + "Tried FadCam & FadCrypt apps?".ljust(49) + Style.NORMAL + Fore.RED + "│")
-        print(Fore.RED + "│ " + Style.NORMAL + "  Join us! " + Fore.CYAN + "https://discord.gg/kvAZvdkuuN".ljust(38) + Fore.RED + "│" + Style.RESET_ALL)
+        print(Fore.RED + "│ " + Fore.MAGENTA + Style.BRIGHT + "Tried FadCam & FadCrypt apps?".ljust(49) + Style.NORMAL + Fore.RED + "│")
+        print(Fore.RED + "│ " + Style.NORMAL + " ⤷ Join us! " + Fore.CYAN + "https://discord.gg/kvAZvdkuuN".ljust(37) + Fore.RED + "│" + Style.RESET_ALL)
         # --- End Discord Line ---
         print(Fore.RED + "├" + "─" * 50 + "┤")
         print(Fore.RED + "│ " + Style.BRIGHT + "Instructions:".ljust(49) + Style.NORMAL + "│")
