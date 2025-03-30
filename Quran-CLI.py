@@ -145,6 +145,46 @@ class QuranApp:
         self._clear_terminal()
         self.surah_names = self._load_surah_names()
 
+    def _display_readme_page(self):
+        """Reads and displays the content of the bundled README_APP.txt file."""
+        readme_filename = 'README_APP.txt'
+        try:
+            # Get path to the bundled file (read-only)
+            readme_path = get_app_path(readme_filename, writable=False)
+
+            if not os.path.exists(readme_path):
+                print(Fore.RED + f"Error: Application readme file '{readme_filename}' not found.")
+                print(Fore.YELLOW + f"Expected location (approx): {readme_path}")
+                sleep(3)
+                return
+
+            with open(readme_path, 'r', encoding='utf-8') as f:
+                readme_content = f.read()
+
+            self._clear_terminal()
+            # Display a simple header for this page
+            term_width = self.term_size.columns
+            print(Fore.RED + Style.BRIGHT + "=" * term_width)
+            print("QuranCLI - Application Notes & Updates".center(term_width))
+            print(Fore.RED + Style.BRIGHT + "=" * term_width + Style.RESET_ALL)
+            print("\n") # Add some space
+
+            # Print the actual content from the file
+            print(Fore.WHITE + readme_content)
+
+            # Footer and wait prompt
+            print("\n" + Fore.RED + Style.BRIGHT + "-" * term_width + Style.RESET_ALL)
+            input(Fore.YELLOW + "\nPress Enter to return to the main menu..." + Style.RESET_ALL)
+            # No need to clear here, main loop will handle it
+
+        except FileNotFoundError:
+            # This case is less likely now with the os.path.exists check, but keep for safety
+            print(Fore.RED + f"Error: Could not find the application readme file '{readme_filename}'.")
+            sleep(3)
+        except Exception as e:
+            print(Fore.RED + f"Error reading or displaying readme file: {e}")
+            sleep(3)
+        
     def _load_preferences(self):
         """Load preferences from file"""
         try:
@@ -443,6 +483,7 @@ class QuranApp:
                 print(Fore.RED + f"│ • {Fore.CYAN}clearaudio{Fore.WHITE}: Clear audio cache")
                 print(Fore.RED + f"│ • {Fore.CYAN}info{Fore.WHITE}: Show help and information")
                 print(Fore.RED + f"│ • {Fore.CYAN}theme{Fore.WHITE}: Change ASCII art color")
+                print(Fore.RED + f"│ • {Fore.RED}readme{Fore.WHITE}: View App Notes & Updates")
                 print(Fore.RED + f"│ • {Fore.CYAN}quit{Fore.WHITE}: Exit the application")
                 print(Fore.RED + "╰" + separator)
                     
@@ -487,6 +528,9 @@ class QuranApp:
                 elif user_input == 'info': # Handle the 'info' command
                     self._display_info()
                     continue # Go back to the start of the loop to show the prompt again
+                elif user_input == 'readme':
+                    self._display_readme_page()
+                    continue # Go back to the main menu prompt
                 elif user_input == 'theme':
                     self._handle_theme_selection()
                     continue # Go back to the main menu prompt

@@ -11,7 +11,8 @@ icon_file = 'core/icon.ico' # Icon in the root directory
 
 # --- Data files to bundle (Read-Only Assets) ---
 datas = [
-    ('core/web', 'core/web')  # Bundle the web server assets
+    ('core/web', 'core/web'),  # Bundle the web server assets
+    ('README_APP.txt', '.')
 ]
 
 # --- Hidden Imports ---
