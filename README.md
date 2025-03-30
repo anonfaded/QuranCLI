@@ -17,7 +17,7 @@
 
 
 <!-- old image on first initial release <img src="https://github.com/user-attachments/assets/a7de16d4-eba6-4645-b5a5-8e9c7978ded3" alt="Demo" width="800"> -->
-<img src="https://github.com/user-attachments/assets/9898caca-bd94-49cd-b3c0-bf4c138196ed" alt="Demo" width="800">
+<img src="https://github.com/user-attachments/assets/9898caca-bd94-49cd-b3c0-bf4c138196ed" alt="Demo" width="500">
 
 
 
@@ -50,6 +50,14 @@ QuranCLI brings the Quran to your Windows command line with a rich set of featur
 <div align="center">
   <img src="https://github.com/user-attachments/assets/be3ae1e9-ca4d-4d8d-abee-7a4d3e854450" alt="Reading View" width="550">
   <p><em>Reading View (Simple & Uthmani Scripts + Translation)</em></p>
+</div>
+
+<br>
+
+<!-- live theme command using screenrecording -->
+https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
+<div align="center">
+  <p><em>Theme command in use</em></p>
 </div>
 
 <br>
