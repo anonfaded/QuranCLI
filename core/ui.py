@@ -93,18 +93,31 @@ class UI:
         sys.stdout.write("\033[3J")
         sys.stdout.flush()
 
-    def display_header(self, QURAN_CLI_ASCII):
-        """Display app header dynamically"""
-        
+    def display_header(self, QURAN_CLI_ASCII, theme_color='red'):
+        """Display app header dynamically with selectable theme color for ASCII art."""
 
-        print(QURAN_CLI_ASCII)
+        # Map color name to colorama code
+        color_map = {
+            'red': Fore.RED,
+            'white': Fore.WHITE,
+            'green': Fore.GREEN,
+            'blue': Fore.BLUE,        # Added
+            'yellow': Fore.YELLOW,    # Added
+            'magenta': Fore.MAGENTA,  # Added
+            'cyan': Fore.CYAN         # Added
+        }
+        # Get the color, default to Fore.RED if invalid or None
+        selected_color = color_map.get(theme_color, Fore.RED)
 
+        # Apply color to the ASCII art and print it *ONCE*
+        themed_ascii_art = selected_color + QURAN_CLI_ASCII + Style.RESET_ALL
+        print(themed_ascii_art)
+
+        # --- REST OF THE HEADER (unchanged from your original code) ---
         # Call _get_update_message() inside display_header to ensure latest updates
         update_message = self._get_update_message()
-
         if update_message:
-            print(update_message)  # Print directly instead of wrapping
-            
+            print(update_message)
 
         # --- Fetch Download Count ---
         download_count_str = "N/A" # Default
@@ -112,13 +125,12 @@ class UI:
             count = self.download_counter.get_total_downloads()
             if count is not None and count >= 0:
                 try:
-                     download_count_str = f"{count:,}" # Format with commas
+                    download_count_str = f"{count:,}" # Format with commas
                 except ValueError: # Handle potential formatting errors
-                     download_count_str = str(count)
-        # --- End Fetch ---
+                    download_count_str = str(count)
 
         box_width = 53 # Keep consistent width
-        
+
         print(Fore.RED + "╭──" + Style.BRIGHT + Fore.GREEN + "✨ As-salamu alaykum! " + Fore.RED + Style.NORMAL + "─" * 26 + "╮")
         print(Fore.RED + "│ " + Fore.LIGHTMAGENTA_EX + "QuranCLI – Read, Listen & Generate Captions".ljust(49) + Fore.RED + "│")
         print(Fore.RED + "├" + "─" * 50 + "┤")

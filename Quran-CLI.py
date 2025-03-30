@@ -97,7 +97,7 @@ else:
     import difflib
 
 QURAN_CLI_ASCII = """
-\033[31m
+
  ██████╗ ██╗   ██╗██████╗  █████╗ ███╗   ██╗    
 ██╔═══██╗██║   ██║██╔══██╗██╔══██╗████╗  ██║   
 ██║   ██║██║   ██║██████╔╝███████║██╔██╗ ██║   
@@ -107,7 +107,7 @@ QURAN_CLI_ASCII = """
                         
      █▓▒­░⡷⠂ 𝒫𝓇𝑜𝒿𝑒𝒸𝓉 𝒷𝓎 𝐹𝒶𝒹𝒮𝑒𝒸 𝐿𝒶𝒷 ⠐⢾░▒▓█
 
-\033[0m"""
+"""
 
 class QuranApp:
     def __init__(self):
@@ -121,6 +121,8 @@ class QuranApp:
         self.preferences_file = get_app_path('preferences.json', writable=True)
         # Load preferences using the defined path
         self.preferences = self._load_preferences()
+        # Add this line immediately after:
+        self.theme_color = self.preferences.get('theme_color', 'red') # Load theme, default red
 
         # Initialize GithubUpdater
         self.updater = GithubUpdater("anonfaded", "QuranCLI", VERSION)
@@ -181,7 +183,60 @@ class QuranApp:
         self.ui.clear_terminal()
 
     def _display_header(self):
-        self.ui.display_header(QURAN_CLI_ASCII)
+        # Pass the currently loaded theme color to the UI method
+        self.ui.display_header(QURAN_CLI_ASCII, theme_color=self.theme_color)
+        
+    def _handle_theme_selection(self):
+        """Handles the UI interaction for selecting a theme."""
+        self._clear_terminal()
+        self._display_header() # Show header in current theme before selection
+        print(Fore.GREEN + Style.BRIGHT + "🎨 Select Theme Color for ASCII Art:")
+        print(Fore.RED + "  1. Red (Default)")
+        print(Fore.WHITE + "  2. White")
+        print(Fore.GREEN + "  3. Green")
+        print(Fore.BLUE + "  4. Blue")        # Added
+        print(Fore.YELLOW + "  5. Yellow")      # Added
+        print(Fore.MAGENTA + "  6. Magenta")    # Added
+        print(Fore.CYAN + "  7. Cyan")        # Added
+        print(Fore.YELLOW + "\n  q. Cancel")
+
+        try:
+            choice = input(Fore.BLUE + "\nEnter choice: " + Fore.WHITE).strip().lower()
+            new_theme = None
+            if choice == '1':
+                new_theme = 'red'
+            elif choice == '2':
+                new_theme = 'white'
+            elif choice == '3':
+                new_theme = 'green'
+            elif choice == '4':          # Added
+                new_theme = 'blue'
+            elif choice == '5':          # Added
+                new_theme = 'yellow'
+            elif choice == '6':          # Added
+                new_theme = 'magenta'
+            elif choice == '7':          # Added
+                new_theme = 'cyan'
+            elif choice == 'q':
+                print(Fore.YELLOW + "Theme selection cancelled.")
+                sleep(1)
+                return # Go back without changing
+
+            if new_theme:
+                self.preferences['theme_color'] = new_theme
+                self.theme_color = new_theme # Update the instance variable immediately
+                self._save_preferences()
+                print(Fore.GREEN + f"\n✅ Theme set to {new_theme.capitalize()}.")
+                sleep(1.5)
+            else:
+                print(Fore.RED + "Invalid choice.")
+                sleep(1)
+        except KeyboardInterrupt:
+            print(Fore.YELLOW + "\nTheme selection cancelled.")
+            sleep(1)
+        except Exception as e:
+            print(Fore.RED + f"Error setting theme: {e}")
+            sleep(1)
 
     def run(self):
         while True:
@@ -387,6 +442,7 @@ class QuranApp:
                 print(Fore.RED + f"│ • {Fore.CYAN}sub{Fore.WHITE}: Create subtitles for Ayahs")
                 print(Fore.RED + f"│ • {Fore.CYAN}clearaudio{Fore.WHITE}: Clear audio cache")
                 print(Fore.RED + f"│ • {Fore.CYAN}info{Fore.WHITE}: Show help and information")
+                print(Fore.RED + f"│ • {Fore.CYAN}theme{Fore.WHITE}: Change ASCII art color")
                 print(Fore.RED + f"│ • {Fore.CYAN}quit{Fore.WHITE}: Exit the application")
                 print(Fore.RED + "╰" + separator)
                     
@@ -431,7 +487,9 @@ class QuranApp:
                 elif user_input == 'info': # Handle the 'info' command
                     self._display_info()
                     continue # Go back to the start of the loop to show the prompt again
-            
+                elif user_input == 'theme':
+                    self._handle_theme_selection()
+                    continue # Go back to the main menu prompt
                 # Check if input is a number
                 elif user_input.isdigit():
                     number = int(user_input)
