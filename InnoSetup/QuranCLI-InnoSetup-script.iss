@@ -29,17 +29,67 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
 LicenseFile=C:\Users\faded\Desktop\QuranCLI\LICENSE
-InfoBeforeFile=C:\Users\faded\Desktop\QuranCLI\InfoBeforeInstall.txt
-InfoAfterFile=C:\Users\faded\Desktop\QuranCLI\InfoAfterInstall.txt
+InfoBeforeFile=C:\Users\faded\Desktop\QuranCLI\InnoSetup\InfoBeforeInstall.txt
+InfoAfterFile=C:\Users\faded\Desktop\QuranCLI\InnoSetup\InfoAfterInstall.txt
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=C:\Users\faded\Desktop\QuranCLI\InnoSetup
 OutputBaseFilename=QuranCLI-Setup
-SetupIconFile=C:\Users\faded\Desktop\QuranCLI\icon.ico
+SetupIconFile=C:\Users\faded\Desktop\QuranCLI\core\icon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+
+[Code]
+const
+    EnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
+
+procedure EnvAddPath(Path: string);
+var
+    Paths: string;
+begin
+    { Retrieve current path }
+    if not RegQueryStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, 'Path', Paths) then
+        Paths := '';
+
+    { Skip if path is already included }
+    if Pos(';' + Uppercase(Path) + ';', ';' + Uppercase(Paths) + ';') > 0 then exit;
+
+    { Add path }
+    if Paths = '' then
+        Paths := Path
+    else
+        Paths := Paths + ';' + Path;
+
+    { Save new path }
+    RegWriteStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, 'Path', Paths);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+    if CurStep = ssPostInstall then 
+        EnvAddPath(ExpandConstant('{app}'));
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+    Path: string;
+    Paths: string;
+    P: Integer;
+begin
+    if CurUninstallStep = usUninstall then
+    begin
+        if RegQueryStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, 'Path', Paths) then
+        begin
+            Path := ExpandConstant('{app}');
+            P := Pos(';' + Uppercase(Path) + ';', ';' + Uppercase(Paths) + ';');
+            if P = 0 then exit;
+            Delete(Paths, P - 1, Length(Path) + 1);
+            RegWriteStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, 'Path', Paths);
+        end;
+    end;
+end;
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -49,6 +99,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "C:\Users\faded\Desktop\QuranCLI\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "C:\Users\faded\Desktop\QuranCLI\qurancli.bat"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
