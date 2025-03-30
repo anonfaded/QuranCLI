@@ -1,7 +1,10 @@
       
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/anonfaded/QuranCLI/main/icon.ico" alt="QuranCLI Icon" width="64">
+<!-- <img src="https://github.com/user-attachments/assets/b82e6f7b-850d-4561-8290-083ef4bebfd6" alt="QuranCLI Icon" width="64"> -->
+
+![icon](https://github.com/user-attachments/assets/b82e6f7b-850d-4561-8290-083ef4bebfd6)
+
 
 # QuranCLI ✨
 
