@@ -47,17 +47,19 @@ QuranCLI brings the Quran to your Windows command line with a rich set of featur
 
 ## 🎬 Demo & Screenshots
 
-<div align="center">
-  <img src="https://github.com/user-attachments/assets/be3ae1e9-ca4d-4d8d-abee-7a4d3e854450" alt="Reading View" width="550">
-  <p><em>Reading View (Simple & Uthmani Scripts + Translation)</em></p>
-</div>
 
-<br>
 
 <!-- live theme command using screenrecording -->
 https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
 <div align="center">
   <p><em>Theme command in use</em></p>
+</div>
+
+<br> 
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/be3ae1e9-ca4d-4d8d-abee-7a4d3e854450" alt="Reading View" width="550">
+  <p><em>Reading View (Simple & Uthmani Scripts + Translation)</em></p>
 </div>
 
 <br>
