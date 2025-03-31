@@ -63,16 +63,21 @@ def _unix_getch_non_blocking():
         # No data available
         return None
 
+
 def _restore_terminal_settings():
     """Restores terminal settings on Unix-like systems."""
     global _original_termios_settings
     if sys.platform != "win32" and _original_termios_settings is not None:
         try:
+            # print("DEBUG: Attempting to restore terminal settings...") # Optional debug
             termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, _original_termios_settings)
-            # print("DEBUG: Restored terminal settings") # Optional debug
+            # print("DEBUG: Restored terminal settings successfully.") # Optional debug
         except Exception as e:
-            print(f"\n{Fore.RED}Warning: Failed to restore terminal settings: {e}{Style.RESET_ALL}")
-        _original_termios_settings = None # Clear stored settings
+            # Use stderr for errors potentially interfering with UI redraw
+            print(f"\n{Fore.RED}Warning: Failed to restore terminal settings: {e}{Style.RESET_ALL}", file=sys.stderr)
+        finally:
+             # Always clear the stored settings after attempting restore
+            _original_termios_settings = None
 
 # --- End Terminal Control ---
 
@@ -489,18 +494,51 @@ class UI:
         # --- Setup Terminal for Non-Blocking Input (Unix) ---
         if is_unix:
             try:
-                # Get the file descriptor for stdin
                 fd = sys.stdin.fileno()
-                # Store original settings BEFORE changing them
                 _original_termios_settings = termios.tcgetattr(fd)
-                # Set terminal to cbreak mode (reacts to keys instantly, no echo)
-                tty.setcbreak(fd)
-                # print("DEBUG: Set terminal to cbreak mode") # Optional debug
+                # --- Make a copy to modify ---
+                new_settings = termios.tcgetattr(fd)
+                # --- Explicitly set flags using setcbreak's logic source ---
+                # Based on Python's tty.py source for setcbreak:
+                # new_settings[0] &= ~(termios.IGNBRK | termios.BRKINT | termios.PARMRK | termios.ISTRIP | termios.INLCR | termios.IGNCR | termios.ICRNL | termios.IXON) # iflags
+                # new_settings[1] &= ~termios.OPOST # oflags
+                new_settings[2] &= ~(termios.CSIZE | termios.PARENB) # cflags
+                new_settings[2] |= termios.CS8
+                new_settings[3] &= ~(termios.ECHO | termios.ECHONL | termios.ICANON | termios.ISIG | termios.IEXTEN) # lflags
+                new_settings[6][termios.VMIN] = 1 # Read 1 char at a time
+                new_settings[6][termios.VTIME] = 0 # No timer, return immediately
+
+                # --- Apply the modified settings ---
+                termios.tcsetattr(fd, termios.TCSADRAIN, new_settings)
+
+                # --- DEBUG: Check flags AFTER setting ---
+                # flags_after = termios.tcgetattr(fd)
+                # print(f"DEBUG: lflags after set: {flags_after[3]:b}") # Print local flags in binary
+                # print(f"DEBUG: ICANON set? {(flags_after[3] & termios.ICANON) == 0}") # Should be True (flag is OFF)
+                # print(f"DEBUG: ECHO set? {(flags_after[3] & termios.ECHO) == 0}")    # Should be True (flag is OFF)
+                # --- END DEBUG ---
+
+                # --- Check if it actually worked (rudimentary check) ---
+                if (termios.tcgetattr(fd)[3] & termios.ICANON) or \
+                   (termios.tcgetattr(fd)[3] & termios.ECHO):
+                    print(f"\n{Fore.YELLOW}Warning: Terminal did not fully enter cbreak mode (ICANON or ECHO still set).")
+                    # Attempt to restore original settings if partial failure
+                    _restore_terminal_settings() # Use helper
+                    is_unix = False # Fallback to standard input
+                    _original_termios_settings = None # Prevent further restore attempts
+                    print(f"{Fore.YELLOW}Audio controls will require pressing Enter.{Style.RESET_ALL}")
+                # else:
+                    # print("DEBUG: Terminal successfully set to cbreak-like mode.") # Optional success debug
+
             except Exception as e:
                 print(f"\n{Fore.YELLOW}Warning: Could not set terminal for instant key input: {e}")
                 print(f"{Fore.YELLOW}Audio controls will require pressing Enter.{Style.RESET_ALL}")
-                is_unix = False # Fallback to standard input if setup fails
-                _original_termios_settings = None # Ensure no restore attempt if setup failed
+                # Ensure restore isn't attempted if setup failed
+                if _original_termios_settings:
+                    try: termios.tcsetattr(fd, termios.TCSADRAIN, _original_termios_settings)
+                    except: pass # Ignore errors during immediate restore on failure
+                is_unix = False
+                _original_termios_settings = None
 
         # --- Main Audio Control Loop ---
         last_display = ""
