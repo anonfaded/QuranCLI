@@ -3,7 +3,7 @@ import sys
 import math
 import time
 import asyncio
-import keyboard
+# import keyboard
 import json
 import os
 import datetime
@@ -11,7 +11,14 @@ import platformdirs
 
 if sys.platform == "win32":
     import msvcrt
-    
+else:
+    # Imports for Unix-like systems (Linux, macOS, Termux)
+    import select
+    import tty
+    import termios
+    # Keep track of original terminal settings
+    _original_termios_settings = None
+     
 from typing import List, Optional, TYPE_CHECKING
 if TYPE_CHECKING: # Avoid circular import issues for type hints
     from core.download_counter import DownloadCounter
@@ -27,6 +34,49 @@ import socket #For Ip Adresses
 import threading #Add threading for server
 import http.server
 import socketserver
+
+
+# --- Terminal Control for Unix-like systems ---
+def _unix_getch_non_blocking():
+    """Gets a single character from standard input on Unix without blocking.
+       Returns None if no key is pressed. Needs terminal in cbreak mode."""
+    # Check if stdin has data to read with a timeout of 0 (non-blocking)
+    # Use select for portability (works on more Unix variants)
+    rlist, _, _ = select.select([sys.stdin], [], [], 0)
+    if rlist:
+        # Data is available, read one character
+        try:
+            # Use os.read for lower-level reading after tty.setcbreak
+            # Read up to 4 bytes to handle potential escape sequences
+            char_bytes = os.read(sys.stdin.fileno(), 4)
+            # Decode carefully
+            try:
+                return char_bytes.decode('utf-8')
+            except UnicodeDecodeError:
+                # If decoding fails, might be a special key - return bytes?
+                # Or return a placeholder/None? Let's return None for simplicity.
+                return None
+        except Exception:
+             # Handle potential errors during read
+             return None
+    else:
+        # No data available
+        return None
+
+def _restore_terminal_settings():
+    """Restores terminal settings on Unix-like systems."""
+    global _original_termios_settings
+    if sys.platform != "win32" and _original_termios_settings is not None:
+        try:
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, _original_termios_settings)
+            # print("DEBUG: Restored terminal settings") # Optional debug
+        except Exception as e:
+            print(f"\n{Fore.RED}Warning: Failed to restore terminal settings: {e}{Style.RESET_ALL}")
+        _original_termios_settings = None # Clear stored settings
+
+# --- End Terminal Control ---
+
+
 
 class UI:
 
@@ -425,89 +475,158 @@ class UI:
             time.sleep(2)
 
     def display_audio_controls(self, surah_info: SurahInfo):
-        """Display audio controls with real-time updates"""
+        """Display audio controls with real-time updates (Cross-Platform Input)."""
+        global _original_termios_settings # Access the global variable
 
-        
         if not surah_info.audio:
             print(Fore.RED + "\n❌ Audio not available for this surah")
+            time.sleep(1.5)
             return
 
-        try:
-            keyboard.unhook_all()  # Clean up any existing hooks
-        except Exception as e:
-            print(Fore.RED + f"\nWarning: Keyboard shortcuts not available: {e}")
+        fd = None
+        is_unix = sys.platform != "win32"
 
+        # --- Setup Terminal for Non-Blocking Input (Unix) ---
+        if is_unix:
+            try:
+                # Get the file descriptor for stdin
+                fd = sys.stdin.fileno()
+                # Store original settings BEFORE changing them
+                _original_termios_settings = termios.tcgetattr(fd)
+                # Set terminal to cbreak mode (reacts to keys instantly, no echo)
+                tty.setcbreak(fd)
+                # print("DEBUG: Set terminal to cbreak mode") # Optional debug
+            except Exception as e:
+                print(f"\n{Fore.YELLOW}Warning: Could not set terminal for instant key input: {e}")
+                print(f"{Fore.YELLOW}Audio controls will require pressing Enter.{Style.RESET_ALL}")
+                is_unix = False # Fallback to standard input if setup fails
+                _original_termios_settings = None # Ensure no restore attempt if setup failed
+
+        # --- Main Audio Control Loop ---
         last_display = ""
         running = True
-        # --- REMOVED error_logged flag and force_redraw_flag ---
         try:
-            # --- Initial Draw ---
-            # Perform an initial draw when entering the controls
+            # Initial Draw
             last_display = self._redraw_audio_ui(surah_info) or ""
-            # --- End Initial Draw ---
 
             while running:
-                # --- Input Handling (Keep existing msvcrt logic) ---
                 choice = None
-                if sys.platform == "win32" and msvcrt.kbhit():
-                    try:
-                        key_byte = msvcrt.getch()
-                        if key_byte == b'\x00' or key_byte == b'\xe0': msvcrt.getch(); continue
-                        else: choice = key_byte.decode('ascii', errors='ignore').lower()
-                    except (UnicodeDecodeError, Exception): continue
-                # --- End Input Handling ---
+                try:
+                    # --- Platform-Specific Non-Blocking Input ---
+                    if sys.platform == "win32":
+                        if msvcrt.kbhit():
+                            key_byte = msvcrt.getch()
+                            # Handle potential special keys (like arrows) on Windows
+                            if key_byte == b'\x00' or key_byte == b'\xe0':
+                                msvcrt.getch() # Consume the second byte of special key
+                                # Optionally map arrow keys here if desired, e.g., to seek
+                                # key_code = msvcrt.getch()
+                                # if key_code == b'K': choice = '[' # Left arrow example
+                                # elif key_code == b'M': choice = ']' # Right arrow example
+                                continue # Ignore other special keys for now
+                            else:
+                                try:
+                                    choice = key_byte.decode('utf-8', errors='ignore').lower()
+                                except UnicodeDecodeError:
+                                    continue # Ignore undecodable bytes
+                    elif is_unix: # Use the Unix non-blocking method if setup succeeded
+                        # _unix_getch_non_blocking now returns the character or None
+                        char_read = _unix_getch_non_blocking()
+                        if char_read:
+                            # Handle multi-byte sequences (like arrows) crudely for now
+                            # A more robust solution uses libraries or more complex termios/escape code parsing
+                            if len(char_read) > 1 and char_read.startswith('\x1b'): # Basic check for escape sequence
+                                 # Could add mapping for arrow keys here, e.g., \x1b[D for left
+                                 # if char_read == '\x1b[D': choice = '[' # Left arrow example
+                                 # if char_read == '\x1b[C': choice = ']' # Right arrow example
+                                 pass # Ignore other escape sequences for now
+                            else:
+                                 choice = char_read.lower() # Use the single character read
+                    else:
+                         # Fallback: Standard blocking input (requires Enter)
+                         # This part shouldn't normally be reached if is_unix setup worked,
+                         # but acts as a safeguard or if setup failed.
+                         # We can't easily mix blocking/non-blocking, so we'll rely on the
+                         # non-blocking methods above and the main loop sleep.
+                         # If we *needed* blocking input here, we'd need to prompt.
+                         pass # Do nothing here, let the loop continue
 
-                # --- Process Input Choice (Directly call redraw for seek) ---
+                except Exception as e_input:
+                     print(f"\n{Fore.RED}Input Error: {e_input}{Style.RESET_ALL}")
+                     time.sleep(1) # Prevent rapid error loops
+                     continue # Skip processing this loop iteration
+
+
+                # --- Process Input Choice (Largely Unchanged) ---
                 if choice:
+                    # print(f"DEBUG: Key pressed: {repr(choice)}") # Debug keys
                     if choice == 'q': running = False
-                    elif choice == '[': self.audio_manager.seek(max(0, self.audio_manager.current_position - 5)); last_display = self._redraw_audio_ui(surah_info) or last_display # Redraw after seek, no full clear
-                    elif choice == ']': self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 5)); last_display = self._redraw_audio_ui(surah_info) or last_display
-                    elif choice == 'j': self.audio_manager.seek(max(0, self.audio_manager.current_position - 30)); last_display = self._redraw_audio_ui(surah_info) or last_display
-                    elif choice == 'k': self.audio_manager.seek(min(self.audio_manager.duration, self.audio_manager.current_position + 30)); last_display = self._redraw_audio_ui(surah_info) or last_display
+                    # Handle seek keys
+                    elif choice in ('[', ']', 'j', 'k'):
+                        seek_amount = 0
+                        if choice == '[': seek_amount = -5
+                        elif choice == ']': seek_amount = 5
+                        elif choice == 'j': seek_amount = -30
+                        elif choice == 'k': seek_amount = 30
+
+                        if self.audio_manager.duration > 0: # Only seek if audio is loaded
+                             current_pos = self.audio_manager.current_position
+                             target_pos = current_pos + seek_amount
+                             # Clamp target position (handled better within seek now)
+                             self.audio_manager.seek(target_pos)
+                             # Redraw immediately after seek action
+                             last_display = self._redraw_audio_ui(surah_info) or last_display
+                        else:
+                             # Optional: Notify user they can't seek yet
+                             # print(Fore.YELLOW + "Load audio first ('p') to seek." + Style.RESET_ALL, end='\r')
+                             pass
+
+                    # Handle other commands (p, s, r)
                     elif choice in ['p', 's', 'r']:
                         # handle_audio_choice now handles redraw for these actions
                         self.handle_audio_choice(choice, surah_info)
-                        # We might need to update last_display *after* handle_audio_choice redraws
-                        # Let's get the latest state again for comparison
-                        current_state_str = self.get_audio_display(surah_info) # Get potentially updated string
-                        last_display = current_state_str # Assume redraw happened, update last_display
+                        # Update last_display after handle_audio_choice potentially redraws
+                        current_state_str = self.get_audio_display(surah_info)
+                        last_display = current_state_str
 
-                    # Reset error state? Maybe not needed if redraw works
-                    # error_logged = False
-                # --- End Process Input Choice ---
+                    # Ignore unrecognized keys silently
 
-                # --- Normal Display Update (less frequent) ---
-                # Only redraw based on time if no key was pressed and audio is playing
-                elif not choice and self.audio_manager.is_playing:
-                    try:
-                        current_display = self.get_audio_display(surah_info)
-                        if current_display != last_display:
-                             # Use redraw helper, but don't force full clear for minor updates
-                            last_display = self._redraw_audio_ui(surah_info) or last_display
-                    except Exception as e:
-                        # Simplified error handling for regular updates
-                        # print(f"Minor display update error: {e}") # Debug only
-                        pass # Ignore minor update errors silently
-                # --- End Normal Display Update ---
-
+                # --- Normal Display Update (Progress Bar) ---
+                elif self.audio_manager.is_playing: # Update display only if playing and no key pressed
+                     try:
+                         current_display = self.get_audio_display(surah_info)
+                         if current_display != last_display:
+                             last_display = self._redraw_audio_ui(surah_info) or last_display
+                     except Exception:
+                         pass # Ignore minor update errors silently
 
                 # --- Check if audio finished playing naturally ---
-                # This check might now be less critical if redraws happen correctly, but keep it
                 if (not self.audio_manager.is_playing and self.audio_manager.current_audio and
                    self.audio_manager.duration > 0 and
                    self.audio_manager.current_position >= self.audio_manager.duration - 0.1):
-                     # Check if display *needs* update (might already show finished)
                      current_state_str_check = self.get_audio_display(surah_info)
                      if last_display != current_state_str_check:
                          last_display = self._redraw_audio_ui(surah_info) or last_display
 
-                time.sleep(0.1) # Main loop delay
+                # Main loop delay - crucial for non-blocking checks
+                time.sleep(0.05) # Shorter sleep for more responsive input checks
 
         except KeyboardInterrupt:
-             print(Fore.YELLOW + "\nAudio controls interrupted.")
+            print(Fore.YELLOW + "\nAudio controls interrupted.")
+            # The finally block will handle cleanup
+        except Exception as e_loop:
+            print(f"\n{Fore.RED}Error in audio control loop: {e_loop}{Style.RESET_ALL}")
+            # The finally block will handle cleanup
         finally:
-             print(Fore.YELLOW + "\nExiting audio player.")
-             self.audio_manager.stop_audio(reset_state=True)
+            # --- ALWAYS Restore Terminal Settings (Unix) ---
+            if is_unix and _original_termios_settings:
+                _restore_terminal_settings() # Use the dedicated restore function
+
+            # --- Stop Audio ---
+            print(Fore.YELLOW + "\nExiting audio player.") # Moved here to appear after restore msg if any
+            self.audio_manager.stop_audio(reset_state=True)
+            # Optional short pause before returning to previous screen
+            time.sleep(0.5)
         
 # core/ui.py (inside class UI)
 
@@ -605,11 +724,18 @@ class UI:
         output.append(_Fore_RED + "╰" + separator + _RESET)
 
         # Input Hint - Use safe DIM
+        output.append("") # Add a blank line before hint
         if sys.platform == "win32":
-             output.append(_Style_DIM + _Fore_WHITE + "\nPress key directly (no Enter needed)" + _RESET)
+            output.append(_Style_DIM + _Fore_WHITE + "Press key directly (no Enter needed)" + _RESET)
         else:
-             output.append(_Style_DIM + _Fore_WHITE + "\nType command (p,s,r,q) and press Enter" + _RESET)
-        output.append(_Fore_RED + "└──╼ " + _Fore_WHITE)
+             # Check if tty setup likely succeeded (based on _original_termios_settings being stored)
+             # If it failed, input might still require Enter.
+             if _original_termios_settings is not None:
+                 output.append(_Style_DIM + _Fore_WHITE + "Press key directly (no Enter needed)" + _RESET)
+             else:
+                 output.append(_Style_DIM + _Fore_WHITE + "Type command (p,s,r,q...) and press Enter" + _RESET) # Fallback hint
+
+        output.append(_Fore_RED + "└──╼ " + _Fore_WHITE) # Keep prompt indicator
 
         return '\n'.join(output)
 
