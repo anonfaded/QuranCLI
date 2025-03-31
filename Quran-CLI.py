@@ -483,7 +483,7 @@ class QuranApp:
                 print(Fore.RED + f"│ • {Fore.CYAN}clearaudio{Fore.WHITE}: Clear audio cache")
                 print(Fore.RED + f"│ • {Fore.CYAN}info{Fore.WHITE}: Show help and information")
                 print(Fore.RED + f"│ • {Fore.CYAN}theme{Fore.WHITE}: Change ASCII art color")
-                print(Fore.RED + f"│ • {Fore.RED}readme{Fore.WHITE}: View App Notes & Updates")
+                print(Fore.RED + f"│ • {Fore.RED}readme{Fore.WHITE}: View Notes by the developer & Updates")
                 print(Fore.RED + f"│ • {Fore.CYAN}quit{Fore.WHITE}: Exit the application")
                 print(Fore.RED + "╰" + separator)
                     
