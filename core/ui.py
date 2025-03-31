@@ -479,237 +479,237 @@ class UI:
             print(Fore.YELLOW + "Please try again or choose a different reciter.")
             time.sleep(2)
 
-# core/ui.py (Replace the existing display_audio_controls method)
 
-def display_audio_controls(self, surah_info: SurahInfo):
-    """Display audio controls with real-time updates (Cross-Platform Input)."""
-    global _original_termios_settings # Access the global variable
 
-    if not surah_info.audio:
-        print(Fore.RED + "\n❌ Audio not available for this surah")
-        time.sleep(1.5)
-        return
+    def display_audio_controls(self, surah_info: SurahInfo):
+        """Display audio controls with real-time updates (Cross-Platform Input)."""
+        global _original_termios_settings # Access the global variable
 
-    fd = None
-    is_unix = sys.platform != "win32"
-    # --- Define new_settings variable here to be accessible later ---
-    new_settings = None # Initialize for non-unix cases
+        if not surah_info.audio:
+            print(Fore.RED + "\n❌ Audio not available for this surah")
+            time.sleep(1.5)
+            return
 
-    # --- Setup Terminal for Non-Blocking Input (Unix) ---
-    if is_unix:
-        try:
-            fd = sys.stdin.fileno()
-            _original_termios_settings = termios.tcgetattr(fd)
-            # --- Make a copy to modify and store in new_settings ---
-            new_settings = termios.tcgetattr(fd)
-            new_settings[3] &= ~(termios.ECHO | termios.ECHONL | termios.ICANON | termios.ISIG | termios.IEXTEN) # lflags
-            new_settings[6][termios.VMIN] = 1
-            new_settings[6][termios.VTIME] = 0
-            termios.tcsetattr(fd, termios.TCSADRAIN, new_settings)
+        fd = None
+        is_unix = sys.platform != "win32"
+        # --- Define new_settings variable here to be accessible later ---
+        new_settings = None # Initialize for non-unix cases
 
-            # --- Check if it actually worked ---
-            if (termios.tcgetattr(fd)[3] & termios.ICANON) or \
-               (termios.tcgetattr(fd)[3] & termios.ECHO):
-                print(f"\n{Fore.YELLOW}Warning: Terminal did not fully enter cbreak mode (ICANON or ECHO still set).")
-                _restore_terminal_settings() # Use helper
+        # --- Setup Terminal for Non-Blocking Input (Unix) ---
+        if is_unix:
+            try:
+                fd = sys.stdin.fileno()
+                _original_termios_settings = termios.tcgetattr(fd)
+                # --- Make a copy to modify and store in new_settings ---
+                new_settings = termios.tcgetattr(fd)
+                new_settings[3] &= ~(termios.ECHO | termios.ECHONL | termios.ICANON | termios.ISIG | termios.IEXTEN) # lflags
+                new_settings[6][termios.VMIN] = 1
+                new_settings[6][termios.VTIME] = 0
+                termios.tcsetattr(fd, termios.TCSADRAIN, new_settings)
+
+                # --- Check if it actually worked ---
+                if (termios.tcgetattr(fd)[3] & termios.ICANON) or \
+                (termios.tcgetattr(fd)[3] & termios.ECHO):
+                    print(f"\n{Fore.YELLOW}Warning: Terminal did not fully enter cbreak mode (ICANON or ECHO still set).")
+                    _restore_terminal_settings() # Use helper
+                    is_unix = False
+                    _original_termios_settings = None
+                    new_settings = None # Clear modified settings as well
+                    print(f"{Fore.YELLOW}Audio controls will require pressing Enter.{Style.RESET_ALL}")
+                # else:
+                    # print("DEBUG: Terminal successfully set to cbreak-like mode.") # Optional success debug
+
+            except Exception as e:
+                print(f"\n{Fore.YELLOW}Warning: Could not set terminal for instant key input: {e}")
+                print(f"{Fore.YELLOW}Audio controls will require pressing Enter.{Style.RESET_ALL}")
+                if _original_termios_settings: # Attempt restore if we got original settings
+                    try: termios.tcsetattr(fd, termios.TCSADRAIN, _original_termios_settings)
+                    except: pass
                 is_unix = False
                 _original_termios_settings = None
-                new_settings = None # Clear modified settings as well
-                print(f"{Fore.YELLOW}Audio controls will require pressing Enter.{Style.RESET_ALL}")
-            # else:
-                # print("DEBUG: Terminal successfully set to cbreak-like mode.") # Optional success debug
+                new_settings = None
 
-        except Exception as e:
-            print(f"\n{Fore.YELLOW}Warning: Could not set terminal for instant key input: {e}")
-            print(f"{Fore.YELLOW}Audio controls will require pressing Enter.{Style.RESET_ALL}")
-            if _original_termios_settings: # Attempt restore if we got original settings
-                try: termios.tcsetattr(fd, termios.TCSADRAIN, _original_termios_settings)
-                except: pass
-            is_unix = False
-            _original_termios_settings = None
-            new_settings = None
+        # --- Main Audio Control Loop ---
+        last_display = ""
+        running = True
+        try:
+            # Initial Draw
+            last_display = self._redraw_audio_ui(surah_info) or ""
 
-    # --- Main Audio Control Loop ---
-    last_display = ""
-    running = True
-    try:
-        # Initial Draw
-        last_display = self._redraw_audio_ui(surah_info) or ""
+            while running:
+                choice = None
+                reciter_selection_active = False # Flag to know if we are inside reciter menu
 
-        while running:
-            choice = None
-            reciter_selection_active = False # Flag to know if we are inside reciter menu
-
-            # --- Platform-Specific Non-Blocking Input ---
-            # (This part remains the same as the previous version)
-            try:
-                if sys.platform == "win32":
-                    if msvcrt.kbhit():
-                        key_byte = msvcrt.getch()
-                        if key_byte == b'\x00' or key_byte == b'\xe0':
-                            msvcrt.getch()
-                            continue
-                        else:
-                            try: choice = key_byte.decode('utf-8', errors='ignore').lower()
-                            except UnicodeDecodeError: continue
-                elif is_unix: # Use the Unix non-blocking method if setup succeeded
-                    char_read = _unix_getch_non_blocking()
-                    if char_read:
-                        if len(char_read) > 1 and char_read.startswith('\x1b'):
-                             pass # Ignore escape sequences for now
-                        else:
-                             choice = char_read.lower()
-                else: # Fallback (shouldn't be reached often now)
-                     pass
-            except Exception as e_input:
-                 print(f"\n{Fore.RED}Input Error: {e_input}{Style.RESET_ALL}")
-                 time.sleep(1)
-                 continue
-
-
-            # --- Process Input Choice ---
-            if choice:
-                if choice == 'q': running = False
-
-                # --- Handle Reciter Selection ('r') ---
-                elif choice == 'r':
-                    surah_num = surah_info.surah_number
-                    if not surah_info.audio:
-                        print(Fore.RED + "\n❌ No reciters available."); time.sleep(1); continue
-
-                    reciter_selection_active = True # Set flag
-                    original_display_needs_restore = True # Assume redraw needed unless selection successful
-
-                    # --- Temporarily Restore Terminal for Input ---
-                    if is_unix and _original_termios_settings:
-                        try:
-                            # print("DEBUG: Restoring terminal for reciter input...") # Debug
-                            # Use original settings, NOT _restore_terminal_settings helper here
-                            termios.tcsetattr(fd, termios.TCSADRAIN, _original_termios_settings)
-                        except Exception as e_restore:
-                            print(f"\n{Fore.RED}Warning: Failed to restore terminal for input: {e_restore}")
-                            # Proceed anyway, input might just lack echo
-
-                    # --- Reciter Selection Input Loop ---
-                    selected_reciter_data = None
-                    try:
-                         while True: # Loop for reciter number input
-                             self.clear_terminal() # Clear before showing options
-                             print(Style.BRIGHT + Fore.RED + "\nAudio Player - Select Reciter" + Style.RESET_ALL)
-                             reciter_options = list(surah_info.audio.items())
-                             for i, (rid, info) in enumerate(reciter_options): print(f"{Fore.GREEN}{i+1}{Fore.WHITE}: {info['reciter']}")
-                             print(Fore.WHITE + "\nEnter number ('q' to cancel): ", end="", flush=True) # Prompt
-
-                             # *** Use standard input() now ***
-                             reciter_input = input().strip().lower() # This will now echo
-
-                             if reciter_input == 'q': break # Exit inner loop
-                             if reciter_input.isdigit():
-                                 choice_idx = int(reciter_input) - 1
-                                 if 0 <= choice_idx < len(reciter_options):
-                                     selected_id, selected_info = reciter_options[choice_idx]
-                                     selected_reciter_data = {
-                                         "url": selected_info["url"],
-                                         "name": selected_info["reciter"],
-                                         "surah_num": surah_num
-                                     }
-                                     print(f"\n{Fore.CYAN}Selected: {selected_reciter_data['name']}")
-                                     # Save preference
-                                     self.preferences[str(surah_num)] = {"reciter_name": selected_reciter_data['name'], "reciter_url": selected_reciter_data['url']}
-                                     self.save_preferences()
-                                     print(Fore.GREEN + " Preference saved.")
-                                     original_display_needs_restore = False
-                                     time.sleep(1.0)
-                                     break # Exit inner loop successfully
-                                 else: print(Fore.RED + "\nInvalid number."); time.sleep(1.5)
-                             else: print(Fore.RED + "\nInvalid input."); time.sleep(1.5)
-                    except KeyboardInterrupt:
-                         print(Fore.YELLOW + "\nSelection cancelled.")
-                    except Exception as e_sel:
-                         print(Fore.RED + f"\nError during selection: {e_sel}")
-                    # --- End Reciter Input Loop ---
-
-                    # --- Re-apply Cbreak Settings AFTER input attempt ---
-                    if is_unix and new_settings: # Check if we have settings to re-apply
-                        try:
-                            # print("DEBUG: Re-applying cbreak settings after reciter input...") # Debug
-                            termios.tcsetattr(fd, termios.TCSADRAIN, new_settings)
-                        except Exception as e_apply:
-                            print(f"\n{Fore.RED}Warning: Failed to re-apply terminal settings: {e_apply}")
-                            # If this fails, subsequent input might require Enter
-
-                    reciter_selection_active = False # Clear flag
-
-                    # --- Play selected reciter if chosen ---
-                    if selected_reciter_data:
-                         self.audio_manager.stop_audio(reset_state=True)
-                         # Run download and play (handle_audio_playback now redraws)
-                         asyncio.run(self.handle_audio_playback(
-                             selected_reciter_data["url"],
-                             selected_reciter_data["surah_num"],
-                             selected_reciter_data["name"]
-                         ))
-                         # Update last_display after potential redraw in handle_audio_playback
-                         last_display = self.get_audio_display(surah_info)
-
-
-                    # --- Redraw if selection was cancelled/failed ---
-                    elif original_display_needs_restore:
-                         last_display = self._redraw_audio_ui(surah_info) or last_display
-
-
-                # Handle seek keys ([, ], j, k)
-                elif choice in ('[', ']', 'j', 'k'):
-                    # (Seek logic remains the same as previous version)
-                    seek_amount = 0
-                    if choice == '[': seek_amount = -5
-                    elif choice == ']': seek_amount = 5
-                    elif choice == 'j': seek_amount = -30
-                    elif choice == 'k': seek_amount = 30
-                    if self.audio_manager.duration > 0:
-                         self.audio_manager.seek(self.audio_manager.current_position + seek_amount)
-                         last_display = self._redraw_audio_ui(surah_info) or last_display
-
-                # Handle play/pause/stop (p, s)
-                elif choice in ['p', 's']:
-                    self.handle_audio_choice(choice, surah_info)
-                    last_display = self.get_audio_display(surah_info) # Update last display state
-
-
-            # --- Normal Display Update (If no key pressed and not in reciter menu) ---
-            elif not reciter_selection_active and self.audio_manager.is_playing:
+                # --- Platform-Specific Non-Blocking Input ---
+                # (This part remains the same as the previous version)
                 try:
-                    current_display = self.get_audio_display(surah_info)
-                    if current_display != last_display:
+                    if sys.platform == "win32":
+                        if msvcrt.kbhit():
+                            key_byte = msvcrt.getch()
+                            if key_byte == b'\x00' or key_byte == b'\xe0':
+                                msvcrt.getch()
+                                continue
+                            else:
+                                try: choice = key_byte.decode('utf-8', errors='ignore').lower()
+                                except UnicodeDecodeError: continue
+                    elif is_unix: # Use the Unix non-blocking method if setup succeeded
+                        char_read = _unix_getch_non_blocking()
+                        if char_read:
+                            if len(char_read) > 1 and char_read.startswith('\x1b'):
+                                pass # Ignore escape sequences for now
+                            else:
+                                choice = char_read.lower()
+                    else: # Fallback (shouldn't be reached often now)
+                        pass
+                except Exception as e_input:
+                    print(f"\n{Fore.RED}Input Error: {e_input}{Style.RESET_ALL}")
+                    time.sleep(1)
+                    continue
+
+
+                # --- Process Input Choice ---
+                if choice:
+                    if choice == 'q': running = False
+
+                    # --- Handle Reciter Selection ('r') ---
+                    elif choice == 'r':
+                        surah_num = surah_info.surah_number
+                        if not surah_info.audio:
+                            print(Fore.RED + "\n❌ No reciters available."); time.sleep(1); continue
+
+                        reciter_selection_active = True # Set flag
+                        original_display_needs_restore = True # Assume redraw needed unless selection successful
+
+                        # --- Temporarily Restore Terminal for Input ---
+                        if is_unix and _original_termios_settings:
+                            try:
+                                # print("DEBUG: Restoring terminal for reciter input...") # Debug
+                                # Use original settings, NOT _restore_terminal_settings helper here
+                                termios.tcsetattr(fd, termios.TCSADRAIN, _original_termios_settings)
+                            except Exception as e_restore:
+                                print(f"\n{Fore.RED}Warning: Failed to restore terminal for input: {e_restore}")
+                                # Proceed anyway, input might just lack echo
+
+                        # --- Reciter Selection Input Loop ---
+                        selected_reciter_data = None
+                        try:
+                            while True: # Loop for reciter number input
+                                self.clear_terminal() # Clear before showing options
+                                print(Style.BRIGHT + Fore.RED + "\nAudio Player - Select Reciter" + Style.RESET_ALL)
+                                reciter_options = list(surah_info.audio.items())
+                                for i, (rid, info) in enumerate(reciter_options): print(f"{Fore.GREEN}{i+1}{Fore.WHITE}: {info['reciter']}")
+                                print(Fore.WHITE + "\nEnter number ('q' to cancel): ", end="", flush=True) # Prompt
+
+                                # *** Use standard input() now ***
+                                reciter_input = input().strip().lower() # This will now echo
+
+                                if reciter_input == 'q': break # Exit inner loop
+                                if reciter_input.isdigit():
+                                    choice_idx = int(reciter_input) - 1
+                                    if 0 <= choice_idx < len(reciter_options):
+                                        selected_id, selected_info = reciter_options[choice_idx]
+                                        selected_reciter_data = {
+                                            "url": selected_info["url"],
+                                            "name": selected_info["reciter"],
+                                            "surah_num": surah_num
+                                        }
+                                        print(f"\n{Fore.CYAN}Selected: {selected_reciter_data['name']}")
+                                        # Save preference
+                                        self.preferences[str(surah_num)] = {"reciter_name": selected_reciter_data['name'], "reciter_url": selected_reciter_data['url']}
+                                        self.save_preferences()
+                                        print(Fore.GREEN + " Preference saved.")
+                                        original_display_needs_restore = False
+                                        time.sleep(1.0)
+                                        break # Exit inner loop successfully
+                                    else: print(Fore.RED + "\nInvalid number."); time.sleep(1.5)
+                                else: print(Fore.RED + "\nInvalid input."); time.sleep(1.5)
+                        except KeyboardInterrupt:
+                            print(Fore.YELLOW + "\nSelection cancelled.")
+                        except Exception as e_sel:
+                            print(Fore.RED + f"\nError during selection: {e_sel}")
+                        # --- End Reciter Input Loop ---
+
+                        # --- Re-apply Cbreak Settings AFTER input attempt ---
+                        if is_unix and new_settings: # Check if we have settings to re-apply
+                            try:
+                                # print("DEBUG: Re-applying cbreak settings after reciter input...") # Debug
+                                termios.tcsetattr(fd, termios.TCSADRAIN, new_settings)
+                            except Exception as e_apply:
+                                print(f"\n{Fore.RED}Warning: Failed to re-apply terminal settings: {e_apply}")
+                                # If this fails, subsequent input might require Enter
+
+                        reciter_selection_active = False # Clear flag
+
+                        # --- Play selected reciter if chosen ---
+                        if selected_reciter_data:
+                            self.audio_manager.stop_audio(reset_state=True)
+                            # Run download and play (handle_audio_playback now redraws)
+                            asyncio.run(self.handle_audio_playback(
+                                selected_reciter_data["url"],
+                                selected_reciter_data["surah_num"],
+                                selected_reciter_data["name"]
+                            ))
+                            # Update last_display after potential redraw in handle_audio_playback
+                            last_display = self.get_audio_display(surah_info)
+
+
+                        # --- Redraw if selection was cancelled/failed ---
+                        elif original_display_needs_restore:
+                            last_display = self._redraw_audio_ui(surah_info) or last_display
+
+
+                    # Handle seek keys ([, ], j, k)
+                    elif choice in ('[', ']', 'j', 'k'):
+                        # (Seek logic remains the same as previous version)
+                        seek_amount = 0
+                        if choice == '[': seek_amount = -5
+                        elif choice == ']': seek_amount = 5
+                        elif choice == 'j': seek_amount = -30
+                        elif choice == 'k': seek_amount = 30
+                        if self.audio_manager.duration > 0:
+                            self.audio_manager.seek(self.audio_manager.current_position + seek_amount)
+                            last_display = self._redraw_audio_ui(surah_info) or last_display
+
+                    # Handle play/pause/stop (p, s)
+                    elif choice in ['p', 's']:
+                        self.handle_audio_choice(choice, surah_info)
+                        last_display = self.get_audio_display(surah_info) # Update last display state
+
+
+                # --- Normal Display Update (If no key pressed and not in reciter menu) ---
+                elif not reciter_selection_active and self.audio_manager.is_playing:
+                    try:
+                        current_display = self.get_audio_display(surah_info)
+                        if current_display != last_display:
+                            last_display = self._redraw_audio_ui(surah_info) or last_display
+                    except Exception: pass # Ignore minor update errors silently
+
+                # --- Check if audio finished ---
+                # (Check remains the same)
+                if not reciter_selection_active and \
+                (not self.audio_manager.is_playing and self.audio_manager.current_audio and
+                self.audio_manager.duration > 0 and
+                self.audio_manager.current_position >= self.audio_manager.duration - 0.1):
+                    current_state_str_check = self.get_audio_display(surah_info)
+                    if last_display != current_state_str_check:
                         last_display = self._redraw_audio_ui(surah_info) or last_display
-                except Exception: pass # Ignore minor update errors silently
 
-            # --- Check if audio finished ---
-            # (Check remains the same)
-            if not reciter_selection_active and \
-               (not self.audio_manager.is_playing and self.audio_manager.current_audio and
-               self.audio_manager.duration > 0 and
-               self.audio_manager.current_position >= self.audio_manager.duration - 0.1):
-                 current_state_str_check = self.get_audio_display(surah_info)
-                 if last_display != current_state_str_check:
-                     last_display = self._redraw_audio_ui(surah_info) or last_display
+                # Main loop delay
+                time.sleep(0.05)
 
-            # Main loop delay
-            time.sleep(0.05)
+        except KeyboardInterrupt:
+            print(Fore.YELLOW + "\nAudio controls interrupted.")
+        except Exception as e_loop:
+            print(f"\n{Fore.RED}Error in audio control loop: {e_loop}{Style.RESET_ALL}")
+        finally:
+            # --- ALWAYS Restore *Original* Terminal Settings (Unix) ---
+            # The _restore_terminal_settings helper handles the check for _original_termios_settings
+            _restore_terminal_settings()
 
-    except KeyboardInterrupt:
-        print(Fore.YELLOW + "\nAudio controls interrupted.")
-    except Exception as e_loop:
-        print(f"\n{Fore.RED}Error in audio control loop: {e_loop}{Style.RESET_ALL}")
-    finally:
-        # --- ALWAYS Restore *Original* Terminal Settings (Unix) ---
-        # The _restore_terminal_settings helper handles the check for _original_termios_settings
-        _restore_terminal_settings()
-
-        # --- Stop Audio ---
-        print(Fore.YELLOW + "\nExiting audio player.")
-        self.audio_manager.stop_audio(reset_state=True)
-        time.sleep(0.5)
+            # --- Stop Audio ---
+            print(Fore.YELLOW + "\nExiting audio player.")
+            self.audio_manager.stop_audio(reset_state=True)
+            time.sleep(0.5)
 
 
 
