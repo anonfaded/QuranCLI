@@ -89,7 +89,7 @@ exe = EXE(
     target_arch=None,       # Auto-detect architecture
     codesign_identity=None,
     entitlements_file=None,
-    icon=[icon_file],       # Specify icon (using list like FadCrypt)
+    icon=[icon_file],       # Specify icon (using list like FadCrypt) 
 )
 
 # No COLLECT block needed for --onefile build

@@ -2,34 +2,32 @@
 import requests
 import time
 import json
+import sys
 import os
 from pathlib import Path
 from colorama import Fore, Style # Use colorama for potential logging
 from urllib.parse import urlparse  # Correct import for urlparse
+import platformdirs # Use platformdirs for cross-platform path handling
 
-# Assuming utils.py is in the same directory level or accessible
-try:
-    from .utils import get_app_path
-except ImportError:
-    # Fallback if run directly or structure is different during dev
-    from utils import get_app_path
+# --- Use relative import for utils ---
+# Only needed if Windows path is used
+if sys.platform == "win32":
+    try:
+        from .utils import get_app_path
+    except ImportError: # Fallback if run directly
+        from utils import get_app_path
 
+# --- Define constants for platformdirs ---
+APP_NAME = "QuranCLI"
+APP_AUTHOR = "FadSecLab"
 
 class DownloadCounter:
     """Fetches and caches the total download count for a GitHub repository."""
 
-    CACHE_FILE_NAME = 'download_cache.json'
+    CACHE_FILE_NAME = 'download_cache.json' # Just the filename now
     DEFAULT_CACHE_EXPIRY = 3600  # 1 hour in seconds
 
     def __init__(self, repo_owner: str, repo_name: str, cache_expiry: int = DEFAULT_CACHE_EXPIRY):
-        """
-        Initializes the DownloadCounter.
-
-        Args:
-            repo_owner: The owner of the GitHub repository (e.g., 'anonfaded').
-            repo_name: The name of the GitHub repository (e.g., 'QuranCLI').
-            cache_expiry: How long the cache is valid in seconds.
-        """
         if not repo_owner or not repo_name:
             raise ValueError("Repository owner and name are required.")
 
@@ -37,25 +35,43 @@ class DownloadCounter:
         self.repo_name = repo_name
         self.api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases"
         self.cache_expiry = cache_expiry
+        self.cache_file_path = None # Initialize path attribute
 
-        # --- Cache file path next to EXE ---
-        self.cache_file_path = Path(get_app_path(self.CACHE_FILE_NAME, writable=True))
-        # --- End Cache path ---
+        # --- Platform-Specific Path for Download Cache ---
+        try:
+            if sys.platform == "win32":
+                # Windows: Save next to executable
+                self.cache_file_path = Path(get_app_path(self.CACHE_FILE_NAME, writable=True))
+                # get_app_path(writable=True) ensures directory exists
+                print(f"DEBUG: Download cache path (Win): {self.cache_file_path}") # Optional debug
+            else:
+                # Linux/macOS: Use user's cache directory
+                cache_base_dir = platformdirs.user_cache_dir(APP_NAME, APP_AUTHOR)
+                os.makedirs(cache_base_dir, exist_ok=True) # Ensure directory exists
+                self.cache_file_path = Path(cache_base_dir) / self.CACHE_FILE_NAME
+                print(f"DEBUG: Download cache path (Unix): {self.cache_file_path}") # Optional debug
 
+        except Exception as e_path:
+            print(f"{Fore.RED}Critical Error determining download cache path: {e_path}")
+            print(f"{Fore.YELLOW}Download count caching may not work correctly.")
+            # cache_file_path remains None, load/save should handle this
+
+        # --- Setup session ---
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": f"{repo_name}DownloadCounter/1.0"})
 
+        # --- Load cache ---
         self._cache = self._load_cache()
 
     def _load_cache(self) -> dict:
         """Loads download count cache from file."""
         default_cache = {"last_check": 0, "total_downloads": None}
-        if not self.cache_file_path.exists():
+        # Check if path was determined successfully
+        if not self.cache_file_path or not self.cache_file_path.exists():
             return default_cache
         try:
             with open(self.cache_file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Basic validation
                 if isinstance(data.get("last_check"), (int, float)) and isinstance(data.get("total_downloads"), (int, type(None))):
                      return data
                 else:
@@ -71,8 +87,12 @@ class DownloadCounter:
 
     def _save_cache(self):
         """Saves the current download count cache to file."""
+        # Check if path was determined successfully
+        if not self.cache_file_path:
+            print(f"{Fore.RED}Error: Cannot save download cache - path not set.{Style.RESET_ALL}")
+            return
         try:
-            # Ensure directory exists (handled by get_app_path on init/first writable call)
+            # Ensure directory exists (should have been created in init)
             self.cache_file_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.cache_file_path, 'w', encoding='utf-8') as f:
                 json.dump(self._cache, f, indent=2)
@@ -80,6 +100,7 @@ class DownloadCounter:
             print(f"{Fore.RED}Error: Could not save download cache ({self.cache_file_path}): {e}{Style.RESET_ALL}")
         except Exception as e:
              print(f"{Fore.RED}Unexpected error saving download cache: {e}{Style.RESET_ALL}")
+
 
 
 # core/download_counter.py (inside DownloadCounter class)

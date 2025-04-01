@@ -1,0 +1,82 @@
+### Commented entries have reasonable defaults.
+### Uncommented entries are required or recommended.
+### Run "man equivs-build" for more information.
+# Package name (lowercase, digits, hyphens)
+Package: qurancli
+Version: 1.1.0
+# Maintainer details
+Maintainer: FadSec Lab <fadedhood@proton.me>
+# Architecture: Should match your build system (usually amd64)
+Architecture: amd64
+# Section: Typically 'utils', 'misc', 'x11', 'sound', etc.
+Section: utils
+Priority: optional
+# Dependencies: List essential system packages if any AREN'T bundled
+# by PyInstaller and absolutely needed. Often empty for PyInstaller bundles.
+# Example: Depends: libc6 (>= 2.17), libsdl2-2.0-0
+Depends: libc6 (>= 2.17) # Example: libc6 is almost always needed
+# Description: A short summary and a longer explanation
+Description: Quran companion for the terminal.
+ A command-line application to read and listen to the Holy Quran,
+ generate subtitles. Works offline.
+
+# --- Files to install ---
+# This is the crucial part for equivs. Format:
+# Files: <source_file_on_build_system> <destination_in_package>
+#        <source_directory_on_build_system>/* <destination_dir_in_package>/
+# Use paths relative to where you run 'equivs-build', or absolute paths.
+
+# Install the main executable (adjust source path if needed)
+Files: dist/QuranCLI /opt/QuranCLI/
+
+# Install the icon into the standard hicolor theme directory
+# Adjust source path if your icon is elsewhere. Choose an appropriate size.
+Files: core/icon.png /usr/share/icons/hicolor/128x128/apps/qurancli.png
+
+# Install the .desktop file for menu integration
+Files: qurancli.desktop /usr/share/applications/
+
+# --- Post-Installation Script ---
+# Create the symbolic link for the 'qurancli' command
+# Use Postinst scriptlet for actions after files are copied.
+# Chmod +x is usually not needed as dpkg preserves permissions.
+Postinst:
+ #!/bin/sh
+ set -e
+ # Create symlink in /usr/local/bin (often preferred over /usr/bin for local installs)
+ ln -sf /opt/QuranCLI/QuranCLI /usr/local/bin/qurancli
+ # Update icon cache (recommended after installing icons/desktop files)
+ if [ -x /usr/bin/gtk-update-icon-cache ]; then
+     gtk-update-icon-cache -q /usr/share/icons/hicolor || true
+ fi
+ # Update desktop database (recommended)
+ if [ -x /usr/bin/update-desktop-database ]; then
+     update-desktop-database -q /usr/share/applications || true
+ fi
+ exit 0
+
+# --- Pre-Removal Script ---
+# Clean up the symbolic link when uninstalling
+Prerm:
+ #!/bin/sh
+ set -e
+ # Remove the symlink
+ rm -f /usr/local/bin/qurancli
+ exit 0
+
+# --- Post-Removal Script ---
+# Update caches after removal (optional but good practice)
+Postrm:
+ #!/bin/sh
+ set -e
+ # Update icon cache
+ if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+     if [ -x /usr/bin/gtk-update-icon-cache ]; then
+         gtk-update-icon-cache -q /usr/share/icons/hicolor || true
+     fi
+     # Update desktop database
+     if [ -x /usr/bin/update-desktop-database ]; then
+         update-desktop-database -q /usr/share/applications || true
+     fi
+ fi
+ exit 0

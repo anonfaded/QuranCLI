@@ -2,6 +2,7 @@
 
 import sys
 import os
+import platformdirs
 import subprocess
 import json
 from time import sleep
@@ -109,38 +110,55 @@ QURAN_CLI_ASCII = """
 
 """
 
+# --- Constants for platformdirs ---
+APP_NAME = "QuranCLI"
+APP_AUTHOR = "FadSecLab"
+
 class QuranApp:
     def __init__(self):
         self.client = QuranAPIClient()
-        # Get terminal size
         self.term_size = shutil.get_terminal_size()
         self.audio_manager = AudioManager()
         self.data_handler = QuranDataHandler(self.client.cache)
 
-        # Define preference file path (next to exe)
-        self.preferences_file = get_app_path('preferences.json', writable=True)
-        # Load preferences using the defined path
-        self.preferences = self._load_preferences()
-        # Add this line immediately after:
-        self.theme_color = self.preferences.get('theme_color', 'red') # Load theme, default red
+        # --- Platform-Specific Path for Preferences ---
+        try:
+            if sys.platform == "win32":
+                # Windows: Save next to executable
+                self.preferences_file = get_app_path('preferences.json', writable=True)
+                # Ensure directory exists (get_app_path with writable=True handles this)
+                print(f"DEBUG: Preferences path (Win): {self.preferences_file}") # Optional debug
+            else:
+                # Linux/macOS: Use user's config directory
+                config_dir = platformdirs.user_config_dir(APP_NAME, APP_AUTHOR)
+                os.makedirs(config_dir, exist_ok=True) # Ensure directory exists
+                self.preferences_file = os.path.join(config_dir, 'preferences.json')
+                print(f"DEBUG: Preferences path (Unix): {self.preferences_file}") # Optional debug
 
-        # Initialize GithubUpdater
+        except Exception as e_path:
+            print(f"{Fore.RED}Critical Error determining preferences path: {e_path}")
+            print(f"{Fore.YELLOW}Preferences may not save correctly.")
+            # Fallback to a non-functional path to avoid crashing later
+            self.preferences_file = None
+
+        # --- Load preferences using the determined path ---
+        self.preferences = self._load_preferences()
+        self.theme_color = self.preferences.get('theme_color', 'red') # Load theme
+
+        # --- Initialize Updaters (remain the same) ---
         self.updater = GithubUpdater("anonfaded", "QuranCLI", VERSION)
-        
-        # --- Create DownloadCounter Instance ---
         self.download_counter = DownloadCounter(repo_owner="anonfaded", repo_name="QuranCLI")
 
-        # --- Initialize UI ONCE, passing necessary arguments ---
+        # --- Initialize UI (remains the same) ---
         self.ui = UI(
             audio_manager=self.audio_manager,
             term_size=self.term_size,
             data_handler=self.data_handler,
             github_updater=self.updater,
-            preferences=self.preferences, # Pass loaded preferences dict
-            preferences_file_path=self.preferences_file, # Pass the path string
-            download_counter=self.download_counter # Pass the download counter instance
+            preferences=self.preferences,
+            preferences_file_path=self.preferences_file, # Pass the determined path
+            download_counter=self.download_counter
         )
-        # --- End UI Initialization ---
 
         self._clear_terminal()
         self.surah_names = self._load_surah_names()
@@ -187,26 +205,33 @@ class QuranApp:
         
     def _load_preferences(self):
         """Load preferences from file"""
+        if not self.preferences_file: return {} # Handle case where path failed
         try:
             with open(self.preferences_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except FileNotFoundError:
-            print(Fore.YELLOW + "Preferences file not found, creating new one.")
-            return {}
+        except FileNotFoundError: return {}
         except json.JSONDecodeError:
-            print(Fore.YELLOW + "Preferences file is corrupted, resetting.")
+            print(Fore.YELLOW + f"Preferences file '{self.preferences_file}' is corrupted, resetting.")
             return {}
         except Exception as e:
-            print(Fore.RED + f"Error loading preferences: {e}")
+            print(Fore.RED + f"Error loading preferences from '{self.preferences_file}': {e}")
             return {}
 
     def _save_preferences(self):
          """Save preferences to file"""
+         if not self.preferences_file:
+             print(Fore.RED + "Error: Preferences file path not determined. Cannot save.")
+             return
          try:
+             # Ensure directory exists (needed esp. for Linux on first save)
+             pref_dir = os.path.dirname(self.preferences_file)
+             if pref_dir: # Avoid trying to create empty dir if path is weird
+                 os.makedirs(pref_dir, exist_ok=True)
              with open(self.preferences_file, 'w', encoding='utf-8') as f:
                  json.dump(self.preferences, f, ensure_ascii=False, indent=2)
+             # print(f"DEBUG: Preferences saved to {self.preferences_file}") # Optional debug
          except Exception as e:
-             print(Fore.RED + f"Error saving preferences: {e}")
+             print(Fore.RED + f"Error saving preferences to '{self.preferences_file}': {e}")
 
     def _load_surah_names(self):
         surah_names = {}

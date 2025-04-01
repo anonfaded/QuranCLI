@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.1.0
+Name=QuranCLI
+Comment=Read, Listen & Generate Subtitles for the Quran
+# This path assumes installation to /opt/QuranCLI/
+Exec=/opt/QuranCLI/QuranCLI
+# This path assumes the icon is installed correctly
+Icon=qurancli
+Terminal=true
+Type=Application
+Categories=Utility;Education;Religion;
