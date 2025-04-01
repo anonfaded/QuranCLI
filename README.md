@@ -122,7 +122,7 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
 
 ## 🚀 Installation
 
-### Option 1: Windows Installer (Recommended)
+### Windows Installer (Recommended)
 
 [<img src="https://raw.githubusercontent.com/vadret/android/master/assets/get-github.png" alt="Get it on GitHub" height="70">](https://github.com/anonfaded/QuranCLI/releases)
 
@@ -132,7 +132,9 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
 4.  Launch QuranCLI from your Start Menu or Desktop shortcut!
 
 
-### Option 2: From Source (Developers / Other Platforms)
+<details>
+  <summary>🔧 Dev Only: Build from Source</summary>
+
 
 *   **Prerequisites:** Python 3.9+ and pip.
 *   **Clone:**
@@ -152,6 +154,45 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
     ```bash
     python Quran-CLI.py
     ```
+</details>
+
+<details>
+  <summary>🔧 Dev Only: Step-by-Step on building the .deb package for Linux</summary>
+
+  ## Building the .deb Package
+
+  1. **Create the Executable:**  
+     Run PyInstaller (inside WSL) in the project's directory:
+     ```bash
+     pyinstaller QuranCLI.spec
+     ```
+
+  2. **Convert Line Endings:**  
+     Convert the Debian maintainer scripts to Unix format:
+     ```bash
+     dos2unix debian/postinst debian/prerm debian/postrm
+     ```
+
+  3. **Copy Codebase from /mnt/c/ (WSL only)**  
+     Due to the WSL `/mnt/c/` structure, copy the whole codebase to the root to match the filesystem as linux would expect:
+     ```bash
+     cp -r /mnt/c/Users/username/Desktop/QuranCLI .
+     ```
+
+  4. **Build the Debian Package:**  
+     Run the Debian build command in the copied codebase directory (the .deb package will be placed one level up):
+     ```bash
+     dpkg-buildpackage -us -uc -b
+     ```
+
+  5. **Verify Executable Permissions:**  
+     Ensure the generated executable has the correct executable permissions:
+     ```bash
+     ls -l dist/QuranCLI
+     ```
+     The permissions should show an `x` (executable) flag.
+
+</details>
 
 ---
 
