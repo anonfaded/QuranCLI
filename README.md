@@ -161,36 +161,36 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
 
   ## Building the .deb Package
 
-  1. **Create the Executable:**  
-     Run PyInstaller (inside WSL) in the project's directory:
-     ```bash
-     pyinstaller QuranCLI.spec
-     ```
-
-  2. **Convert Line Endings:**  
-     Convert the Debian maintainer scripts to Unix format:
-     ```bash
-     dos2unix debian/postinst debian/prerm debian/postrm
-     ```
-
-  3. **Copy Codebase from /mnt/c/ (WSL only)**  
+  1. **Copy Codebase from /mnt/c/ (WSL only)**  
      Due to the WSL `/mnt/c/` structure, copy the whole codebase to the root to match the filesystem as linux would expect:
      ```bash
      cp -r /mnt/c/Users/username/Desktop/QuranCLI .
      ```
 
-  4. **Build the Debian Package:**  
-     Run the Debian build command in the copied codebase directory (the .deb package will be placed one level up):
+  2. **Create the Executable:**  
+     Run PyInstaller (WSL) in the project's directory:
      ```bash
-     dpkg-buildpackage -us -uc -b
+     pyinstaller QuranCLI.spec
      ```
 
-  5. **Verify Executable Permissions:**  
+  3. **Convert Line Endings:**  
+     Convert the Debian maintainer scripts to Unix format:
+     ```bash
+     dos2unix debian/postinst debian/prerm debian/postrm
+     ```
+
+  4. **Verify Executable Permissions:**  
      Ensure the generated executable has the correct executable permissions:
      ```bash
      ls -l dist/QuranCLI
      ```
      The permissions should show an `x` (executable) flag.
+
+  5. **Build the Debian Package:**  
+     Run the Debian build command in the copied codebase directory (the .deb package will be placed one level up):
+     ```bash
+     dpkg-buildpackage -us -uc -b
+     ```
 
 </details>
 
