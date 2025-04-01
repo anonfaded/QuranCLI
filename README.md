@@ -126,10 +126,29 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
 
 [<img src="https://raw.githubusercontent.com/vadret/android/master/assets/get-github.png" alt="Get it on GitHub" height="70">](https://github.com/anonfaded/QuranCLI/releases)
 
-1.  Go to the **[Releases Page](https://github.com/anonfaded/QuranCLI/releases)**.
-2.  Download the latest `QuranCLI-Setup.exe` file.
-3.  Run the installer and follow the on-screen instructions.
-4.  Launch QuranCLI from your Start Menu or Desktop shortcut!
+1. Go to the **[Releases Page](https://github.com/anonfaded/QuranCLI/releases)**.
+2. Download the latest `QuranCLI-Setup.exe` file.
+3. Run the installer and follow the on-screen instructions.
+4. Launch QuranCLI from your Start Menu or Desktop shortcut.  
+   *Tip: You can also run the tool directly from the terminal by typing `qurancli`.*
+
+### Linux (.deb Package Installation)
+
+1. Go to the **[Releases Page](https://github.com/anonfaded/QuranCLI/releases)**.
+2. Download the latest `.deb` package, for example: `qurancli_1.1.0_amd64.deb`.
+3. Open a terminal and navigate to the download directory.
+4. Install the package with:
+    ```bash
+    sudo dpkg -i qurancli_1.1.0_amd64.deb
+    ```
+5. If any dependency errors appear, run:
+    ```bash
+    sudo apt-get install -f
+    ```
+6. Once installed, launch QuranCLI directly by typing:
+    ```bash
+    qurancli
+    ```
 
 
 <details>
