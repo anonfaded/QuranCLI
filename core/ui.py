@@ -8,6 +8,7 @@ import json
 import os
 import datetime
 import platformdirs
+import subprocess  # Added for Linux/Mac folder opening
 
 if sys.platform == "win32":
     import msvcrt
