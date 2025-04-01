@@ -1,0 +1,7 @@
+qurancli (1.1.0) stable; urgency=medium
+
+  * Incremented version number to 1.1.0.
+  * Fixed issue with get_app_path on non-Windows platforms.
+  * Minor bug fixes and improvements.
+
+ -- FadSec Lab <fadedhood@proton.me>  Mon, 01 Apr 2025 12:00:00 +0000

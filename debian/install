@@ -1,0 +1,4 @@
+# Format: <source_path_relative_to_project_root> <destination_dir_without_leading_/>
+dist/QuranCLI opt/QuranCLI/
+core/icon.png usr/share/icons/hicolor/128x128/apps/qurancli.png
+qurancli.desktop usr/share/applications/

@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+set -e
+
+# Update caches after removal/purge
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    if [ -x /usr/bin/gtk-update-icon-cache ]; then
+        gtk-update-icon-cache -q /usr/share/icons/hicolor || true
+    fi
+    if [ -x /usr/bin/update-desktop-database ]; then
+        update-desktop-database -q /usr/share/applications || true
+    fi
+fi
+
+exit 0

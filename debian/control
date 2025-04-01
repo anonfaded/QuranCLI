@@ -1,0 +1,14 @@
+Source: qurancli
+Section: utils
+Priority: optional
+Maintainer: FadSec Lab <fadedhood@proton.me>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2 
+Homepage: https://github.com/anonfaded/QuranCLI 
+
+Package: qurancli
+Architecture: amd64 
+Depends: ${misc:Depends}, libc6 (>= 2.17) 
+Description: Quran companion for the terminal.
+ A command-line application to read and listen to the Holy Quran,
+ generate subtitles. Works offline. Bundled dependencies.

@@ -1,0 +1,25 @@
+The Debian Package qurancli
+----------------------------
+
+QuranCLI is a command-line application for reading, listening to, and generating subtitles for the Holy Quran.
+It is designed to work offline and provides an intuitive interface for both casual users and enthusiasts.
+
+Features:
+  - Read and navigate through the Quran text efficiently.
+  - Listen to Quran recitations.
+  - Generate subtitles for recitations.
+
+Installation:
+  - The package installs the QuranCLI executable to /opt/QuranCLI.
+  - A symlink is created in /usr/local/bin for easy terminal access.
+  - Icons and desktop file are integrated with your system.
+
+Usage:
+  - Simply run `qurancli` from your terminal to start the application.
+  - For further documentation, please refer to the online docs or the project homepage:
+    https://github.com/anonfaded/QuranCLI
+
+Contact:
+  - FadSec Lab <fadedhood@proton.me>
+
+ -- FadSec Lab <fadedhood@proton.me>  Mon, 01 Apr 2025 15:17:39 +0500
