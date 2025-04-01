@@ -5,38 +5,66 @@ import aiohttp
 import aiofiles
 from pathlib import Path
 from mutagen.mp3 import MP3
+import platformdirs
 import os
 import time
 import threading
 from colorama import Fore, Style
 import tqdm
 import sys
+from typing import Optional 
+
 # --- Use relative import for utils ---
-from .utils import get_app_path
+# Only needed if Windows path is used
+if sys.platform == "win32":
+    try:
+        from .utils import get_app_path
+    except ImportError: # Fallback if run directly
+        from utils import get_app_path
 
 if sys.platform == "win32":
     import msvcrt # Only relevant for seek key detection, not pathing
+
+# --- Define constants for platformdirs ---
+APP_NAME = "QuranCLI"
+APP_AUTHOR = "FadSecLab"
 
 class AudioManager:
     """Handles audio downloads and playback"""
     def __init__(self):
         self.current_surah = None
-        # --- CORRECTED PATH: Use writable=True ---
-        self.audio_dir = Path(get_app_path('audio_cache', writable=True)) # Audio cache next to exe
-        # --- End Correction ---
-        # get_app_path ensures the directory exists, including parents if needed
-        # self.audio_dir.mkdir(parents=True, exist_ok=True) # Can remove if get_app_path handles it
+        self.audio_dir = None # Initialize path attribute
 
+        # --- Platform-Specific Path for Audio Cache ---
+        try:
+            if sys.platform == "win32":
+                # Windows: Save next to executable
+                self.audio_dir = Path(get_app_path('audio_cache', writable=True))
+                # get_app_path(writable=True) ensures directory exists
+                print(f"DEBUG: Audio cache path (Win): {self.audio_dir}") # Optional debug
+            else:
+                # Linux/macOS: Use user's cache directory
+                cache_base_dir = platformdirs.user_cache_dir(APP_NAME, APP_AUTHOR)
+                self.audio_dir = Path(cache_base_dir) / 'audio_cache'
+                os.makedirs(self.audio_dir, exist_ok=True) # Ensure directory exists
+                print(f"DEBUG: Audio cache path (Unix): {self.audio_dir}") # Optional debug
+
+        except Exception as e_path:
+            print(f"{Fore.RED}Critical Error determining audio cache path: {e_path}")
+            print(f"{Fore.YELLOW}Audio download/playback may not work correctly.")
+            # audio_dir remains None, subsequent operations should check
+
+        # --- Pygame init ---
         try:
              pygame.mixer.init()
         except pygame.error as e:
              print(f"{Fore.RED}Error initializing pygame mixer: {e}")
              print(f"{Fore.YELLOW}Audio playback will be disabled.")
-             # Add a flag or handle this state elsewhere if needed
              self.mixer_initialized = False
         else:
              self.mixer_initialized = True
 
+        # --- Rest of init variables ---
         self.current_audio = None
         self.current_reciter = None
         self.is_playing = False
@@ -50,23 +78,32 @@ class AudioManager:
 
     def get_audio_path(self, surah_num: int, reciter: str) -> Path:
         """Get audio file path using the initialized audio_dir"""
-        # Sanitize reciter name for filename? Optional.
+        if not self.audio_dir: # Check if path determination failed
+            print(f"{Fore.RED}Error: Audio directory not set, cannot get path.{Style.RESET_ALL}")
+            return None
+        # Sanitize reciter name
         safe_reciter = "".join(c for c in reciter if c.isalnum() or c in (' ', '_')).rstrip()
         safe_reciter = safe_reciter.replace(' ', '_')
         return self.audio_dir / f"surah_{surah_num}_reciter_{safe_reciter}.mp3"
 
-    async def download_audio(self, url: str, surah_num: int, reciter: str, max_retries: int = 5) -> Path | None:
+    async def download_audio(self, url: str, surah_num: int, reciter: str, max_retries: int = 5) -> Optional[Path]:
         """Download audio file with resume support and retry handling"""
         if not self.mixer_initialized: return None # Skip download if mixer failed
+        if not self.audio_dir: # Check if path determination failed
+            print(f"{Fore.RED}Error: Audio directory not set, cannot download audio.{Style.RESET_ALL}")
+            return None
 
-        filename = self.get_audio_path(surah_num, reciter)
+        filename_path = self.get_audio_path(surah_num, reciter)
+        if not filename_path: return None # If get_audio_path failed
+
+        filename = filename_path # Use the Path object directly
         temp_file = filename.with_suffix('.tmp')
 
-        # Ensure parent directory exists (should be handled by get_app_path on init, but good safety)
+        # Ensure parent directory exists (should be handled by init, but safe check)
         try:
              self.audio_dir.mkdir(parents=True, exist_ok=True)
         except OSError as e:
-             print(f"{Fore.RED}Error creating audio cache directory {self.audio_dir}: {e}")
+             print(f"{Fore.RED}Error ensuring audio cache directory {self.audio_dir}: {e}")
              return None
 
         for attempt in range(max_retries):
@@ -74,16 +111,13 @@ class AudioManager:
                 # Check if valid file already exists
                 if filename.exists() and filename.stat().st_size > 0:
                     try:
-                        MP3(str(filename)) # Quick validation
-                        # print(f"{Fore.GREEN}Using existing audio file: {filename.name}") # Optional info
+                        MP3(filename) # Use Path object
                         return filename
                     except Exception:
                         print(f"{Fore.YELLOW}Existing audio file {filename.name} seems corrupt, removing.")
-                        try: os.remove(filename)
-                        except OSError: pass
-                elif filename.exists(): # Remove zero-byte files
-                     try: os.remove(filename)
-                     except OSError: pass
+                        filename.unlink(missing_ok=True) # Use Path method
+                elif filename.exists():
+                     filename.unlink(missing_ok=True)
 
                 # Resume logic
                 start_pos = temp_file.stat().st_size if temp_file.exists() else 0
@@ -91,20 +125,17 @@ class AudioManager:
                 mode = 'ab' if start_pos > 0 else 'wb'
 
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(url, headers=headers, timeout=30) as response: # Added timeout
-                        if response.status == 416 and start_pos > 0: # Range Not Satisfiable - likely already complete
+                    async with session.get(url, headers=headers, timeout=30) as response:
+                        if response.status == 416 and start_pos > 0:
                              if temp_file.exists():
-                                  os.rename(temp_file, filename)
+                                  temp_file.rename(filename) # Use Path method
                                   print(f"{Fore.GREEN}\n✓ Resumed download appears complete.")
                                   return filename
-                             else: # Should not happen if start_pos > 0
-                                   start_pos = 0; headers={}; mode='wb' # Reset and retry full download
-                                   # Re-fetch without range header - code needs restructuring for this cleanly
-                                   # For now, let the main loop retry
+                             else:
+                                   start_pos = 0; headers={}; mode='wb'
                                    raise aiohttp.ClientError("Resume failed, retrying full download")
 
-
-                        response.raise_for_status() # Check for HTTP errors like 404
+                        response.raise_for_status()
 
                         # Get total size for progress bar
                         content_length = response.headers.get('content-length')
@@ -164,9 +195,9 @@ class AudioManager:
 
                         # Validate MP3 and finalize
                         try:
-                            MP3(str(temp_file)) # Validate the temp file
-                            if filename.exists(): os.remove(filename) # Remove old target if exists
-                            os.rename(temp_file, filename) # Final rename
+                            MP3(temp_file) # Use Path object
+                            filename.unlink(missing_ok=True) # Use Path method
+                            temp_file.rename(filename) # Use Path method
                             print(Fore.GREEN + "\n✓ Audio downloaded and verified!")
                             return filename
                         except Exception as e_verify:
@@ -177,16 +208,10 @@ class AudioManager:
                 print(Fore.RED + f"\nNetwork error (Attempt {attempt + 1}/{max_retries}): {e_net}")
             except ValueError as e_val:
                  print(Fore.RED + f"\nDownload error (Attempt {attempt + 1}/{max_retries}): {e_val}")
-                 # If incomplete/corrupt, clean up temp file for next retry
-                 if temp_file.exists():
-                      try: os.remove(temp_file)
-                      except OSError: pass
+                 temp_file.unlink(missing_ok=True) # Use Path method
             except Exception as e_other:
                 print(Fore.RED + f"\nUnexpected download error (Attempt {attempt + 1}/{max_retries}): {e_other}")
-                # Clean up temp file on unexpected errors too
-                if temp_file.exists():
-                      try: os.remove(temp_file)
-                      except OSError: pass
+                temp_file.unlink(missing_ok=True) # Use Path method
 
 
             if attempt < max_retries - 1:
@@ -196,10 +221,8 @@ class AudioManager:
 
         # All attempts failed
         print(Fore.RED + "\n❌ Audio download failed after all attempts.")
-        if temp_file.exists(): # Clean up temp file on final failure
-            try: os.remove(temp_file)
-            except OSError: pass
-        return None # Indicate failure
+        temp_file.unlink(missing_ok=True) # Use Path method
+        return None
 
     # --- load_audio, play_audio, _track_progress, seek, etc. remain mostly unchanged ---
     # Ensure they check self.mixer_initialized before using pygame.mixer

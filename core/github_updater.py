@@ -3,65 +3,112 @@ import requests
 import re
 import time
 import json
+import sys
 import os
-from colorama import Fore
+from colorama import Fore, Style
 from pathlib import Path
+import platformdirs 
+
 # --- Use relative import for utils ---
-from .utils import get_app_path
+# Only needed if Windows path is used
+if sys.platform == "win32":
+    try:
+        from .utils import get_app_path
+    except ImportError: # Fallback if run directly
+        from utils import get_app_path
+
+# --- Define constants for platformdirs ---
+APP_NAME = "QuranCLI"
+APP_AUTHOR = "FadSecLab"
+
 
 class GithubUpdater:
-    # --- CORRECTED PATH: Use writable=True ---
-    CACHE_FILE = Path(get_app_path('api_cache.json', writable=True)) # API cache next to exe
-    # --- End Correction ---
+    # REMOVED Class level CACHE_FILE definition
+    CACHE_FILE_NAME = 'api_cache.json' # Keep only filename
     CACHE_EXPIRY = 3600  # Cache expiry time in seconds (1 hour)
-    GITHUB_REPO_OWNER = "anonfaded"
-    GITHUB_REPO_NAME = "QuranCLI"
+    # GITHUB_REPO_OWNER/NAME are set via __init__ args now
 
     def __init__(self, repo_owner, repo_name, current_version):
         self.repo_owner = repo_owner
         self.repo_name = repo_name
         self.current_version = current_version
         self.api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+        self.cache_file_path = None # Initialize path attribute
+
+        # --- Platform-Specific Path for API Cache ---
+        try:
+            if sys.platform == "win32":
+                # Windows: Save next to executable
+                self.cache_file_path = Path(get_app_path(self.CACHE_FILE_NAME, writable=True))
+                # get_app_path(writable=True) ensures directory exists
+                print(f"DEBUG: API cache path (Win): {self.cache_file_path}") # Optional debug
+            else:
+                # Linux/macOS: Use user's cache directory
+                cache_base_dir = platformdirs.user_cache_dir(APP_NAME, APP_AUTHOR)
+                os.makedirs(cache_base_dir, exist_ok=True) # Ensure directory exists
+                self.cache_file_path = Path(cache_base_dir) / self.CACHE_FILE_NAME
+                print(f"DEBUG: API cache path (Unix): {self.cache_file_path}") # Optional debug
+
+        except Exception as e_path:
+            print(f"{Fore.RED}Critical Error determining API cache path: {e_path}")
+            print(f"{Fore.YELLOW}Update checking may use excessive API calls.")
+            # cache_file_path remains None, load/save should handle this
+
+        # --- Load Cache ---
         self.cache = self._load_cache()
 
     def _load_cache(self):
         """Loads the cache from the JSON file. Creates the file if it doesn't exist."""
+        default_cache = {"last_check": 0, "data": {}}
+        # Check if path was determined successfully
+        if not self.cache_file_path:
+             return default_cache
         try:
-            # get_app_path(writable=True) should ensure directory exists
-            if not self.CACHE_FILE.exists():
-                default_cache = {"last_check": 0, "data": {}}
+            if not self.cache_file_path.exists():
                 # Attempt to create the file with default content
                 try:
-                     with open(self.CACHE_FILE, "w", encoding='utf-8') as f:
+                     self.cache_file_path.parent.mkdir(parents=True, exist_ok=True) # Ensure dir exists
+                     with open(self.cache_file_path, "w", encoding='utf-8') as f:
                          json.dump(default_cache, f, indent=4)
                      return default_cache
                 except IOError as e:
-                     print(f"{Fore.RED}Error creating cache file {self.CACHE_FILE}: {e}")
-                     return {"last_check": 0, "data": {}} # Return default on creation error
+                     print(f"{Fore.RED}Error creating cache file {self.cache_file_path}: {e}")
+                     return default_cache # Return default on creation error
             else:
-                 with open(self.CACHE_FILE, "r", encoding='utf-8') as f:
-                     return json.load(f)
+                 with open(self.cache_file_path, "r", encoding='utf-8') as f:
+                     # --- Basic validation ---
+                     data = json.load(f)
+                     if isinstance(data, dict) and isinstance(data.get("last_check"), (int, float)):
+                          return data
+                     else:
+                          raise json.JSONDecodeError("Invalid cache structure", "", 0)
+
         except json.JSONDecodeError:
-            print(Fore.YELLOW + f"Cache file {self.CACHE_FILE} is corrupted. Resetting cache.")
-            default_cache = {"last_check": 0, "data": {}}
+            print(Fore.YELLOW + f"Cache file {self.cache_file_path} is corrupted. Resetting cache.")
             try: # Attempt to overwrite corrupted file
-                 with open(self.CACHE_FILE, "w", encoding='utf-8') as f:
+                 self.cache_file_path.parent.mkdir(parents=True, exist_ok=True)
+                 with open(self.cache_file_path, "w", encoding='utf-8') as f:
                       json.dump(default_cache, f, indent=4)
             except IOError as e:
                  print(f"{Fore.RED}Error resetting corrupted cache file: {e}")
             return default_cache
         except Exception as e:
-            print(Fore.RED + f"Error loading cache {self.CACHE_FILE}: {e}")
-            return {"last_check": 0, "data": {}}  # Return a default cache on error
+            print(Fore.RED + f"Error loading cache {self.cache_file_path}: {e}")
+            return default_cache # Return a default cache on error
 
     def _save_cache(self):
         """Saves the cache to the JSON file."""
+        # Check if path was determined successfully
+        if not self.cache_file_path:
+            print(f"{Fore.RED}Error: Cannot save API cache - path not set.{Style.RESET_ALL}")
+            return
         try:
-            # get_app_path(writable=True) should ensure directory exists
-            with open(self.CACHE_FILE, "w", encoding='utf-8') as f:
+            # Ensure directory exists
+            self.cache_file_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.cache_file_path, "w", encoding='utf-8') as f:
                 json.dump(self.cache, f, indent=4)
         except IOError as e:
-            print(Fore.RED + f"Error saving cache {self.CACHE_FILE}: {e}")
+            print(Fore.RED + f"Error saving cache {self.cache_file_path}: {e}")
         except Exception as e:
              print(Fore.RED + f"Unexpected error saving cache: {e}")
 
