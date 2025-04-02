@@ -93,6 +93,12 @@ class AudioManager:
             print(f"{Fore.RED}Error: Audio directory not set, cannot download audio.{Style.RESET_ALL}")
             return None
 
+        # Special case for Muhammad Al Luhaidan - validate URL structure
+        is_luhaidan = reciter == "Muhammad Al Luhaidan"
+        if is_luhaidan and "server8.mp3quran.net/lhdan" not in url:
+            print(f"{Fore.RED}Error: Invalid URL format for Muhammad Al Luhaidan recitation.{Style.RESET_ALL}")
+            return None
+
         filename_path = self.get_audio_path(surah_num, reciter)
         if not filename_path: return None # If get_audio_path failed
 

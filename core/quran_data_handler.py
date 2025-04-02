@@ -30,13 +30,27 @@ class QuranDataHandler:
             #This will be replaced later.
             raise ValueError("Surah data not found in cache")
         
+        # Get the regular reciters from the API data
+        audio_data = data.get("audio", {})
+        
+        # Add Muhammad Al Luhaidan reciter with the special URL format
+        # Format surah number with leading zeros for URL (001, 002, etc.)
+        padded_surah = str(surah_number).zfill(3)
+        luhaidan_url = f"https://server8.mp3quran.net/lhdan/{padded_surah}.mp3"
+        
+        # Add as a new reciter with ID "luhaidan"
+        audio_data["luhaidan"] = {
+            "reciter": "Muhammad Al Luhaidan",
+            "url": luhaidan_url
+        }
+        
         return SurahInfo(
             surah_name=data.get("surahName", "Unknown"),
             surah_name_arabic=self.fix_arabic_text(data.get("surahNameArabic", "غير معروف")),
             total_ayah=data.get("totalAyah", 0),
             revelation_place=data.get("revelationPlace", "Unknown"),
             surah_number=surah_number,
-            audio=data.get("audio", {})
+            audio=audio_data
         )
 
     def get_ayahs(self, surah_number: int, start: int, end: int) -> List[Ayah]:
