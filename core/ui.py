@@ -9,6 +9,7 @@ import os
 import datetime
 import platformdirs
 import subprocess  # Added for Linux/Mac folder opening
+import re
 
 if sys.platform == "win32":
     import msvcrt
@@ -246,21 +247,31 @@ class UI:
             self.clear_terminal()
             # Single consolidated header
             print(Style.BRIGHT + Fore.RED + "=" * self.term_size.columns)
-            print(f"📖 {surah_info.surah_name} ({surah_info.surah_name_arabic}) • {surah_info.revelation_place} • {surah_info.total_ayah} Ayahs")
+            # --- FIX ATTRIBUTE: Use surah_name_ar ---
+            # --- REVERT HEADER to simpler format temporarily to fix error, can enhance later ---
+            print(f"📖 Surah {surah_info.surah_number}: {surah_info.surah_name} ({surah_info.surah_name_ar})")
+            # print(f"📖 {surah_info.surah_name} ({surah_info.surah_name_ar}) • {surah_info.translation} • {surah_info.type.capitalize()}") # Use corrected name
+            # print(f"Total Ayahs: {surah_info.total_verses}")
+            # --- END FIX ATTRIBUTE ---
             print(f"Page {current_page}/{total_pages}")
             print(Style.BRIGHT + Fore.RED + "=" * self.term_size.columns)
 
-            # Arabic display information - CONCISE NOTE
-            print(Style.DIM + Fore.YELLOW + "⚠ Note: Arabic text is formatted for correct reading. If reversed or copying gives reversed output, use 'reverse' command, then 'q' and re-enter the input.")
+            # Display Surah Description (Keep this part)
+            if surah_info.description:
+                print(Style.DIM + Fore.YELLOW + "Description:" + Style.RESET_ALL + Style.DIM)
+                wrapped_desc = self.wrap_text(surah_info.description, self.term_size.columns - 4)
+                for line in wrapped_desc.split('\n'):
+                    print(Style.DIM + "  " + line + Style.RESET_ALL)
+                print(Style.BRIGHT + Fore.RED + "-" * self.term_size.columns)
 
-            # Display ayahs for current page
+            # Display ayahs for current page (Keep this part)
             start_idx = (current_page - 1) * page_size
             end_idx = min(start_idx + page_size, len(ayahs))
-
             local_ayahs = ayahs[start_idx:end_idx]
             for ayah in local_ayahs:
+                # Ensure display_single_ayah uses the correct fields (content, transliteration, translation_eng)
                 self.display_single_ayah(ayah)
-
+                
             # Navigation Menu
             box_width = 26  # Adjust width if needed
             separator = "─" * box_width
@@ -294,18 +305,49 @@ class UI:
                     return
 
     def display_single_ayah(self, ayah: Ayah):
-        """Display a single ayah with proper formatting"""
+        """Display a single ayah with Arabic, Transliteration, and Translation
+           (Translation now sourced from cached data)."""
         print(Style.BRIGHT + Fore.GREEN + f"\n[{ayah.number}]")
-        wrapped_text = self.wrap_text(ayah.text, self.term_size.columns - 4)
-        print(Style.NORMAL + Fore.WHITE + wrapped_text)
 
-        # Arabic text with proper indentation and different title colors
-        print(Style.BRIGHT + Fore.RED + "\nSimple Arabic:" + Style.BRIGHT + Fore.WHITE)
-        print("    " + ayah.arabic_simple)
+        # 1. Arabic Text (Remains the same - uses ayah.content from local DB)
+        print(Style.BRIGHT + Fore.RED + "Arabic:" + Style.NORMAL + Fore.WHITE)
+        print("    " + ayah.content) # Assumes content was processed by fix_arabic_text
 
-        print(Style.BRIGHT + Fore.RED + "\nUthmani Script:" + Style.BRIGHT + Fore.WHITE)
-        print("    " + ayah.arabic_uthmani)
+        # 2. Transliteration (Remains the same - uses ayah.transliteration from local DB)
+        print(Style.BRIGHT + Fore.CYAN + "\nTransliteration:" + Style.NORMAL + Fore.WHITE)
+        wrapped_translit = self.wrap_text(ayah.transliteration, self.term_size.columns - 4)
+        for line in wrapped_translit.split('\n'):
+             print("    " + line)
 
+        # --- 3. Display English Translation from Cache ---
+        print(Style.BRIGHT + Fore.YELLOW + "\nTranslation:" + Style.NORMAL + Fore.WHITE)
+        # Directly use ayah.text which comes from the cache
+        cached_translation = ayah.text
+        # --- REMOVE FOOTNOTE PARSING LOGIC ---
+        # raw_translation = ayah.translation_eng # Old field
+        # main_translation = raw_translation
+        # notes = None
+        # ... (all the regex and splitting logic removed) ...
+        # cleaned_main_translation = re.sub(r'([\w—.,;:’])(\d+)', r'\1', main_translation)
+        # --- END REMOVE FOOTNOTE PARSING ---
+
+        # Wrap and indent the translation from the cache
+        wrapped_translation = self.wrap_text(cached_translation, self.term_size.columns - 4)
+        for line in wrapped_translation.split('\n'):
+             print("    " + line)
+
+        # --- REMOVE NOTES DISPLAY SECTION ---
+        # if notes:
+        #     print(Style.DIM + Fore.WHITE + "\n    Notes:" + Style.RESET_ALL)
+        #     cleaned_notes = re.sub(r'^(\d+)\s*', '', notes).strip()
+        #     if cleaned_notes:
+        #         wrapped_notes = self.wrap_text(cleaned_notes, self.term_size.columns - 8)
+        #         for line in wrapped_notes.split('\n'):
+        #              print(Style.DIM + "        " + line + Style.RESET_ALL)
+        # --- END REMOVE NOTES DISPLAY ---
+
+
+        # Separator
         print(Style.BRIGHT + Fore.GREEN + "\n" + "-" * min(40, self.term_size.columns))
 
     def wrap_text(self, text: str, width: int) -> str:
@@ -844,7 +886,7 @@ class UI:
         """Handles the subtitle creation process, saving to Documents."""
         try:
             surah_number = surah_info.surah_number
-            total_ayah = surah_info.total_ayah
+            total_ayah = surah_info.total_verses
 
             # Ayah range input loop
             while True:
@@ -1173,9 +1215,14 @@ class UI:
 
 
     def generate_srt_content(self, surah_number: int, start_ayah: int, end_ayah: int, ayah_duration: float) -> str:
-        """Generates the SRT content with original Arabic text."""
+        """Generates the SRT content with raw Arabic and cached English."""
         try:
-            ayahs = self.data_handler.get_ayahs_raw(surah_number, start_ayah, end_ayah)  # Use raw ayahs
+            # get_ayahs_raw now fetches raw arabic (content) and cached english (text)
+            ayahs = self.data_handler.get_ayahs_raw(surah_number, start_ayah, end_ayah)
+            if not ayahs:
+                print(Fore.RED + f"Error: No ayah data found for SRT generation {surah_number}:{start_ayah}-{end_ayah}.")
+                return ""
+
             srt_content = ""
             start_time = 0.0
 
@@ -1183,8 +1230,10 @@ class UI:
                 end_time = start_time + ayah_duration
                 srt_content += f"{i+1}\n"
                 srt_content += f"{self.format_time_srt(start_time)} --> {self.format_time_srt(end_time)}\n"
-                srt_content += f"{ayah.arabic_uthmani}\n"  # Use raw Arabic text
-                srt_content += f"{ayah.text}\n\n"  # English Translation
+                # Use ayah.content for RAW Arabic
+                srt_content += f"{ayah.content}\n"
+                # Use ayah.text for CACHED English
+                srt_content += f"{ayah.text}\n\n"
                 start_time = end_time
 
             return srt_content
