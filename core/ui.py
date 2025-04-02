@@ -472,6 +472,7 @@ class UI:
         try:
             print(Fore.YELLOW + "\n⏳ Starting download, please wait...")
             print(Fore.CYAN + "This may take a moment depending on your internet speed.")
+                
             file_path = await self.audio_manager.download_audio(url, surah_num, reciter)
             print(Fore.GREEN + "\n✓ Starting playback...")
             self.audio_manager.play_audio(file_path, reciter)
@@ -767,6 +768,7 @@ class UI:
         state = "⏹ Stopped"
         state_color = _Fore_RED
         reciter_name = self.audio_manager.current_reciter or "None"
+        is_luhaidan = reciter_name == "Muhammad Al Luhaidan"
         if self.audio_manager.is_playing: state, state_color = "▶ Playing", _Fore_GREEN
         elif self.audio_manager.current_audio:
             is_finished = (self.audio_manager.duration > 0 and
@@ -778,7 +780,7 @@ class UI:
 
         output.append(f"\nState  : {state_color}{state}{_RESET}")
         output.append(f"Reciter: {_Fore_CYAN}{current_reciter_display}{_RESET}")
-
+        
         # Progress Bar
         if self.audio_manager.duration > 0:
             output.append("\nProgress:")
