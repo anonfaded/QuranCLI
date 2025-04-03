@@ -43,13 +43,13 @@ class DownloadCounter:
                 # Windows: Save next to executable
                 self.cache_file_path = Path(get_app_path(self.CACHE_FILE_NAME, writable=True))
                 # get_app_path(writable=True) ensures directory exists
-                print(f"DEBUG: Download cache path (Win): {self.cache_file_path}") # Optional debug
+                # print(f"DEBUG: Download cache path (Win): {self.cache_file_path}") # Optional debug
             else:
                 # Linux/macOS: Use user's cache directory
                 cache_base_dir = platformdirs.user_cache_dir(APP_NAME, APP_AUTHOR)
                 os.makedirs(cache_base_dir, exist_ok=True) # Ensure directory exists
                 self.cache_file_path = Path(cache_base_dir) / self.CACHE_FILE_NAME
-                print(f"DEBUG: Download cache path (Unix): {self.cache_file_path}") # Optional debug
+                # print(f"DEBUG: Download cache path (Unix): {self.cache_file_path}") # Optional debug
 
         except Exception as e_path:
             print(f"{Fore.RED}Critical Error determining download cache path: {e_path}")

@@ -1,5 +1,6 @@
 # Quran-CLI.py
 
+import re
 import sys
 import os
 import platformdirs
@@ -127,13 +128,13 @@ class QuranApp:
                 # Windows: Save next to executable
                 self.preferences_file = get_app_path('preferences.json', writable=True)
                 # Ensure directory exists (get_app_path with writable=True handles this)
-                print(f"DEBUG: Preferences path (Win): {self.preferences_file}") # Optional debug
+                # print(f"DEBUG: Preferences path (Win): {self.preferences_file}") # Optional debug
             else:
                 # Linux/macOS: Use user's config directory
                 config_dir = platformdirs.user_config_dir(APP_NAME, APP_AUTHOR)
                 os.makedirs(config_dir, exist_ok=True) # Ensure directory exists
                 self.preferences_file = os.path.join(config_dir, 'preferences.json')
-                print(f"DEBUG: Preferences path (Unix): {self.preferences_file}") # Optional debug
+                # print(f"DEBUG: Preferences path (Unix): {self.preferences_file}") # Optional debug
 
         except Exception as e_path:
             print(f"{Fore.RED}Critical Error determining preferences path: {e_path}")
@@ -438,51 +439,84 @@ class QuranApp:
         print(Fore.GREEN + "\nGitHub Repository:")
         print(Fore.MAGENTA + Style.BRIGHT + "https://github.com/anonfaded/QuranCLI" + Style.RESET_ALL)
 
+
+
+
+        # Function to remove ANSI escape codes for length calculations
+        def strip_ansi(s):
+            ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+            return ansi_escape.sub('', s)
+
+        # Example separator and box width
+        separator_minor = "-" * 120
+        box_width = 120
+
         # --- Commands ---
         print("\n" + separator_minor)
-        print(Fore.GREEN + Style.BRIGHT + "Available Commands".center(box_width + len(Fore.GREEN + Style.BRIGHT)))
+        print(Fore.GREEN + Style.BRIGHT + "Available Commands".center(box_width))
         print(separator_minor)
 
+        # Remove the colon from the description in the tuple so we can insert it in the format.
         commands_info = [
-            (Fore.CYAN + "1-114", Fore.WHITE + ": Select a Surah directly by its number."),
-            (Fore.CYAN + "Surah Name", Fore.WHITE + ": Search for a Surah by name (e.g., 'Fatiha', 'Rahman'). Provides suggestions."),
-            (Fore.CYAN + "list", Fore.WHITE + ": Display a list of all 114 Surahs with their numbers."),
-            (Fore.CYAN + "sub", Fore.WHITE + ": Generate subtitle files (.srt format) for a range of Ayahs."),
-            (Fore.YELLOW + "  ↳ Use Case:", Fore.WHITE + "Ideal for video editors needing Quran captions."),
-            (Fore.YELLOW + "  ↳ How:", Fore.WHITE + "Creates timestamped Arabic/English text for import into editors (e.g., CapCut)."),
-            (Fore.CYAN + "clearaudio", Fore.WHITE + ": Delete all downloaded audio files from the cache."),
-            (Fore.CYAN + "reverse", Fore.WHITE + ": Toggle Arabic text display direction within the Ayah reader."),
-            (Fore.YELLOW + "  ↳ Use Case:", Fore.WHITE + "Fixes display issues on some terminals where Arabic appears reversed."),
-            (Fore.YELLOW + "  ↳ Note:", Fore.WHITE + "Copied text should generally be correct regardless of display."),
-            (Fore.CYAN + "info", Fore.WHITE + ": Display this help and information screen."),
-            (Fore.CYAN + "quit / exit", Fore.WHITE + ": Close the QuranCLI application.")
+            (Fore.CYAN + "1-114", "Select a Surah directly by its number."),
+            (Fore.CYAN + "Surah Name", "Search for a Surah by name (e.g., 'Fatiha', 'Rahman'). Provides suggestions."),
+            (Fore.CYAN + "list", "Display a list of all 114 Surahs with their numbers."),
+            (Fore.CYAN + "sub", "Generate subtitle files (.srt format) for a range of Ayahs."),
+            (Fore.YELLOW + "  ↳ Use Case", "Ideal for video editors needing Quran captions."),
+            (Fore.YELLOW + "  ↳ How", "Creates timestamped Arabic/English text for import into editors (e.g., CapCut)."),
+            (Fore.CYAN + "clearaudio", "Delete all downloaded audio files from the cache."),
+            (Fore.CYAN + "reverse", "Toggle Arabic text display direction within the Ayah reader."),
+            (Fore.YELLOW + "  ↳ Use Case", "Fixes display issues on some terminals where Arabic appears reversed."),
+            (Fore.YELLOW + "  ↳ Note", "Copied text should generally be correct regardless of display."),
+            (Fore.CYAN + "info", "Display this help and information screen."),
+            (Fore.CYAN + "theme", "Change the color of the Quran CLI ASCII art."),
+            (Fore.CYAN + "readme", "View Notes by the developer & Updates."),
+            (Fore.CYAN + "quit / exit", "Close the QuranCLI application.")
         ]
 
-        cmd_col_width = 15 # Width for the command name part
-        desc_col_width = box_width - cmd_col_width - 1 # Remaining width for description
+        cmd_col_width = 20  # Fixed width for the command part
+        # The description column width is based on the total box width minus the command width and the extra " : " (3 characters)
+        desc_col_width = box_width - cmd_col_width - 3
+
+        # A simple text-wrapping function that respects the width after stripping ANSI codes.
+        def wrap_text(text, width):
+            words = text.split()
+            lines = []
+            current_line = ""
+            for word in words:
+                # Check length without ANSI codes
+                if len(strip_ansi(current_line + " " + word).strip()) <= width:
+                    if current_line:
+                        current_line += " " + word
+                    else:
+                        current_line = word
+                else:
+                    lines.append(current_line)
+                    current_line = word
+            if current_line:
+                lines.append(current_line)
+            return "\n".join(lines)
 
         for cmd, desc in commands_info:
-            cmd_part = f"{cmd}".ljust(cmd_col_width + len(cmd) - len(cmd.replace('\033[','').split('m')[-1])) # Adjust ljust for color codes
+            plain_cmd = strip_ansi(cmd)
+            # Calculate the padding needed for a fixed column width
+            padding = cmd_col_width - len(plain_cmd)
+            if padding < 0:
+                padding = 0
+            cmd_part = cmd + " " * padding  # Fixed-width command string
 
-            # Use the UI's wrap_text method if available and needed
-            if hasattr(self.ui, 'wrap_text') and desc_col_width > 10:
-                 desc_lines = self.ui.wrap_text(desc, desc_col_width).split('\n')
-            else: # Basic fallback wrapping
-                 desc_lines = [desc[i:i+desc_col_width] for i in range(0, len(desc), desc_col_width)]
-
-            # Print first line
-            print(f"{cmd_part}{Fore.WHITE}{desc_lines[0]}")
-            # Print subsequent lines indented
+            # Wrap the description text to fit the description column width
+            wrapped_desc = wrap_text(desc, desc_col_width)
+            desc_lines = wrapped_desc.split("\n")
+            # Print the first line with the command, a space-colon-space separator, and the first description line
+            print(f"{Fore.WHITE}{cmd_part} : {desc_lines[0]}")
+            # Print additional description lines (if any) indented to align with the description column
             for line in desc_lines[1:]:
-                print(f"{' '.ljust(cmd_col_width)}{Fore.WHITE}{line}")
-
-            # Add spacing after multi-line descriptions (like sub and reverse)
-            if cmd.startswith(Fore.CYAN + "sub") or cmd.startswith(Fore.CYAN + "reverse"):
-                 print("")
+                print(" " * (cmd_col_width + 3) + line)
 
         # --- Credits ---
         print("\n" + separator_minor)
-        print(Fore.GREEN + Style.BRIGHT + "Credits".center(box_width + len(Fore.GREEN + Style.BRIGHT)))
+        print(Fore.GREEN + Style.BRIGHT + "Credits".center(box_width))
         print(separator_minor)
 
         print(Fore.WHITE + "  Quran Data & Audio API provided by:")
@@ -496,7 +530,7 @@ class QuranApp:
 
         # --- Feedback / Bug Reports ---
         print("\n" + separator_minor)
-        print(Fore.GREEN + Style.BRIGHT + "Feedback & Bug Reports".center(box_width + len(Fore.GREEN + Style.BRIGHT)))
+        print(Fore.GREEN + Style.BRIGHT + "Feedback & Bug Reports".center(box_width))
         print(separator_minor)
         print(f"""{Fore.RED + Style.BRIGHT}                          
                                       
@@ -527,21 +561,32 @@ class QuranApp:
                 # Clear terminal and display header before prompt
                 self._clear_terminal()
                 self._display_header()
-                box_width = 26  # Adjust width if needed
-                separator = "─" * box_width
+                # List of commands with their descriptions
+                commands = [
+                    (f"{Fore.CYAN}1-114{Fore.WHITE}", "Select Surah by number"),
+                    (f"{Fore.CYAN}Surah Name{Fore.WHITE}", f"Search Surah {Style.DIM}{Fore.WHITE}(e.g., 'Rahman')"),
+                    (f"{Fore.CYAN}list{Fore.WHITE}", "Display list of Surahs"),
+                    (f"{Fore.CYAN}sub{Fore.WHITE}", "Create subtitles for Ayahs"),
+                    (f"{Fore.CYAN}clearaudio{Fore.WHITE}", "Clear audio cache"),
+                    (f"{Fore.CYAN}info{Fore.WHITE}", "Show help and information"),
+                    (f"{Fore.CYAN}theme{Fore.WHITE}", "Change ASCII art color"),
+                    (f"{Fore.RED}readme{Fore.WHITE}", "View Notes by the developer & Updates"),
+                    (f"{Fore.CYAN}quit{Fore.WHITE}", "Exit the application")
+                ]
 
-                # Descriptive command list with colors
+                # Adjust this value to set the width of the command column
+                command_width = 20
+
+                # Header
                 print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📜 Available Commands")
-                print(Fore.RED + f"│ • {Fore.CYAN}1-114{Fore.WHITE}: Select Surah by number")
-                print(Fore.RED + f"│ • {Fore.CYAN}Surah Name{Fore.WHITE}: Search Surah {Style.DIM}(e.g., 'Rahman')")
-                print(Fore.RED + f"│ • {Fore.CYAN}list{Fore.WHITE}: Display list of Surahs")
-                print(Fore.RED + f"│ • {Fore.CYAN}sub{Fore.WHITE}: Create subtitles for Ayahs")
-                print(Fore.RED + f"│ • {Fore.CYAN}clearaudio{Fore.WHITE}: Clear audio cache")
-                print(Fore.RED + f"│ • {Fore.CYAN}info{Fore.WHITE}: Show help and information")
-                print(Fore.RED + f"│ • {Fore.CYAN}theme{Fore.WHITE}: Change ASCII art color")
-                print(Fore.RED + f"│ • {Fore.RED}readme{Fore.WHITE}: View Notes by the developer & Updates")
-                print(Fore.RED + f"│ • {Fore.CYAN}quit{Fore.WHITE}: Exit the application")
-                print(Fore.RED + "╰" + separator)
+
+                # Print each command with aligned descriptions
+                for cmd, desc in commands:
+                    # The colon will be aligned at the same column for every command
+                    print(Fore.RED + f"│ • {cmd:<{command_width}} : {desc}")
+
+                # Footer line (adjust the length as needed)
+                print(Fore.RED + "╰" + "─" * (command_width + 25))
                     
                     
                 # Helper Text

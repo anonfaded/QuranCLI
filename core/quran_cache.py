@@ -37,14 +37,14 @@ class QuranCache:
                 self.CACHE_DIR = get_app_path('cache', writable=True)
                 self.CACHE_FILE = os.path.join(self.CACHE_DIR, self.CACHE_FILE_NAME)
                 # get_app_path(writable=True) ensures directory exists
-                print(f"DEBUG: Quran cache path (Win): {self.CACHE_FILE}") # Optional debug
+                # print(f"DEBUG: Quran cache path (Win): {self.CACHE_FILE}") # Optional debug
             else:
                 # Linux/macOS: Use user's cache directory
                 cache_base_dir = platformdirs.user_cache_dir(APP_NAME, APP_AUTHOR)
                 self.CACHE_DIR = os.path.join(cache_base_dir) # Store base cache dir
                 self.CACHE_FILE = os.path.join(self.CACHE_DIR, self.CACHE_FILE_NAME)
                 os.makedirs(self.CACHE_DIR, exist_ok=True) # Ensure directory exists
-                print(f"DEBUG: Quran cache path (Unix): {self.CACHE_FILE}") # Optional debug
+                # print(f"DEBUG: Quran cache path (Unix): {self.CACHE_FILE}") # Optional debug
 
         except Exception as e_path:
             print(f"{Fore.RED}Critical Error determining Quran cache path: {e_path}")

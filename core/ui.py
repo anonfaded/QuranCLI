@@ -389,7 +389,7 @@ class UI:
         print("    " + ayah.content) # Assumes content was processed by fix_arabic_text
 
         # 2. Transliteration
-        print(Style.BRIGHT + Fore.CYAN + "\nTransliteration:" + Style.NORMAL + Fore.WHITE)
+        print(Style.BRIGHT + Fore.RED + "\nTransliteration:" + Style.NORMAL + Fore.WHITE)
         wrapped_translit = self.wrap_text(ayah.transliteration, self.term_size.columns - 4)
         for line in wrapped_translit.split('\n'):
              print("    " + line)
@@ -406,7 +406,7 @@ class UI:
         # --- END ADD Urdu Translation ---
 
         # --- 4. English Translation (Now below Urdu) ---
-        print(Style.BRIGHT + Fore.YELLOW + "\nEnglish Translation:" + Style.NORMAL + Fore.WHITE)
+        print(Style.BRIGHT + Fore.MAGENTA + "\nEnglish Translation:" + Style.NORMAL + Fore.WHITE)
         cached_translation = ayah.text
         wrapped_translation = self.wrap_text(cached_translation, self.term_size.columns - 4)
         for line in wrapped_translation.split('\n'):

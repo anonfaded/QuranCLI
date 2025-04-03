@@ -2,16 +2,14 @@
 
 Welcome to QuranCLI! This space holds notes from the developer and highlights recent updates to help you make the most of this tool.
 
---- What's New (v1.1.0) ---
-• New commands: `theme` to change ASCII banner color, and `readme` to display these notes.
-• Variable paths: Run QuranCLI directly via `qurancli` on both Windows and Linux.
-• Linux Support: Now available as a .deb package.
-• Bug Fixes: Various improvements for a smoother experience.
+--- What's New (v1.2.0) ---
+• Added new reciter: Shiekh Mohammad Al Luhaidan.
+• Added Urdu translation database.
+• Added transliteration database.
+• In SRT files, users can now choose to include or exclude English translation, Urdu translation, and transliteration.
 
 --- Upcoming Features Roadmap ---
-• Full Quran transliteration.
-• Integrated Urdu translation.
-• Additional reciters (e.g., Shiekh Mohammad Al Luhaidan).
+• Additional reciters.
 • Tafsir integration.
 • Mood-based ayah recommendations ("I'm-Feeling" feature).
 
@@ -24,9 +22,9 @@ Welcome to QuranCLI! This space holds notes from the developer and highlights re
 
 --- General Info ---
 
-•   Cache/Preferences: Located alongside `QuranCLI.exe`.
+•   Cache/Preferences: Located alongside `QuranCLI.exe` on Windows and at `.config` and `.cache` on Linux.
 •   Subtitles: Saved in your `Documents\QuranCLI Subtitles` folder.
-•   Dependencies: Bundled within the `.exe` for ease of use.
+•   Dependencies: Bundled within the `.exe` and `.deb` for ease of use.
 
 --- A Final Word ---
 
