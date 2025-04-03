@@ -950,14 +950,14 @@ class UI:
 
     def display_subtitle_menu(self, surah_info: SurahInfo):
         """Handles the subtitle creation process, saving to Documents,
-           with settings confirmation before generation."""
+        with a redesigned settings confirmation menu."""
         try:
             surah_number = surah_info.surah_number
             total_ayah = surah_info.total_verses
             start_ayah = None
             end_ayah = None
 
-            # --- Ayah range input loop (remains first) ---
+            # --- Ayah range input loop (remains the same) ---
             while True:
                 try:
                     self.clear_terminal()
@@ -983,61 +983,83 @@ class UI:
                     return
             # --- End Ayah range input loop ---
 
-            # --- Settings Confirmation Loop (NEW) ---
+            # --- Redesigned Settings Confirmation Loop ---
             while True:
                 self.clear_terminal()
-                print(Fore.CYAN + Style.BRIGHT + "Confirm Subtitle Content")
-                print(Fore.WHITE + "-------------------------------------")
-                print(f"{Fore.MAGENTA}Surah: {surah_info.surah_name}")
-                print(f"{Fore.MAGENTA}Ayahs: {start_ayah} - {end_ayah}")
-                print(Fore.WHITE + "-------------------------------------")
+                box_width = 55 # Adjust as needed
+                separator = "─" * box_width
 
-                # Display Current Subtitle Settings
-                subtitle_config = self.preferences.get("subtitle_config", {}) # Get current config
-                content_parts = ["Arabic"]
-                if subtitle_config.get("include_urdu"): content_parts.append("Urdu")
-                if subtitle_config.get("include_english"): content_parts.append("English")
-                if subtitle_config.get("include_transliteration"): content_parts.append("Translit")
-                current_config_str = " + ".join(content_parts)
-                print(f"{Fore.CYAN}Content to Generate:{Fore.GREEN} {current_config_str}")
-                print(Fore.WHITE + "-------------------------------------")
+                # --- REDESIGNED HEADER ---
+                print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "🎬 Confirm Subtitle Content & Generate")
+                print(Fore.RED + f"│ {Fore.WHITE}Surah:{Fore.CYAN} {surah_info.surah_name} ({surah_info.surah_number})")
+                print(Fore.RED + f"│ {Fore.WHITE}Ayahs:{Fore.CYAN} {start_ayah}-{end_ayah}")
+                print(Fore.RED + "├" + separator) # Use full separator
 
-                # Show Confirmation/Settings Options
-                print(f"{Fore.YELLOW}g.{Fore.WHITE} Generate SRT with current settings")
-                print(f"{Fore.YELLOW}s.{Fore.WHITE} Change Settings")
-                print(f"{Fore.YELLOW}c.{Fore.WHITE} Cancel (Back to Main Menu)")
+                # --- Display Current Subtitle Settings Clearly ---
+                print(Fore.RED + f"│ {Fore.YELLOW}Current Content Configuration:")
+                subtitle_config = self.preferences.get("subtitle_config", {})
+
+                # Define content parts with labels
+                content_parts_info = [
+                    ("Arabic Ayah", True, Fore.GREEN), # Arabic is always included
+                    ("Transliteration", subtitle_config.get("include_transliteration", False), Fore.CYAN),
+                    ("Urdu Translation", subtitle_config.get("include_urdu", False), Fore.MAGENTA),
+                    ("English Translation", subtitle_config.get("include_english", False), Fore.YELLOW),
+                ]
+
+                for label, enabled, color in content_parts_info:
+                    status = Fore.GREEN + "✓ Included" if enabled else Fore.RED + "✗ Excluded"
+                    print(Fore.RED + f"│   • {color}{label.ljust(25)} {status}")
+
+                print(Fore.RED + "├" + separator) # Use full separator
+
+                # --- Redesigned Options with Numbers ---
+                print(Fore.RED + f"│ {Fore.WHITE}Choose an action:")
+                print(Fore.RED + f"│   • {Fore.CYAN}1{Fore.WHITE}: Generate SRT with current settings")
+                print(Fore.RED + f"│   • {Fore.CYAN}2{Fore.WHITE}: Change Content Settings")
+                print(Fore.RED + f"│   • {Fore.CYAN}3{Fore.WHITE}: Cancel (Back to Main Menu)")
+                print(Fore.RED + "╰" + separator)
+
+                # --- Helper Text ---
+                print(Style.DIM + Fore.WHITE + "\n  Enter the number corresponding to your choice.")
 
                 try:
-                    confirm_choice = input(f"\n{Fore.BLUE}Enter choice: {Fore.WHITE}").strip().lower()
+                    confirm_choice = input(f"\n{Fore.BLUE}Enter choice (1-3): {Fore.WHITE}").strip()
 
-                    if confirm_choice == 'g':
+                    if confirm_choice == '1': # Generate
                         # Proceed to generate using current subtitle_config
                         break # Exit settings confirmation loop
-                    elif confirm_choice == 's':
-                        # Open settings menu
+                    elif confirm_choice == '2': # Settings
+                        # Open settings menu (assuming _display_subtitle_settings_menu is okay)
                         self._display_subtitle_settings_menu()
                         # Loop back to show this confirmation screen again
                         continue
-                    elif confirm_choice == 'c':
-                        print(Fore.YELLOW + "Generation cancelled.")
+                    elif confirm_choice == '3': # Cancel
+                        print(Fore.YELLOW + "Subtitle generation cancelled.")
                         time.sleep(1)
                         return # Return directly to main app menu
                     else:
-                        print(Fore.RED + "Invalid choice.")
+                        print(Fore.RED + "Invalid choice. Please enter 1, 2, or 3.")
                         time.sleep(1)
 
                 except KeyboardInterrupt:
                     print(Fore.YELLOW + "\nGeneration cancelled.")
                     return # Return to main app menu
                 except Exception as e:
-                     print(Fore.RED + f"Error in confirmation menu: {e}")
-                     time.sleep(1)
-            # --- End Settings Confirmation Loop ---
+                    print(Fore.RED + f"Error in confirmation menu: {e}")
+                    time.sleep(1)
+            # --- End Redesigned Settings Confirmation Loop ---
 
-            # --- Generate SRT content (Uses the confirmed config) ---
-            # Reload config in case it was changed in the settings menu
+            # --- Generate SRT content ---
             final_subtitle_config = self.preferences.get("subtitle_config", {})
-            print(f"\n{Fore.YELLOW}Generating SRT file with {current_config_str}...{Style.RESET_ALL}") # Feedback
+            # Build a string representation for the final feedback message
+            final_content_parts = ["Arabic"]
+            if final_subtitle_config.get("include_transliteration"): final_content_parts.append("Translit")
+            if final_subtitle_config.get("include_urdu"): final_content_parts.append("Urdu")
+            if final_subtitle_config.get("include_english"): final_content_parts.append("English")
+            final_config_str = " + ".join(final_content_parts)
+
+            print(f"\n{Fore.YELLOW}⏳ Generating SRT file ({final_config_str})...{Style.RESET_ALL}")
             ayah_duration = 5.0 # Default duration
             srt_content = self.generate_srt_content(
                 surah_number, start_ayah, end_ayah, ayah_duration, final_subtitle_config
@@ -1058,6 +1080,7 @@ class UI:
             except Exception as e:
                 print(Fore.RED + f"\n❌ Error accessing Documents directory: {e}")
                 print(Fore.YELLOW + "Cannot save subtitle file.")
+                time.sleep(2)
                 return
 
             now = datetime.datetime.now()
@@ -1067,11 +1090,12 @@ class UI:
             try:
                 with open(filepath, "w", encoding="utf-8") as f:
                     f.write(srt_content)
-                print(Fore.GREEN + f"\n✅ Subtitle file saved to: {Fore.CYAN}{filepath}")
-                # Short pause before showing management console
-                time.sleep(1.5)
+                print(Fore.GREEN + f"\n✅ Subtitle file saved successfully!")
+                print(Fore.CYAN + f"   Location: {filepath}")
+                time.sleep(2) # Increased pause to see save location
             except Exception as e:
                 print(Fore.RED + f"\n❌ Error saving subtitle file: {e}")
+                time.sleep(2)
                 return
             # --- End File Saving Logic ---
 
@@ -1081,22 +1105,21 @@ class UI:
             try:
                 web_assets_dir = get_app_path('core/web')
                 if not os.path.exists(os.path.join(web_assets_dir, 'index.html')):
-                     print(Fore.RED + "\n❌ Web server assets (index.html) not found!")
-                     web_assets_dir = None
+                    print(Fore.RED + "\n❌ Web server assets (index.html) not found!")
+                    web_assets_dir = None
             except Exception as e:
-                 print(Fore.RED + f"\n❌ Error finding web assets: {e}")
-                 web_assets_dir = None
+                print(Fore.RED + f"\n❌ Error finding web assets: {e}")
+                web_assets_dir = None
 
             PORT = 8000
             ip_address = self.get_primary_ip_address()
             server_running = False
             if web_assets_dir and ip_address:
-                # Start server thread (logic assumed correct from previous step)
                 self.start_server_thread(surah_dir, web_assets_dir, PORT, surah_info.surah_name)
                 time.sleep(0.5)
                 if self.httpd: server_running = True
                 else: print(Fore.YELLOW + "Web server failed to start.")
-            else: print(Fore.YELLOW + "\nWeb server cannot be started.")
+            else: print(Fore.YELLOW + "\nWeb server cannot be started (missing assets or IP).")
             # --- End Web Server Setup ---
 
 
@@ -1106,6 +1129,17 @@ class UI:
                 print(Fore.RED + Style.BRIGHT + "Subtitle Management Console:")
                 print(Fore.MAGENTA + f"      Subtitle generated for Surah {surah_info.surah_name} ({start_ayah}-{end_ayah})")
                 # --- Display generated content format ---
+                # Construct current_config_str from subtitle_config
+                subtitle_config = self.preferences.get("subtitle_config", {})
+                current_config_parts = ["Arabic"]
+                if subtitle_config.get("include_transliteration"):
+                    current_config_parts.append("Translit")
+                if subtitle_config.get("include_urdu"):
+                    current_config_parts.append("Urdu")
+                if subtitle_config.get("include_english"):
+                    current_config_parts.append("English")
+                current_config_str = " + ".join(current_config_parts)
+
                 print(f"{Fore.CYAN}      Content Included: {Fore.GREEN}{current_config_str}")
                 # --- End Display ---
                 print(Fore.GREEN + f"\nFile saved in Documents folder:")
@@ -1345,9 +1379,9 @@ class UI:
 
     def generate_srt_content(self, surah_number: int, start_ayah: int, end_ayah: int, ayah_duration: float, config: dict) -> str:
         """Generates the SRT content based on the provided configuration,
-        applying letter reshaping (but not BiDi display reversal) to Urdu."""
+        applying letter reshaping to Urdu and ordering content as:
+        Arabic -> Transliteration -> Urdu -> English."""
         try:
-            # get_ayahs_raw fetches raw arabic, translit, urdu, english
             ayahs = self.data_handler.get_ayahs_raw(surah_number, start_ayah, end_ayah)
             if not ayahs:
                 print(Fore.RED + f"Error: No ayah data found for SRT generation {surah_number}:{start_ayah}-{end_ayah}.")
@@ -1356,7 +1390,6 @@ class UI:
             srt_content = ""
             start_time = 0.0
 
-            # Get config values safely, defaulting to False if missing
             include_urdu = config.get("include_urdu", False)
             include_english = config.get("include_english", False)
             include_translit = config.get("include_transliteration", False)
@@ -1366,43 +1399,34 @@ class UI:
                 srt_content += f"{i+1}\n"
                 srt_content += f"{self.format_time_srt(start_time)} --> {self.format_time_srt(end_time)}\n"
 
-                # 1. Always include Arabic (Raw)
-                # Sticking with raw Arabic as user reported it was fine in SRT.
-                # If issues arise, consider applying arabic_reshaper.reshape here too.
+                # 1. Always include Arabic (Ayah)
                 srt_content += f"{ayah.content}\n"
 
-                # 2. Conditionally include Urdu (Apply ONLY letter reshaping)
+                # --- REORDERED: 2. Conditionally include Transliteration ---
+                if include_translit and ayah.transliteration:
+                    srt_content += f"{ayah.transliteration}\n"
+
+                # --- REORDERED: 3. Conditionally include Urdu (Translation) ---
                 if include_urdu and ayah.translation_ur:
-                    # --- CORRECTED FIX ---
-                    # Apply only arabic_reshaper to connect letters, preserving logical order.
-                    # Do NOT use self.data_handler.fix_arabic_text() here.
                     try:
                         reshaped_urdu_srt = arabic_reshaper.reshape(ayah.translation_ur)
                         srt_content += f"{reshaped_urdu_srt}\n"
                     except Exception as reshape_err:
                         print(Fore.YELLOW + f"Warning: Could not reshape Urdu text for ayah {ayah.number}: {reshape_err}")
-                        srt_content += f"{ayah.translation_ur}\n" # Fallback to raw Urdu
-                    # --- END CORRECTED FIX ---
+                        srt_content += f"{ayah.translation_ur}\n" # Fallback
 
-                # 3. Conditionally include English
+                # --- REORDERED: 4. Conditionally include English (Translation) ---
                 if include_english and ayah.text:
                     srt_content += f"{ayah.text}\n"
 
-                # 4. Conditionally include Transliteration
-                if include_translit and ayah.transliteration:
-                    srt_content += f"{ayah.transliteration}\n"
-
-                # Add final newline for separation, removing trailing newline if any existed
+                # Add final newline for separation
                 srt_content = srt_content.rstrip('\n') + "\n\n"
                 start_time = end_time
 
-            return srt_content.strip() # Return stripped content
+            return srt_content.strip()
 
         except Exception as e:
             print(Fore.RED + f"\nError generating SRT content: {e}")
-            # Optional: Add traceback for debugging
-            # import traceback
-            # traceback.print_exc()
             return ""
 
     def format_time_srt(self, seconds: float) -> str:
