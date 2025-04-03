@@ -234,14 +234,29 @@ class QuranApp:
              print(Fore.RED + f"Error saving preferences to '{self.preferences_file}': {e}")
 
     def _load_surah_names(self):
+        """Load simpler surah names directly from the CACHED data for search functionality."""
         surah_names = {}
+        print(f"{Fore.YELLOW}Loading surah names from cache for search...{Style.RESET_ALL}") # Info message
         for i in range(1, 115):
             try:
-                surah_info = self.data_handler.get_surah_info(i)
-                surah_names[i] = surah_info.surah_name
-            except ValueError:
-                print(Fore.RED + f"Warning: Could not load surah info for surah {i}")
-                surah_names[i] = "Unknown"
+                # Access the cache directly using the API client's cache instance
+                cached_data = self.client.cache.get_surah(i)
+                if cached_data and 'surahName' in cached_data:
+                    # Use the 'surahName' field from the cached data (e.g., "Al-Fatiha")
+                    surah_names[i] = cached_data['surahName']
+                else:
+                    # Fallback if cache is missing or incomplete for this surah
+                    print(f"{Fore.YELLOW}Warning: Cache missing 'surahName' for Surah {i}. Using fallback.{Style.RESET_ALL}", file=sys.stderr)
+                    surah_names[i] = f"Surah {i}" # Fallback name
+            except Exception as e:
+                 print(f"{Fore.RED}Error loading cached name for surah {i}: {e}{Style.RESET_ALL}", file=sys.stderr)
+                 surah_names[i] = f"Surah {i}" # Fallback on error
+
+        # Check if loading failed significantly
+        if len(surah_names) < 114 or all(name.startswith("Surah ") for name in surah_names.values()):
+             print(f"{Fore.RED}Error: Failed to load most surah names from cache. Search may be impaired.{Style.RESET_ALL}", file=sys.stderr)
+
+        print(f"{Fore.GREEN}Finished loading surah names from cache.{Style.RESET_ALL}")
         return surah_names
 
     def _clear_terminal(self):
@@ -319,38 +334,54 @@ class QuranApp:
                 try:
                     print(Style.BRIGHT + Fore.GREEN + "\n" + "=" * 52)
 
+                    # --- Check if get_surah_info returned None ---
                     surah_info = self.data_handler.get_surah_info(surah_number)
-                    # Surah Information Header
-                    box_width = 52  # Adjust width if needed
+                    if surah_info is None:
+                        print(Fore.RED + f"Error: Could not retrieve information for Surah {surah_number}. Returning to main menu.")
+                        sleep(2)
+                        continue # Go back to the start of the main loop
+                    # --- End Check ---
+
+                    # Surah Information Header (This part remains the same, uses updated SurahInfo)
+                    box_width = 52
                     separator = "─" * box_width
-
-                    print(Fore.RED + "╭─ " + Style.BRIGHT +  Fore.GREEN + "📜 Surah Information")
+                    print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📜 Surah Information")
                     print(Fore.RED + f"│ • {Fore.CYAN}Name:       {Fore.WHITE}{surah_info.surah_name}")
-                    print(Fore.RED + f"│ • {Fore.CYAN}Arabic:     {Fore.WHITE}{surah_info.surah_name_arabic}")
-                    print(Fore.RED + f"│ • {Fore.CYAN}Revelation: {Fore.WHITE}{surah_info.revelation_place}")
-                    print(Fore.RED + f"│ • {Fore.CYAN}Total Ayahs:{Fore.WHITE} {surah_info.total_ayah}")
+                    print(Fore.RED + f"│ • {Fore.CYAN}Arabic:     {Fore.WHITE}{surah_info.surah_name_ar}")
+                    # --- ADD/MODIFY Fields based on new SurahInfo ---
+                    print(Fore.RED + f"│ • {Fore.CYAN}Translation:{Fore.WHITE}{surah_info.translation}")
+                    print(Fore.RED + f"│ • {Fore.CYAN}Type:       {Fore.WHITE}{surah_info.type.capitalize()}")
+                    # --- Use total_verses from SurahInfo ---
+                    print(Fore.RED + f"│ • {Fore.CYAN}Total Ayahs:{Fore.WHITE} {surah_info.total_verses}")
+                    # --- REMOVE Revelation Place if not needed, replaced by Type ---
+                    # print(Fore.RED + f"│ • {Fore.CYAN}Revelation: {Fore.WHITE}{surah_info.revelation_place}")
                     print(Fore.RED + "╰" + separator)
-
-                    # Note Section
-                    # print(Style.DIM + Fore.YELLOW + "⚠ Note: Arabic text may appear reversed but will copy correctly.")
-                    # print(Style.BRIGHT + Fore.RED + separator)
 
                     while True:
                         try:
-                            start, end = self._get_ayah_range(surah_info.total_ayah)
+                            # Use total_verses from the updated surah_info
+                            start, end = self._get_ayah_range(surah_info.total_verses)
                             ayahs = self.data_handler.get_ayahs(surah_number, start, end)
-                            self.ui.display_ayahs(ayahs, surah_info)
+                            # Check if ayahs list is empty due to error in get_ayahs
+                            if not ayahs and start <= end : # Only show error if range was valid but no data returned
+                                print(Fore.RED + f"Error: Could not retrieve ayahs {start}-{end} for Surah {surah_number}.")
+                                sleep(2)
+                                # Decide whether to break inner loop or allow retry
+                                break # Break to ask_yes_no which likely returns to main menu
+                            self.ui.display_ayahs(ayahs, surah_info) # display_ayahs now handles description internally
 
                             if not self._ask_yes_no(surah_info.surah_name):
-                                self._clear_terminal()
-                                self._display_header()
+                                # No need to clear/display header here, outer loop does it
+                                # self._clear_terminal()
+                                # self._display_header()
                                 break
                         except KeyboardInterrupt:
-                            break #Break the inner while loop
+                            # print(Fore.YELLOW + "\nAyah range selection cancelled.") # Optional message
+                            break # Break the inner while loop (ayah range)
 
                 except KeyboardInterrupt:
                     print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to main menu.")
-                    continue  # Continue to the outer loop
+                    continue  # Continue to the outer loop (surah selection)
 
             except KeyboardInterrupt:
                 # Allow KeyboardInterrupt to propagate to the top level handler

@@ -7,8 +7,10 @@ import asyncio
 import json
 import os
 import datetime
+import arabic_reshaper
 import platformdirs
 import subprocess  # Added for Linux/Mac folder opening
+import re
 
 if sys.platform == "win32":
     import msvcrt
@@ -109,9 +111,84 @@ class UI:
         self.preferences_file = preferences_file_path
         # Use the already loaded preferences
         self.preferences = preferences if preferences is not None else self._load_preferences() # Keep fallback loading just in case
+        # --- ADD Subtitle Config Loading with Defaults ---
+        default_subtitle_config = {
+            "include_urdu": True,
+            "include_english": True,
+            "include_transliteration": False
+        }
+        # Load existing or set default
+        if "subtitle_config" not in self.preferences:
+            self.preferences["subtitle_config"] = default_subtitle_config
+        else:
+            # Ensure all keys exist in loaded config, add defaults if missing
+            for key, default_value in default_subtitle_config.items():
+                if key not in self.preferences["subtitle_config"]:
+                    self.preferences["subtitle_config"][key] = default_value
+        # --- END ADD ---
+        
         self.httpd = None
         self.server_thread = None # Initialize server_thread attribute
 
+    def _display_subtitle_settings_menu(self):
+        """Displays and handles the subtitle content settings menu."""
+        while True:
+            self.clear_terminal()
+            print(Fore.RED + Style.BRIGHT + "⚙️ Subtitle Content Settings")
+            print(Fore.WHITE + "--------------------------------")
+            print(Fore.YELLOW + "Configure what content appears below the Arabic text in the SRT file.")
+            print(Fore.WHITE + "Arabic text is always included.")
+            print(Fore.WHITE + "--------------------------------\n")
+
+            config = self.preferences.get("subtitle_config", {}) # Get current config safely
+
+            # Display options with current status
+            options = [
+                ("include_urdu", "Urdu Translation"),
+                ("include_english", "English Translation"),
+                ("include_transliteration", "Transliteration")
+            ]
+
+            for i, (key, label) in enumerate(options):
+                status = config.get(key, False) # Get status, default to False if missing
+                status_text = Fore.GREEN + "Enabled" if status else Fore.RED + "Disabled"
+                print(f"{Fore.CYAN}{i+1}. {Fore.WHITE}{label.ljust(25)} [{status_text}{Fore.WHITE}]")
+
+            print(f"\n{Fore.CYAN}b. {Fore.WHITE}Back to Subtitle Menu")
+
+            # Prompt for choice
+            try:
+                choice = input(f"\n{Fore.BLUE}Enter number to toggle, or 'b' to go back: {Fore.WHITE}").strip().lower()
+
+                if choice == 'b':
+                    break # Exit settings menu
+
+                if choice.isdigit():
+                    index = int(choice) - 1
+                    if 0 <= index < len(options):
+                        key_to_toggle = options[index][0]
+                        # Toggle the boolean value
+                        self.preferences["subtitle_config"][key_to_toggle] = not self.preferences["subtitle_config"].get(key_to_toggle, False)
+                        self.save_preferences() # Save immediately after toggle
+                        print(f"{Fore.GREEN}Setting '{options[index][1]}' updated.{Style.RESET_ALL}")
+                        time.sleep(0.8) # Brief pause to see feedback
+                    else:
+                        print(Fore.RED + "Invalid number.")
+                        time.sleep(1)
+                else:
+                    print(Fore.RED + "Invalid input.")
+                    time.sleep(1)
+
+            except ValueError:
+                print(Fore.RED + "Invalid input. Please enter a number or 'b'.")
+                time.sleep(1)
+            except KeyboardInterrupt:
+                print(Fore.YELLOW + "\nSettings cancelled. Returning to Subtitle Menu.")
+                break # Exit settings menu on Ctrl+C
+            except Exception as e:
+                print(Fore.RED + f"An error occurred: {e}")
+                time.sleep(1)
+                
     def _load_preferences(self) -> dict:
         """Fallback method to load preferences if not provided or path is missing."""
         if not self.preferences_file or not os.path.exists(self.preferences_file):
@@ -246,21 +323,31 @@ class UI:
             self.clear_terminal()
             # Single consolidated header
             print(Style.BRIGHT + Fore.RED + "=" * self.term_size.columns)
-            print(f"📖 {surah_info.surah_name} ({surah_info.surah_name_arabic}) • {surah_info.revelation_place} • {surah_info.total_ayah} Ayahs")
+            # --- FIX ATTRIBUTE: Use surah_name_ar ---
+            # --- REVERT HEADER to simpler format temporarily to fix error, can enhance later ---
+            print(f"📖 Surah {surah_info.surah_number}: {surah_info.surah_name} ({surah_info.surah_name_ar})")
+            # print(f"📖 {surah_info.surah_name} ({surah_info.surah_name_ar}) • {surah_info.translation} • {surah_info.type.capitalize()}") # Use corrected name
+            # print(f"Total Ayahs: {surah_info.total_verses}")
+            # --- END FIX ATTRIBUTE ---
             print(f"Page {current_page}/{total_pages}")
             print(Style.BRIGHT + Fore.RED + "=" * self.term_size.columns)
 
-            # Arabic display information - CONCISE NOTE
-            print(Style.DIM + Fore.YELLOW + "⚠ Note: Arabic text is formatted for correct reading. If reversed or copying gives reversed output, use 'reverse' command, then 'q' and re-enter the input.")
+            # Display Surah Description (Keep this part)
+            if surah_info.description:
+                print(Style.DIM + Fore.YELLOW + "Description:" + Style.RESET_ALL + Style.DIM)
+                wrapped_desc = self.wrap_text(surah_info.description, self.term_size.columns - 4)
+                for line in wrapped_desc.split('\n'):
+                    print(Style.DIM + "  " + line + Style.RESET_ALL)
+                print(Style.BRIGHT + Fore.RED + "-" * self.term_size.columns)
 
-            # Display ayahs for current page
+            # Display ayahs for current page (Keep this part)
             start_idx = (current_page - 1) * page_size
             end_idx = min(start_idx + page_size, len(ayahs))
-
             local_ayahs = ayahs[start_idx:end_idx]
             for ayah in local_ayahs:
+                # Ensure display_single_ayah uses the correct fields (content, transliteration, translation_eng)
                 self.display_single_ayah(ayah)
-
+                
             # Navigation Menu
             box_width = 26  # Adjust width if needed
             separator = "─" * box_width
@@ -294,19 +381,40 @@ class UI:
                     return
 
     def display_single_ayah(self, ayah: Ayah):
-        """Display a single ayah with proper formatting"""
+        """Display a single ayah with Arabic, Transliteration, Urdu, and English."""
         print(Style.BRIGHT + Fore.GREEN + f"\n[{ayah.number}]")
-        wrapped_text = self.wrap_text(ayah.text, self.term_size.columns - 4)
-        print(Style.NORMAL + Fore.WHITE + wrapped_text)
 
-        # Arabic text with proper indentation and different title colors
-        print(Style.BRIGHT + Fore.RED + "\nSimple Arabic:" + Style.BRIGHT + Fore.WHITE)
-        print("    " + ayah.arabic_simple)
+        # 1. Arabic Text
+        print(Style.BRIGHT + Fore.RED + "Arabic:" + Style.NORMAL + Fore.WHITE)
+        print("    " + ayah.content) # Assumes content was processed by fix_arabic_text
 
-        print(Style.BRIGHT + Fore.RED + "\nUthmani Script:" + Style.BRIGHT + Fore.WHITE)
-        print("    " + ayah.arabic_uthmani)
+        # 2. Transliteration
+        print(Style.BRIGHT + Fore.CYAN + "\nTransliteration:" + Style.NORMAL + Fore.WHITE)
+        wrapped_translit = self.wrap_text(ayah.transliteration, self.term_size.columns - 4)
+        for line in wrapped_translit.split('\n'):
+             print("    " + line)
 
+        # --- 3. ADD Urdu Translation ---
+        if ayah.translation_ur: # Only display if Urdu text exists
+            print(Style.BRIGHT + Fore.MAGENTA + "\nUrdu Translation:" + Style.NORMAL + Fore.WHITE)
+            # Apply BiDi formatting to Urdu text
+            formatted_urdu = self.data_handler.fix_arabic_text(ayah.translation_ur)
+            # Wrap and indent Urdu text
+            wrapped_urdu = self.wrap_text(formatted_urdu, self.term_size.columns - 4)
+            for line in wrapped_urdu.split('\n'):
+                 print("    " + line)
+        # --- END ADD Urdu Translation ---
+
+        # --- 4. English Translation (Now below Urdu) ---
+        print(Style.BRIGHT + Fore.YELLOW + "\nEnglish Translation:" + Style.NORMAL + Fore.WHITE)
+        cached_translation = ayah.text
+        wrapped_translation = self.wrap_text(cached_translation, self.term_size.columns - 4)
+        for line in wrapped_translation.split('\n'):
+             print("    " + line)
+
+        # Separator
         print(Style.BRIGHT + Fore.GREEN + "\n" + "-" * min(40, self.term_size.columns))
+
 
     def wrap_text(self, text: str, width: int) -> str:
         """Wrap text to specified width"""
@@ -841,12 +949,15 @@ class UI:
 
 
     def display_subtitle_menu(self, surah_info: SurahInfo):
-        """Handles the subtitle creation process, saving to Documents."""
+        """Handles the subtitle creation process, saving to Documents,
+        with a redesigned settings confirmation menu."""
         try:
             surah_number = surah_info.surah_number
-            total_ayah = surah_info.total_ayah
+            total_ayah = surah_info.total_verses
+            start_ayah = None
+            end_ayah = None
 
-            # Ayah range input loop
+            # --- Ayah range input loop (remains the same) ---
             while True:
                 try:
                     self.clear_terminal()
@@ -855,11 +966,12 @@ class UI:
                     start_ayah_str = input(Fore.RED + "│ ❯ " + Fore.WHITE)
                     print(Fore.RED + "├──╼ " + Fore.MAGENTA + "End Ayah" + ":\n", end="")
                     end_ayah_str = input(Fore.RED + "│ ❯ " + Fore.WHITE)
-                    start_ayah = int(start_ayah_str)
-                    end_ayah = int(end_ayah_str)
-                    ayah_duration = 5.0 # Default duration
-                    if 1 <= start_ayah <= end_ayah <= total_ayah:
-                        break
+                    temp_start_ayah = int(start_ayah_str)
+                    temp_end_ayah = int(end_ayah_str)
+                    if 1 <= temp_start_ayah <= temp_end_ayah <= total_ayah:
+                        start_ayah = temp_start_ayah
+                        end_ayah = temp_end_ayah
+                        break # Valid range entered
                     else:
                         print(Fore.RED + "└──╼ " + Style.BRIGHT + "Invalid ayah range. Please try again.")
                         time.sleep(1.5)
@@ -869,25 +981,108 @@ class UI:
                 except KeyboardInterrupt:
                     print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
                     return
+            # --- End Ayah range input loop ---
 
-            # Generate SRT content
-            srt_content = self.generate_srt_content(surah_number, start_ayah, end_ayah, ayah_duration)
+            # --- Redesigned Settings Confirmation Loop ---
+            while True:
+                self.clear_terminal()
+                box_width = 55 # Adjust as needed
+                separator = "─" * box_width
+
+                # --- REDESIGNED HEADER ---
+                print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "🎬 Confirm Subtitle Content & Generate")
+                print(Fore.RED + f"│ {Fore.WHITE}Surah:{Fore.CYAN} {surah_info.surah_name} ({surah_info.surah_number})")
+                print(Fore.RED + f"│ {Fore.WHITE}Ayahs:{Fore.CYAN} {start_ayah}-{end_ayah}")
+                print(Fore.RED + "├" + separator) # Use full separator
+
+                # --- Display Current Subtitle Settings Clearly ---
+                print(Fore.RED + f"│ {Fore.YELLOW}Current Content Configuration:")
+                subtitle_config = self.preferences.get("subtitle_config", {})
+
+                # Define content parts with labels
+                content_parts_info = [
+                    ("Arabic Ayah", True, Fore.GREEN), # Arabic is always included
+                    ("Transliteration", subtitle_config.get("include_transliteration", False), Fore.CYAN),
+                    ("Urdu Translation", subtitle_config.get("include_urdu", False), Fore.MAGENTA),
+                    ("English Translation", subtitle_config.get("include_english", False), Fore.YELLOW),
+                ]
+
+                for label, enabled, color in content_parts_info:
+                    status = Fore.GREEN + "✓ Included" if enabled else Fore.RED + "✗ Excluded"
+                    print(Fore.RED + f"│   • {color}{label.ljust(25)} {status}")
+
+                print(Fore.RED + "├" + separator) # Use full separator
+
+                # --- Redesigned Options with Numbers ---
+                print(Fore.RED + f"│ {Fore.WHITE}Choose an action:")
+                print(Fore.RED + f"│   • {Fore.CYAN}1{Fore.WHITE}: Generate SRT with current settings")
+                print(Fore.RED + f"│   • {Fore.CYAN}2{Fore.WHITE}: Change Content Settings")
+                print(Fore.RED + f"│   • {Fore.CYAN}3{Fore.WHITE}: Cancel (Back to Main Menu)")
+                print(Fore.RED + "╰" + separator)
+
+                # --- Helper Text ---
+                print(Style.DIM + Fore.WHITE + "\n  Enter the number corresponding to your choice.")
+
+                try:
+                    confirm_choice = input(f"\n{Fore.BLUE}Enter choice (1-3): {Fore.WHITE}").strip()
+
+                    if confirm_choice == '1': # Generate
+                        # Proceed to generate using current subtitle_config
+                        break # Exit settings confirmation loop
+                    elif confirm_choice == '2': # Settings
+                        # Open settings menu (assuming _display_subtitle_settings_menu is okay)
+                        self._display_subtitle_settings_menu()
+                        # Loop back to show this confirmation screen again
+                        continue
+                    elif confirm_choice == '3': # Cancel
+                        print(Fore.YELLOW + "Subtitle generation cancelled.")
+                        time.sleep(1)
+                        return # Return directly to main app menu
+                    else:
+                        print(Fore.RED + "Invalid choice. Please enter 1, 2, or 3.")
+                        time.sleep(1)
+
+                except KeyboardInterrupt:
+                    print(Fore.YELLOW + "\nGeneration cancelled.")
+                    return # Return to main app menu
+                except Exception as e:
+                    print(Fore.RED + f"Error in confirmation menu: {e}")
+                    time.sleep(1)
+            # --- End Redesigned Settings Confirmation Loop ---
+
+            # --- Generate SRT content ---
+            final_subtitle_config = self.preferences.get("subtitle_config", {})
+            # Build a string representation for the final feedback message
+            final_content_parts = ["Arabic"]
+            if final_subtitle_config.get("include_transliteration"): final_content_parts.append("Translit")
+            if final_subtitle_config.get("include_urdu"): final_content_parts.append("Urdu")
+            if final_subtitle_config.get("include_english"): final_content_parts.append("English")
+            final_config_str = " + ".join(final_content_parts)
+
+            print(f"\n{Fore.YELLOW}⏳ Generating SRT file ({final_config_str})...{Style.RESET_ALL}")
+            ayah_duration = 5.0 # Default duration
+            srt_content = self.generate_srt_content(
+                surah_number, start_ayah, end_ayah, ayah_duration, final_subtitle_config
+            )
+            # --- End Generate ---
+
             if not srt_content:
                 print(Fore.RED + "❌ Failed to generate SRT content. Returning.")
+                time.sleep(2)
                 return
 
-            # Determine Save Path using platformdirs
+            # --- File Saving Logic (remains the same) ---
             try:
                 documents_dir = platformdirs.user_documents_dir()
                 quran_dir = os.path.join(documents_dir, "QuranCLI Subtitles")
                 surah_dir = os.path.join(quran_dir, surah_info.surah_name)
-                os.makedirs(surah_dir, exist_ok=True) # Ensure directories exist
+                os.makedirs(surah_dir, exist_ok=True)
             except Exception as e:
                 print(Fore.RED + f"\n❌ Error accessing Documents directory: {e}")
                 print(Fore.YELLOW + "Cannot save subtitle file.")
+                time.sleep(2)
                 return
 
-            # Create Filename and Save
             now = datetime.datetime.now()
             date_str = now.strftime("%Y-%m-%d")
             filename = f"Surah{surah_number:03d}_Ayah{start_ayah:03d}-{end_ayah:03d}_{date_str}.srt"
@@ -895,65 +1090,72 @@ class UI:
             try:
                 with open(filepath, "w", encoding="utf-8") as f:
                     f.write(srt_content)
-                print(Fore.GREEN + f"\n✅ Subtitle file saved to: {Fore.CYAN}{filepath}")
+                print(Fore.GREEN + f"\n✅ Subtitle file saved successfully!")
+                print(Fore.CYAN + f"   Location: {filepath}")
+                time.sleep(2) # Increased pause to see save location
             except Exception as e:
                 print(Fore.RED + f"\n❌ Error saving subtitle file: {e}")
+                time.sleep(2)
                 return
+            # --- End File Saving Logic ---
 
-            # --- Get Bundled Web Assets Path using get_app_path ---
+
+            # --- Web Server Setup (remains the same) ---
             web_assets_dir = None
             try:
-                # Use writable=False (default) to get path relative to _MEIPASS/script root
                 web_assets_dir = get_app_path('core/web')
                 if not os.path.exists(os.path.join(web_assets_dir, 'index.html')):
-                     print(Fore.RED + "\n❌ Web server assets (index.html) not found!")
-                     web_assets_dir = None
+                    print(Fore.RED + "\n❌ Web server assets (index.html) not found!")
+                    web_assets_dir = None
             except Exception as e:
-                 print(Fore.RED + f"\n❌ Error finding web assets: {e}")
-                 web_assets_dir = None
-            # --- End Get Bundled Web Assets Path ---
+                print(Fore.RED + f"\n❌ Error finding web assets: {e}")
+                web_assets_dir = None
 
-            # Start Server (if assets found)
             PORT = 8000
             ip_address = self.get_primary_ip_address()
             server_running = False
             if web_assets_dir and ip_address:
-                print(Fore.GREEN + f"\nStarting web server to share subtitles...")
                 self.start_server_thread(surah_dir, web_assets_dir, PORT, surah_info.surah_name)
-                # Small delay to allow server thread to potentially print errors
                 time.sleep(0.5)
-                # Check if server actually started (httpd attribute would be set)
-                if self.httpd:
-                    server_running = True
-                else:
-                    print(Fore.YELLOW + "Web server failed to start (check console for errors).")
-
-            else:
-                 print(Fore.YELLOW + "\nWeb server cannot be started (Assets missing or IP not found).")
+                if self.httpd: server_running = True
+                else: print(Fore.YELLOW + "Web server failed to start.")
+            else: print(Fore.YELLOW + "\nWeb server cannot be started (missing assets or IP).")
+            # --- End Web Server Setup ---
 
 
-            # Management Console Loop
+            # --- Management Console Loop (Show generated content info) ---
             while True:
                 self.clear_terminal()
                 print(Fore.RED + Style.BRIGHT + "Subtitle Management Console:")
-                print(Fore.MAGENTA + f"      Subtitle generated for Surah {surah_info.surah_name}!")
+                print(Fore.MAGENTA + f"      Subtitle generated for Surah {surah_info.surah_name} ({start_ayah}-{end_ayah})")
+                # --- Display generated content format ---
+                # Construct current_config_str from subtitle_config
+                subtitle_config = self.preferences.get("subtitle_config", {})
+                current_config_parts = ["Arabic"]
+                if subtitle_config.get("include_transliteration"):
+                    current_config_parts.append("Translit")
+                if subtitle_config.get("include_urdu"):
+                    current_config_parts.append("Urdu")
+                if subtitle_config.get("include_english"):
+                    current_config_parts.append("English")
+                current_config_str = " + ".join(current_config_parts)
+
+                print(f"{Fore.CYAN}      Content Included: {Fore.GREEN}{current_config_str}")
+                # --- End Display ---
                 print(Fore.GREEN + f"\nFile saved in Documents folder:")
                 print(Fore.CYAN + f"      {filepath}")
 
+                # Web server info (remains same)
                 if server_running:
                     print(Fore.GREEN + f"\nShare link on your network:")
                     print(f"      🚀✨ " + Back.MAGENTA + Fore.WHITE + f" http://{ip_address}:{PORT} " + Style.RESET_ALL + " ✨🚀      ")
-                    print(Fore.WHITE + Style.DIM + "\n   Open this link in your browser to view and manage your subtitle files with a better UI.\n   You can also access it from your phone or any device connected to the same Wi-Fi network to download files easily.")
-                    
-                    print(Fore.CYAN + Style.BRIGHT + "\n📌 Next Steps: Adding Captions to your Video" + Fore.WHITE + Style.DIM + " (e.g., in CapCut) ")
-                    print("    1️⃣  Download the .srt subtitle file on your phone.")
-                    print("    2️⃣  Open CapCut and load your video.")
-                    print("    3️⃣  Go to the 'Captions' section.")
-                    print("    4️⃣  Click on 'Import Captions' and select the downloaded .srt file.")
-                    print("    5️⃣  The captions will be auto-added! 🎉 You can now adjust and sync them manually.")
+                    # ... (rest of web server info and capcut hint) ...
+                    print(Fore.WHITE + Style.DIM + "\n   Open this link in your browser or on your phone (same Wi-Fi)...")
+                    print(Fore.CYAN + Style.BRIGHT + "\n📌 CapCut Tip:" + Fore.WHITE + Style.DIM + " Download SRT -> Open CapCut -> Captions -> Import Captions.")
                 else:
                     print(Fore.YELLOW + "\nWeb sharing disabled/failed.")
 
+                # Commands (remains same)
                 box_width = 26
                 separator = "─" * box_width
                 print("\n" + Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📜 Available Commands")
@@ -970,16 +1172,15 @@ class UI:
                     continue
 
                 if user_input == 'open':
+                    # Folder opening logic (remains same)
                     try:
                         folder_to_open = os.path.normpath(surah_dir)
                         print(f"\nAttempting to open folder: {folder_to_open}")
                         if sys.platform == "win32": os.startfile(folder_to_open)
                         elif sys.platform == "darwin": subprocess.run(['open', folder_to_open], check=True)
                         else: subprocess.run(['xdg-open', folder_to_open], check=True)
-                    except FileNotFoundError:
-                         print(Fore.RED + f"❌ Error: Could not find command to open folder.")
-                    except Exception as e:
-                        print(Fore.RED + f"❌ Error opening folder: {e}")
+                    except FileNotFoundError: print(Fore.RED + f"❌ Error: Could not find command to open folder.")
+                    except Exception as e: print(Fore.RED + f"❌ Error opening folder: {e}")
                     input(Fore.YELLOW + "\nPress Enter to continue...") # Pause
 
                 elif user_input == 'back':
@@ -988,9 +1189,13 @@ class UI:
                 else:
                     print(Fore.RED + "❌ Invalid Command.")
                     time.sleep(1)
+            # --- End Management Console Loop ---
 
         except Exception as e:
             print(Fore.RED + f"\n❌ An unexpected error occurred in subtitle menu: {e}")
+            # Optional: Add traceback for debugging
+            # import traceback
+            # traceback.print_exc()
             self.stop_server() # Attempt cleanup
             input(Fore.YELLOW + "\nPress Enter to return to main menu...")
 
@@ -1172,22 +1377,53 @@ class UI:
 
 
 
-    def generate_srt_content(self, surah_number: int, start_ayah: int, end_ayah: int, ayah_duration: float) -> str:
-        """Generates the SRT content with original Arabic text."""
+    def generate_srt_content(self, surah_number: int, start_ayah: int, end_ayah: int, ayah_duration: float, config: dict) -> str:
+        """Generates the SRT content based on the provided configuration,
+        applying letter reshaping to Urdu and ordering content as:
+        Arabic -> Transliteration -> Urdu -> English."""
         try:
-            ayahs = self.data_handler.get_ayahs_raw(surah_number, start_ayah, end_ayah)  # Use raw ayahs
+            ayahs = self.data_handler.get_ayahs_raw(surah_number, start_ayah, end_ayah)
+            if not ayahs:
+                print(Fore.RED + f"Error: No ayah data found for SRT generation {surah_number}:{start_ayah}-{end_ayah}.")
+                return ""
+
             srt_content = ""
             start_time = 0.0
+
+            include_urdu = config.get("include_urdu", False)
+            include_english = config.get("include_english", False)
+            include_translit = config.get("include_transliteration", False)
 
             for i, ayah in enumerate(ayahs):
                 end_time = start_time + ayah_duration
                 srt_content += f"{i+1}\n"
                 srt_content += f"{self.format_time_srt(start_time)} --> {self.format_time_srt(end_time)}\n"
-                srt_content += f"{ayah.arabic_uthmani}\n"  # Use raw Arabic text
-                srt_content += f"{ayah.text}\n\n"  # English Translation
+
+                # 1. Always include Arabic (Ayah)
+                srt_content += f"{ayah.content}\n"
+
+                # --- REORDERED: 2. Conditionally include Transliteration ---
+                if include_translit and ayah.transliteration:
+                    srt_content += f"{ayah.transliteration}\n"
+
+                # --- REORDERED: 3. Conditionally include Urdu (Translation) ---
+                if include_urdu and ayah.translation_ur:
+                    try:
+                        reshaped_urdu_srt = arabic_reshaper.reshape(ayah.translation_ur)
+                        srt_content += f"{reshaped_urdu_srt}\n"
+                    except Exception as reshape_err:
+                        print(Fore.YELLOW + f"Warning: Could not reshape Urdu text for ayah {ayah.number}: {reshape_err}")
+                        srt_content += f"{ayah.translation_ur}\n" # Fallback
+
+                # --- REORDERED: 4. Conditionally include English (Translation) ---
+                if include_english and ayah.text:
+                    srt_content += f"{ayah.text}\n"
+
+                # Add final newline for separation
+                srt_content = srt_content.rstrip('\n') + "\n\n"
                 start_time = end_time
 
-            return srt_content
+            return srt_content.strip()
 
         except Exception as e:
             print(Fore.RED + f"\nError generating SRT content: {e}")
