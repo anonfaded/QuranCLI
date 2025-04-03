@@ -1,7 +1,10 @@
-qurancli (1.1.0) stable; urgency=medium
+qurancli (1.2.0) stable; urgency=medium
 
-  * Incremented version number to 1.1.0.
-  * Fixed issue with get_app_path on non-Windows platforms.
-  * Minor bug fixes and improvements.
+  * Version bumped to 1.2.0.
+  * Added commands: `theme` (change ASCII banner) and `readme` (show developer notes).
+  * New reciter: Shiekh Mohammad Al Luhaidan.
+  * Translation enhancements: Added Urdu translation and full transliteration.
+  * SRT options: Users can choose to include/exclude English, Urdu translations, and transliteration.
+  * Command Alias: Run the app via the `qurancli` command.
 
  -- FadSec Lab <fadedhood@proton.me>  Mon, 01 Apr 2025 12:00:00 +0000
