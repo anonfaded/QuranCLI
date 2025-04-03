@@ -1,5 +1,6 @@
 # Quran-CLI.py
 
+import re
 import sys
 import os
 import platformdirs
@@ -527,21 +528,32 @@ class QuranApp:
                 # Clear terminal and display header before prompt
                 self._clear_terminal()
                 self._display_header()
-                box_width = 26  # Adjust width if needed
-                separator = "─" * box_width
+                # List of commands with their descriptions
+                commands = [
+                    (f"{Fore.CYAN}1-114{Fore.WHITE}", "Select Surah by number"),
+                    (f"{Fore.CYAN}Surah Name{Fore.WHITE}", f"Search Surah {Style.DIM}{Fore.WHITE}(e.g., 'Rahman')"),
+                    (f"{Fore.CYAN}list{Fore.WHITE}", "Display list of Surahs"),
+                    (f"{Fore.CYAN}sub{Fore.WHITE}", "Create subtitles for Ayahs"),
+                    (f"{Fore.CYAN}clearaudio{Fore.WHITE}", "Clear audio cache"),
+                    (f"{Fore.CYAN}info{Fore.WHITE}", "Show help and information"),
+                    (f"{Fore.CYAN}theme{Fore.WHITE}", "Change ASCII art color"),
+                    (f"{Fore.RED}readme{Fore.WHITE}", "View Notes by the developer & Updates"),
+                    (f"{Fore.CYAN}quit{Fore.WHITE}", "Exit the application")
+                ]
 
-                # Descriptive command list with colors
+                # Adjust this value to set the width of the command column
+                command_width = 20
+
+                # Header
                 print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📜 Available Commands")
-                print(Fore.RED + f"│ • {Fore.CYAN}1-114{Fore.WHITE}: Select Surah by number")
-                print(Fore.RED + f"│ • {Fore.CYAN}Surah Name{Fore.WHITE}: Search Surah {Style.DIM}(e.g., 'Rahman')")
-                print(Fore.RED + f"│ • {Fore.CYAN}list{Fore.WHITE}: Display list of Surahs")
-                print(Fore.RED + f"│ • {Fore.CYAN}sub{Fore.WHITE}: Create subtitles for Ayahs")
-                print(Fore.RED + f"│ • {Fore.CYAN}clearaudio{Fore.WHITE}: Clear audio cache")
-                print(Fore.RED + f"│ • {Fore.CYAN}info{Fore.WHITE}: Show help and information")
-                print(Fore.RED + f"│ • {Fore.CYAN}theme{Fore.WHITE}: Change ASCII art color")
-                print(Fore.RED + f"│ • {Fore.RED}readme{Fore.WHITE}: View Notes by the developer & Updates")
-                print(Fore.RED + f"│ • {Fore.CYAN}quit{Fore.WHITE}: Exit the application")
-                print(Fore.RED + "╰" + separator)
+
+                # Print each command with aligned descriptions
+                for cmd, desc in commands:
+                    # The colon will be aligned at the same column for every command
+                    print(Fore.RED + f"│ • {cmd:<{command_width}} : {desc}")
+
+                # Footer line (adjust the length as needed)
+                print(Fore.RED + "╰" + "─" * (command_width + 25))
                     
                     
                 # Helper Text
