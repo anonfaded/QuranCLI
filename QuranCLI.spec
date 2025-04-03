@@ -13,7 +13,8 @@ icon_file = 'core/icon.ico' # Icon in the root directory
 datas = [
     ('core/web', 'core/web'),  # Bundle the web server assets
     ('README_APP.txt', '.'),
-    ('core/database/quran-translation-and-transliteration.json', 'core/database')
+    ('core/database/quran-translation-and-transliteration.json', 'core/database'),
+    ('core/database/quran_ur.json', 'core/database')
 ]
 
 # --- Hidden Imports ---

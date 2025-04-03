@@ -305,50 +305,40 @@ class UI:
                     return
 
     def display_single_ayah(self, ayah: Ayah):
-        """Display a single ayah with Arabic, Transliteration, and Translation
-           (Translation now sourced from cached data)."""
+        """Display a single ayah with Arabic, Transliteration, Urdu, and English."""
         print(Style.BRIGHT + Fore.GREEN + f"\n[{ayah.number}]")
 
-        # 1. Arabic Text (Remains the same - uses ayah.content from local DB)
+        # 1. Arabic Text
         print(Style.BRIGHT + Fore.RED + "Arabic:" + Style.NORMAL + Fore.WHITE)
         print("    " + ayah.content) # Assumes content was processed by fix_arabic_text
 
-        # 2. Transliteration (Remains the same - uses ayah.transliteration from local DB)
+        # 2. Transliteration
         print(Style.BRIGHT + Fore.CYAN + "\nTransliteration:" + Style.NORMAL + Fore.WHITE)
         wrapped_translit = self.wrap_text(ayah.transliteration, self.term_size.columns - 4)
         for line in wrapped_translit.split('\n'):
              print("    " + line)
 
-        # --- 3. Display English Translation from Cache ---
-        print(Style.BRIGHT + Fore.YELLOW + "\nTranslation:" + Style.NORMAL + Fore.WHITE)
-        # Directly use ayah.text which comes from the cache
-        cached_translation = ayah.text
-        # --- REMOVE FOOTNOTE PARSING LOGIC ---
-        # raw_translation = ayah.translation_eng # Old field
-        # main_translation = raw_translation
-        # notes = None
-        # ... (all the regex and splitting logic removed) ...
-        # cleaned_main_translation = re.sub(r'([\w—.,;:’])(\d+)', r'\1', main_translation)
-        # --- END REMOVE FOOTNOTE PARSING ---
+        # --- 3. ADD Urdu Translation ---
+        if ayah.translation_ur: # Only display if Urdu text exists
+            print(Style.BRIGHT + Fore.MAGENTA + "\nUrdu Translation:" + Style.NORMAL + Fore.WHITE)
+            # Apply BiDi formatting to Urdu text
+            formatted_urdu = self.data_handler.fix_arabic_text(ayah.translation_ur)
+            # Wrap and indent Urdu text
+            wrapped_urdu = self.wrap_text(formatted_urdu, self.term_size.columns - 4)
+            for line in wrapped_urdu.split('\n'):
+                 print("    " + line)
+        # --- END ADD Urdu Translation ---
 
-        # Wrap and indent the translation from the cache
+        # --- 4. English Translation (Now below Urdu) ---
+        print(Style.BRIGHT + Fore.YELLOW + "\nEnglish Translation:" + Style.NORMAL + Fore.WHITE)
+        cached_translation = ayah.text
         wrapped_translation = self.wrap_text(cached_translation, self.term_size.columns - 4)
         for line in wrapped_translation.split('\n'):
              print("    " + line)
 
-        # --- REMOVE NOTES DISPLAY SECTION ---
-        # if notes:
-        #     print(Style.DIM + Fore.WHITE + "\n    Notes:" + Style.RESET_ALL)
-        #     cleaned_notes = re.sub(r'^(\d+)\s*', '', notes).strip()
-        #     if cleaned_notes:
-        #         wrapped_notes = self.wrap_text(cleaned_notes, self.term_size.columns - 8)
-        #         for line in wrapped_notes.split('\n'):
-        #              print(Style.DIM + "        " + line + Style.RESET_ALL)
-        # --- END REMOVE NOTES DISPLAY ---
-
-
         # Separator
         print(Style.BRIGHT + Fore.GREEN + "\n" + "-" * min(40, self.term_size.columns))
+
 
     def wrap_text(self, text: str, width: int) -> str:
         """Wrap text to specified width"""

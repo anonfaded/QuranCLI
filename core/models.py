@@ -23,11 +23,10 @@ class SurahInfo(BaseModel):
     audio: Dict[str, Dict[str, str]]
 
 class Ayah(BaseModel):
-    number: int             # The ayah number within the surah (e.g., 1, 2, 3...)
-    content: str            # The primary Arabic text (Uthmani script from NEW local DB)
-    transliteration: str    # Transliteration from the NEW local DB
-    text: str               # English Translation from the OLD CACHED data (quran_data.json)
-
-    # --- REMOVED ---
-    # translation_eng: str    # No longer needed as we use 'text' from cache
-    # --- END REMOVED ---
+    number: int
+    content: str            # Arabic text (from local DB)
+    transliteration: str    # Transliteration (from local DB)
+    text: str               # English Translation (from CACHE)
+    # --- ADD THIS FIELD ---
+    translation_ur: str     # Urdu Translation (from new urdu DB)
+    # --- END ADD ---

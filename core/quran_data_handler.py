@@ -39,6 +39,8 @@ except ImportError:
 
 class QuranDataHandler:
     DATABASE_FILENAME = "core/database/quran-translation-and-transliteration.json"
+    # --- ADD URDU DB FILENAME ---
+    URDU_DATABASE_FILENAME = "core/database/quran_ur.json"
 
     def __init__(self, cache: QuranCache):
         """
@@ -48,7 +50,9 @@ class QuranDataHandler:
             cache: The QuranCache instance (used ONLY for accessing downloaded audio URLs).
         """
         self.cache = cache # Keep cache reference for audio URLs
-        self.quran_db = self._load_quran_database() # Load the new local DB
+        self.quran_db = self._load_quran_database(self.DATABASE_FILENAME, "main") # Load the new local DB
+        # --- ADD URDU DB LOADING ---
+        self.urdu_db = self._load_quran_database(self.URDU_DATABASE_FILENAME, "Urdu")
 
         # --- ADDED arabic_reversed flag and related logic ---
         self.arabic_reversed = False
@@ -60,31 +64,28 @@ class QuranDataHandler:
         import time
         time.sleep(0.7) # Brief pause to see feedback
     
-    def _load_quran_database(self) -> Optional[Dict]:
-        """Loads the Quran data from the local JSON database file."""
+    def _load_quran_database(self, db_filename: str, db_name: str = "database") -> Optional[Dict]:
+        """Loads Quran data from a specified local JSON database file."""
         try:
-            # Use get_app_path to locate the database file correctly
-            # writable=False ensures it looks inside _MEIPASS or relative to script
-            db_path = get_app_path(self.DATABASE_FILENAME, writable=False)
+            db_path = get_app_path(db_filename, writable=False)
 
             if not os.path.exists(db_path):
-                print(f"{Fore.RED}Fatal Error: Quran database not found at {db_path}{Style.RESET_ALL}", file=sys.stderr)
-                return None # Indicate failure
+                print(f"{Fore.RED}Fatal Error: Quran {db_name} database not found at {db_path}{Style.RESET_ALL}", file=sys.stderr)
+                return None
 
             with open(db_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            print(f"{Fore.GREEN}Successfully loaded local Quran database.{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}Successfully loaded local Quran {db_name} database.{Style.RESET_ALL}")
             return data
 
         except json.JSONDecodeError as e:
-            print(f"{Fore.RED}Fatal Error: Failed to parse Quran database file ({db_path}): {e}{Style.RESET_ALL}", file=sys.stderr)
+            print(f"{Fore.RED}Fatal Error: Failed to parse Quran {db_name} database file ({db_path}): {e}{Style.RESET_ALL}", file=sys.stderr)
             return None
         except FileNotFoundError:
-            # This case is less likely now with os.path.exists, but good practice
-             print(f"{Fore.RED}Fatal Error: Quran database file not found ({db_path} does not exist).{Style.RESET_ALL}", file=sys.stderr)
+             print(f"{Fore.RED}Fatal Error: Quran {db_name} database file not found ({db_path} does not exist).{Style.RESET_ALL}", file=sys.stderr)
              return None
         except Exception as e:
-            print(f"{Fore.RED}Fatal Error: An unexpected error occurred loading the Quran database: {e}{Style.RESET_ALL}", file=sys.stderr)
+            print(f"{Fore.RED}Fatal Error: An unexpected error occurred loading the Quran {db_name} database: {e}{Style.RESET_ALL}", file=sys.stderr)
             return None
 
 
@@ -162,42 +163,44 @@ class QuranDataHandler:
              return None
 
     def get_ayahs(self, surah_number: int, start: int, end: int) -> List[Ayah]:
-        """Get ayahs combining local DB (Arabic, Translit) and Cache (English Translation)."""
-        if not self.quran_db:
-            print(f"{Fore.RED}Error: Local Quran database not loaded.{Style.RESET_ALL}", file=sys.stderr)
-            return []
+        """Get ayahs combining data from local DBs (Arabic, Translit, Urdu) and Cache (English)."""
+        if not self.quran_db: return [] # Main DB check
+        # Optional: Add check for self.urdu_db if Urdu is critical
+        # if not self.urdu_db: print(...) ; return []
 
         surah_key = str(surah_number)
         chapters = self.quran_db.get("chapters", {})
-        if surah_key not in chapters:
-            print(f"{Fore.RED}Error: Surah {surah_number} not found in local database.{Style.RESET_ALL}", file=sys.stderr)
-            return []
+        if surah_key not in chapters: return []
 
         db_verses_data = chapters[surah_key].get("verses", {})
         total_ayah_db = chapters[surah_key].get("total_verses", 0)
 
-        # --- Fetch cached data for English text ---
+        # --- Get Urdu Verses for this Surah (Handle potential errors) ---
+        urdu_verses_list = []
+        urdu_surah_index = surah_number - 1 # Urdu DB uses 0-based list index
+        if self.urdu_db and isinstance(self.urdu_db, list) and 0 <= urdu_surah_index < len(self.urdu_db):
+            urdu_surah_data = self.urdu_db[urdu_surah_index]
+            if isinstance(urdu_surah_data, dict):
+                 urdu_verses_list = urdu_surah_data.get("verses", [])
+            if not isinstance(urdu_verses_list, list):
+                 print(f"{Fore.YELLOW}Warning: Invalid 'verses' format in Urdu DB for Surah {surah_number}.{Style.RESET_ALL}", file=sys.stderr)
+                 urdu_verses_list = []
+        elif self.urdu_db: # Only warn if urdu_db was loaded but index was bad
+            print(f"{Fore.YELLOW}Warning: Surah {surah_number} not found or invalid structure in Urdu DB.{Style.RESET_ALL}", file=sys.stderr)
+        # --- End Urdu Verse Fetching ---
+
+        # Fetch cached data for English text (remains the same)
         cached_surah_data = self.cache.get_surah(surah_number)
         cached_english_texts = []
-        total_ayah_cache = 0
         if cached_surah_data:
             cached_english_texts = cached_surah_data.get("english", [])
-            total_ayah_cache = cached_surah_data.get("totalAyah", 0) # Get total ayah count from cache too
-            if not isinstance(cached_english_texts, list): # Basic type check
-                 print(f"{Fore.YELLOW}Warning: Invalid 'english' data type in cache for Surah {surah_number}. Expected list.{Style.RESET_ALL}", file=sys.stderr)
-                 cached_english_texts = []
-        else:
-            print(f"{Fore.YELLOW}Warning: Cached data not found for Surah {surah_number}. English translation will be unavailable.{Style.RESET_ALL}", file=sys.stderr)
+            if not isinstance(cached_english_texts, list): cached_english_texts = []
+        # else: # Warning printed below if needed
 
-        # Use the total ayah count from the *local DB* as the primary reference
-        total_ayah_ref = total_ayah_db
-        if total_ayah_db != total_ayah_cache and total_ayah_cache > 0:
-             print(f"{Fore.YELLOW}Warning: Mismatch in total ayah count for Surah {surah_number} (DB: {total_ayah_db}, Cache: {total_ayah_cache}). Using DB count.{Style.RESET_ALL}", file=sys.stderr)
-             # You might want a more robust strategy here depending on data source reliability
+        total_ayah_ref = total_ayah_db # Use main DB count as reference
+        # (Optional: Add warning if total_ayah count mismatches between DBs)
 
-        if not (1 <= start <= end <= total_ayah_ref):
-            print(f"{Fore.YELLOW}Warning: Invalid ayah range ({start}-{end}) for Surah {surah_number} (Total: {total_ayah_ref}){Style.RESET_ALL}", file=sys.stderr)
-            return []
+        if not (1 <= start <= end <= total_ayah_ref): return [] # Range check
 
         ayah_list = []
         for ayah_num in range(start, end + 1):
@@ -205,23 +208,29 @@ class QuranDataHandler:
             db_ayah_data = db_verses_data.get(ayah_key)
 
             # Get Arabic and Transliteration from local DB
-            arabic_content = ""
-            transliteration = ""
-            if db_ayah_data:
-                arabic_content = self.fix_arabic_text(db_ayah_data.get("content", "")) # Apply BiDi fix
-                transliteration = db_ayah_data.get("transliteration", "")
-            else:
-                print(f"{Fore.YELLOW}Warning: Ayah {surah_number}:{ayah_num} data missing in local DB.{Style.RESET_ALL}", file=sys.stderr)
+            arabic_content = self.fix_arabic_text(db_ayah_data.get("content", "")) if db_ayah_data else ""
+            transliteration = db_ayah_data.get("transliteration", "") if db_ayah_data else ""
 
-            # Get English from Cache (adjusting for 0-based index)
+            # Get English from Cache
             english_text = ""
             cache_index = ayah_num - 1
             if 0 <= cache_index < len(cached_english_texts):
                 english_text = cached_english_texts[cache_index]
-                if not isinstance(english_text, str): # Ensure it's a string
-                    english_text = str(english_text) # Attempt conversion
-            elif cached_surah_data: # Only warn if cache existed but index was out of bounds
-                print(f"{Fore.YELLOW}Warning: English text missing in cache for Ayah {surah_number}:{ayah_num}.{Style.RESET_ALL}", file=sys.stderr)
+                if not isinstance(english_text, str): english_text = str(english_text)
+            elif cached_surah_data: # Warn only if cache existed but index was out of bounds
+                 print(f"{Fore.YELLOW}Warning: English text missing in cache for Ayah {surah_number}:{ayah_num}.{Style.RESET_ALL}", file=sys.stderr)
+
+            # --- Get Urdu from Urdu DB ---
+            urdu_translation = ""
+            urdu_ayah_index = ayah_num - 1 # Urdu verses list is 0-based
+            if 0 <= urdu_ayah_index < len(urdu_verses_list):
+                urdu_ayah_data = urdu_verses_list[urdu_ayah_index]
+                if isinstance(urdu_ayah_data, dict):
+                    urdu_translation = urdu_ayah_data.get("translation", "")
+                if not isinstance(urdu_translation, str): urdu_translation = str(urdu_translation)
+            elif self.urdu_db: # Warn only if urdu_db was loaded but index was out of bounds
+                print(f"{Fore.YELLOW}Warning: Urdu translation missing in Urdu DB for Ayah {surah_number}:{ayah_num}.{Style.RESET_ALL}", file=sys.stderr)
+            # --- End Urdu Fetching ---
 
             # Construct Ayah model
             try:
@@ -229,7 +238,8 @@ class QuranDataHandler:
                     number=ayah_num,
                     content=arabic_content,
                     transliteration=transliteration,
-                    text=english_text # Use English from cache
+                    text=english_text,
+                    translation_ur=urdu_translation # Add Urdu text
                 ))
             except Exception as e:
                 print(f"{Fore.RED}Error creating Ayah object for {surah_number}:{ayah_num}: {e}{Style.RESET_ALL}", file=sys.stderr)
@@ -237,8 +247,7 @@ class QuranDataHandler:
         return ayah_list
 
     def get_ayahs_raw(self, surah_number: int, start: int, end: int) -> List[Ayah]:
-        """Get ayahs for SRT: local DB (RAW Arabic, Translit) and Cache (English Translation)."""
-        # This method is very similar to get_ayahs, differing only in not calling fix_arabic_text
+        """Get ayahs for SRT: Raw Arabic, Translit, Urdu (local DBs) + English (Cache)."""
         if not self.quran_db: return []
 
         surah_key = str(surah_number)
@@ -248,19 +257,23 @@ class QuranDataHandler:
         db_verses_data = chapters[surah_key].get("verses", {})
         total_ayah_db = chapters[surah_key].get("total_verses", 0)
 
-        # Fetch cached data for English text
+        # Get Urdu Verses (same logic as get_ayahs)
+        urdu_verses_list = []
+        urdu_surah_index = surah_number - 1
+        if self.urdu_db and isinstance(self.urdu_db, list) and 0 <= urdu_surah_index < len(self.urdu_db):
+            urdu_surah_data = self.urdu_db[urdu_surah_index]
+            if isinstance(urdu_surah_data, dict): urdu_verses_list = urdu_surah_data.get("verses", [])
+            if not isinstance(urdu_verses_list, list): urdu_verses_list = []
+        # else: # Warnings handled by get_ayahs if called first
+
+        # Fetch cached data for English text (same logic as get_ayahs)
         cached_surah_data = self.cache.get_surah(surah_number)
         cached_english_texts = []
-        total_ayah_cache = 0
         if cached_surah_data:
             cached_english_texts = cached_surah_data.get("english", [])
-            total_ayah_cache = cached_surah_data.get("totalAyah", 0)
             if not isinstance(cached_english_texts, list): cached_english_texts = []
-        # else: pass # Warning printed in get_ayahs if called
 
         total_ayah_ref = total_ayah_db
-        # if total_ayah_db != total_ayah_cache and total_ayah_cache > 0: pass # Warning printed in get_ayahs
-
         if not (1 <= start <= end <= total_ayah_ref): return []
 
         ayah_list = []
@@ -268,13 +281,9 @@ class QuranDataHandler:
             ayah_key = str(ayah_num)
             db_ayah_data = db_verses_data.get(ayah_key)
 
-            # Get RAW Arabic and Transliteration from local DB
-            raw_arabic_content = ""
-            transliteration = ""
-            if db_ayah_data:
-                raw_arabic_content = db_ayah_data.get("content", "") # DO NOT call fix_arabic_text
-                transliteration = db_ayah_data.get("transliteration", "")
-            # else: pass # Warning printed in get_ayahs
+            # Get RAW Arabic and Transliteration
+            raw_arabic_content = db_ayah_data.get("content", "") if db_ayah_data else ""
+            transliteration = db_ayah_data.get("transliteration", "") if db_ayah_data else ""
 
             # Get English from Cache
             english_text = ""
@@ -282,18 +291,26 @@ class QuranDataHandler:
             if 0 <= cache_index < len(cached_english_texts):
                 english_text = cached_english_texts[cache_index]
                 if not isinstance(english_text, str): english_text = str(english_text)
-            # elif cached_surah_data: pass # Warning printed in get_ayahs
+
+            # Get Urdu from Urdu DB
+            urdu_translation = ""
+            urdu_ayah_index = ayah_num - 1
+            if 0 <= urdu_ayah_index < len(urdu_verses_list):
+                urdu_ayah_data = urdu_verses_list[urdu_ayah_index]
+                if isinstance(urdu_ayah_data, dict): urdu_translation = urdu_ayah_data.get("translation", "")
+                if not isinstance(urdu_translation, str): urdu_translation = str(urdu_translation)
 
             # Construct Ayah model
             try:
                 ayah_list.append(Ayah(
                     number=ayah_num,
-                    content=raw_arabic_content, # Use RAW Arabic
+                    content=raw_arabic_content, # RAW Arabic
                     transliteration=transliteration,
-                    text=english_text # Use English from cache
+                    text=english_text,
+                    translation_ur=urdu_translation
                 ))
             except Exception as e:
-                print(f"{Fore.RED}Error creating raw Ayah object for {surah_number}:{ayah_num}: {e}{Style.RESET_ALL}", file=sys.stderr)
+                 print(f"{Fore.RED}Error creating raw Ayah object for {surah_number}:{ayah_num}: {e}{Style.RESET_ALL}", file=sys.stderr)
 
         return ayah_list
 
