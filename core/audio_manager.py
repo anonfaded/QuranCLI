@@ -41,13 +41,13 @@ class AudioManager:
                 # Windows: Save next to executable
                 self.audio_dir = Path(get_app_path('audio_cache', writable=True))
                 # get_app_path(writable=True) ensures directory exists
-                print(f"DEBUG: Audio cache path (Win): {self.audio_dir}") # Optional debug
+                # print(f"DEBUG: Audio cache path (Win): {self.audio_dir}") # Optional debug
             else:
                 # Linux/macOS: Use user's cache directory
                 cache_base_dir = platformdirs.user_cache_dir(APP_NAME, APP_AUTHOR)
                 self.audio_dir = Path(cache_base_dir) / 'audio_cache'
                 os.makedirs(self.audio_dir, exist_ok=True) # Ensure directory exists
-                print(f"DEBUG: Audio cache path (Unix): {self.audio_dir}") # Optional debug
+                # print(f"DEBUG: Audio cache path (Unix): {self.audio_dir}") # Optional debug
 
         except Exception as e_path:
             print(f"{Fore.RED}Critical Error determining audio cache path: {e_path}")
