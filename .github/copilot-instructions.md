@@ -16,4 +16,4 @@
 - **No buggy code**: Ensure all code is correct, tested, and free of obvious bugs.
 - **Keep responses concise**: Avoid unnecessary explanations or code.
 - **Complete**: If methods are not too long then give complete method codeblocks with fixes.
-- **Multiplatform**: Our app is for windows and linux systems so always handle cases for both together in a very robust way.
+- **Multiplatform Support**: Our app is for windows and linux systems so always handle cases for both together in a very robust way.
