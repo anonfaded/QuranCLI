@@ -19,3 +19,4 @@
 - **Multiplatform Support**: Our app is for windows and linux systems so always handle cases for both together in a very robust way.
 - **Error handling**: Have proper error handling for each step with debug prints where necessary so we can easily catch bugs.
 - **Proper Indentation**: Add proper indentation spaces according to the current file format like if a method is in a class then it should have correct indentation and not just start directly.
+- **No Duplication**: Don't add duplicate code first check if we already have such code, also don't add import statements inside the method instead keep it all at top of the file.
