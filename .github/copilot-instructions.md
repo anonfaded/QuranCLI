@@ -9,7 +9,7 @@
 
 # -------------- Fix Start for this method(method_name)-----------
 ...changes here...
-# -------------- Fix Ended for this method------------------------
+# -------------- Fix Ended for this method(method_name)-----------
 
 
 - **Ask for clarification**: If requirements are unclear, ask the user before proceeding.
@@ -17,3 +17,4 @@
 - **Keep responses concise**: Avoid unnecessary explanations or code.
 - **Complete**: If methods are not too long then give complete method codeblocks with fixes.
 - **Multiplatform Support**: Our app is for windows and linux systems so always handle cases for both together in a very robust way.
+- **Error handling**: Have proper error handling for each step with debug prints where necessary so we can easily catch bugs.
