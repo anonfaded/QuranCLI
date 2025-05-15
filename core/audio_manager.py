@@ -87,11 +87,12 @@ class AudioManager:
         return self.audio_dir / f"surah_{surah_num}_reciter_{safe_reciter}.mp3"
 
 
-    # -------------- Fix Start for this method(download_audio)-----------
+# -------------- Fix Start for this method(download_audio)-----------
     async def download_audio(self, url: str, surah_num: int, reciter: str, max_retries: int = 5, fallback_url: str = None) -> Optional[Path]:
         """
         Download audio file with resume support and retry handling.
-        Uses correct URL validation for Muhammad Al Luhaidan (quranicaudio.com).
+        Uses correct URL validation for Muhammad Al Luhaidan (quranicaudio.com) and
+        for surahs 2, 6, and 112, uses the GitHub fallback URL.
         Cleans up any leftover .tmp file before starting a new download for a surah/reciter.
         Handles multiplatform (Windows/Linux) robustly.
         """
@@ -102,9 +103,17 @@ class AudioManager:
             print(f"{Fore.RED}Audio directory not set. Cannot download audio.")
             return None
 
-        # --- Correct URL validation for Muhammad Al Luhaidan ---
+        # --- Special handling for Muhammad Al Luhaidan missing surahs ---
         is_luhaidan = reciter == "Muhammad Al Luhaidan"
-        if is_luhaidan and "download.quranicaudio.com/quran/muhammad_alhaidan" not in url:
+        github_missing_surahs = {2, 6, 112}
+        padded_surah = str(surah_num).zfill(3)
+        github_url = f"https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/muhammad_al_luhaidan/muhammad-al-luhaidan-{padded_surah}.mp3"
+
+        # If Luhaidan and surah is missing, override url and fallback_url
+        if is_luhaidan and surah_num in github_missing_surahs:
+            url = github_url
+            fallback_url = None
+        elif is_luhaidan and "download.quranicaudio.com/quran/muhammad_alhaidan" not in url:
             print(f"{Fore.RED}Error: Invalid URL format for Muhammad Al Luhaidan recitation.{Style.RESET_ALL}")
             return None
 
@@ -245,7 +254,7 @@ class AudioManager:
         if not result:
             temp_file.unlink(missing_ok=True)
         return result
-    # -------------- Fix Ended for this method(download_audio)-----------
+# -------------- Fix Ended for this method(download_audio)-----------
 
 
     # Ensure they check self.mixer_initialized before using pygame.mixer
