@@ -18,3 +18,4 @@
 - **Complete**: If methods are not too long then give complete method codeblocks with fixes.
 - **Multiplatform Support**: Our app is for windows and linux systems so always handle cases for both together in a very robust way.
 - **Error handling**: Have proper error handling for each step with debug prints where necessary so we can easily catch bugs.
+- **Proper Indentation**: Add proper indentation spaces according to the current file format like if a method is in a class then it should have correct indentation and not just start directly.
