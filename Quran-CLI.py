@@ -465,6 +465,7 @@ class QuranApp:
             (Fore.YELLOW + "  ↳ Use Case", "Ideal for video editors needing Quran captions."),
             (Fore.YELLOW + "  ↳ How", "Creates timestamped Arabic/English text for import into editors (e.g., CapCut)."),
             (Fore.CYAN + "clearaudio", "Delete all downloaded audio files from the cache."),
+            (Fore.CYAN + "audiopath", "Show and open audio cache folder."),
             (Fore.CYAN + "reverse", "Toggle Arabic text display direction within the Ayah reader."),
             (Fore.YELLOW + "  ↳ Use Case", "Fixes display issues on some terminals where Arabic appears reversed."),
             (Fore.YELLOW + "  ↳ Note", "Copied text should generally be correct regardless of display."),
@@ -568,6 +569,7 @@ class QuranApp:
                     (f"{Fore.CYAN}list{Fore.WHITE}", "Display list of Surahs"),
                     (f"{Fore.CYAN}sub{Fore.WHITE}", "Create subtitles for Ayahs"),
                     (f"{Fore.CYAN}clearaudio{Fore.WHITE}", "Clear audio cache"),
+                    (f"{Fore.CYAN}audiopath{Fore.WHITE}", "Show and open audio cache folder"),
                     (f"{Fore.CYAN}info{Fore.WHITE}", "Show help and information"),
                     (f"{Fore.CYAN}theme{Fore.WHITE}", "Change ASCII art color"),
                     (f"{Fore.RED}readme{Fore.WHITE}", "View Notes by the developer & Updates"),
@@ -587,8 +589,7 @@ class QuranApp:
 
                 # Footer line (adjust the length as needed)
                 print(Fore.RED + "╰" + "─" * (command_width + 25))
-                    
-                    
+                
                 # Helper Text
                 print(Style.DIM + Fore.WHITE + "\nType any of the above commands and press Enter.")
 
@@ -625,6 +626,9 @@ class QuranApp:
                     continue # After subtitle, return to main
                 elif user_input == 'clearaudio':
                     self._clear_audio_cache()
+                    continue
+                elif user_input == 'audiopath':
+                    self._show_audio_cache_path()
                     continue
                 elif user_input == 'info': # Handle the 'info' command
                     self._display_info()
@@ -679,7 +683,6 @@ class QuranApp:
                 print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
                 break # Return to main menu immediately, *without exiting app*.
 
-    
     def _get_surah_number_for_subtitle(self) -> Optional[int]:
             """Helper function to get surah number specifically for subtitle generation."""
             while True:
@@ -791,6 +794,60 @@ class QuranApp:
             print(Fore.RED + f"Error while clearing audio cache: {e}")
             input(Fore.GREEN + "Press Enter to continue...")  # Pause
 
+    # -------------- Fix Start for this method(_show_audio_cache_path)-----------
+    def _show_audio_cache_path(self):
+        """
+        Print the audio cache directory path, number of audio files, and total size.
+        Offer to open it in the system file explorer (Windows/Linux robustly).
+        """
+        self._clear_terminal()
+        audio_cache_dir = self.audio_manager.audio_dir
+        print(f"{Fore.GREEN}Audio cache directory:{Fore.WHITE} {audio_cache_dir}\n")
+
+        # Count files and calculate total size
+        file_count = 0
+        total_size = 0
+        from pathlib import Path
+        try:
+            for f in Path(audio_cache_dir).glob("**/*"):
+                if f.is_file():
+                    file_count += 1
+                    try:
+                        total_size += f.stat().st_size
+                    except Exception as e:
+                        print(f"{Fore.YELLOW}Warning: Could not get size for {f}: {e}")
+        except Exception as e:
+            print(f"{Fore.RED}Error reading audio cache directory: {e}\n")
+
+        total_size_mb = total_size / (1024 * 1024)
+        print(f"{Fore.CYAN}Audio files: {file_count}   Total size: {total_size_mb:.2f} MB\n")
+        print(f"{Fore.YELLOW}This is where downloaded audio files are stored.\n")
+
+        try:
+            open_choice = input(f"{Fore.CYAN}Open this folder in your file explorer? (y/n): {Fore.WHITE}").strip().lower()
+            if open_choice in ['y', 'yes']:
+                if sys.platform == "win32":
+                    os.startfile(str(audio_cache_dir))
+                elif sys.platform == "darwin":
+                    subprocess.run(['open', str(audio_cache_dir)], check=False)
+                else:
+                    try:
+                        subprocess.run(['xdg-open', str(audio_cache_dir)], check=False)
+                    except Exception:
+                        for fm in ['nautilus', 'thunar', 'dolphin', 'pcmanfm']:
+                            if shutil.which(fm):
+                                subprocess.run([fm, str(audio_cache_dir)], check=False)
+                                break
+                        else:
+                            print(f"{Fore.RED}Could not open folder: No suitable file manager found.\n")
+                print(f"{Fore.GREEN}Opened folder in file explorer.\n")
+            else:
+                print(f"{Fore.YELLOW}Folder not opened. You can browse to the above path manually.\n")
+        except Exception as e:
+            print(f"{Fore.RED}Error opening folder: {e}\n")
+        print()
+        input(f"{Fore.GREEN}Press Enter to continue...")
+    # -------------- Fix Ended for this method(_show_audio_cache_path)-----------
 
 if __name__ == "__main__":
     # Wrap the entire app execution in a try-except block
