@@ -107,8 +107,12 @@ class QuranDataHandler:
             print(f"{Fore.YELLOW}Warning: Error processing Arabic text ('{text[:20]}...'): {e}{Style.RESET_ALL}", file=sys.stderr)
             return text # Return original text on error
 
+    # -------------- Fix Start for this method(get_surah_info)-----------
     def get_surah_info(self, surah_number: int) -> Optional[SurahInfo]:
-        """Get surah info from the local DB and audio info from the cache."""
+        """
+        Get surah info from the local DB and audio info from the cache.
+        Uses download.quranicaudio.com/quran/muhammad_alhaidan/ as the server for Muhammad Al Luhaidan reciter.
+        """
         if not self.quran_db:
             print(f"{Fore.RED}Error: Local Quran database not loaded.{Style.RESET_ALL}", file=sys.stderr)
             return None
@@ -121,32 +125,23 @@ class QuranDataHandler:
         db_data = self.quran_db["chapters"][surah_key]
 
         # --- Get Audio Data from the CACHED downloaded file ---
-        # This assumes QuranAPIClient still downloads the original structure
         cached_surah_data = self.cache.get_surah(surah_number)
+        padded_surah = str(surah_number).zfill(3)
+        luhaidan_url = f"https://download.quranicaudio.com/quran/muhammad_alhaidan/{padded_surah}.mp3"
         if cached_surah_data:
             audio_data = cached_surah_data.get("audio", {})
-            # Add Muhammad Al Luhaidan reciter logic (same as before)
-            padded_surah = str(surah_number).zfill(3)
-            luhaidan_url = f"https://server8.mp3quran.net/lhdan/{padded_surah}.mp3"
             audio_data["luhaidan"] = {
                 "reciter": "Muhammad Al Luhaidan",
                 "url": luhaidan_url
             }
         else:
-            # If cached data is missing (e.g., initial run failed download), provide empty audio dict
             print(f"{Fore.YELLOW}Warning: Cached data for Surah {surah_number} not found. Audio URLs may be unavailable.{Style.RESET_ALL}", file=sys.stderr)
             audio_data = {}
-            # Still add Luhaidan URL as a fallback if needed
-            padded_surah = str(surah_number).zfill(3)
-            luhaidan_url = f"https://server8.mp3quran.net/lhdan/{padded_surah}.mp3"
             audio_data["luhaidan"] = {
                 "reciter": "Muhammad Al Luhaidan",
                 "url": luhaidan_url
             }
-            # TODO: Consider if we need a mechanism to *trigger* a download if cache is missing here.
-            # For now, it relies on the initial check in QuranAPIClient.
 
-        # --- Construct SurahInfo using data from both sources ---
         try:
             return SurahInfo(
                 surah_name=db_data.get("surah_name", "Unknown"),
@@ -154,13 +149,14 @@ class QuranDataHandler:
                 translation=db_data.get("translation", "N/A"),
                 type=db_data.get("type", "Unknown"),
                 total_verses=db_data.get("total_verses", 0),
-                description=db_data.get("description", None), # Get description
+                description=db_data.get("description", None),
                 surah_number=surah_number,
-                audio=audio_data # Use audio data fetched from cache
+                audio=audio_data
             )
-        except Exception as e: # Catch potential Pydantic validation errors or others
-             print(f"{Fore.RED}Error creating SurahInfo for Surah {surah_number}: {e}{Style.RESET_ALL}", file=sys.stderr)
-             return None
+        except Exception as e:
+            print(f"{Fore.RED}Error creating SurahInfo for Surah {surah_number}: {e}{Style.RESET_ALL}", file=sys.stderr)
+            return None
+    # -------------- Fix Ended for this method(get_surah_info)-----------
 
     def get_ayahs(self, surah_number: int, start: int, end: int) -> List[Ayah]:
         """Get ayahs combining data from local DBs (Arabic, Translit, Urdu) and Cache (English)."""

@@ -86,151 +86,168 @@ class AudioManager:
         safe_reciter = safe_reciter.replace(' ', '_')
         return self.audio_dir / f"surah_{surah_num}_reciter_{safe_reciter}.mp3"
 
-    async def download_audio(self, url: str, surah_num: int, reciter: str, max_retries: int = 5) -> Optional[Path]:
-        """Download audio file with resume support and retry handling"""
-        if not self.mixer_initialized: return None # Skip download if mixer failed
-        if not self.audio_dir: # Check if path determination failed
-            print(f"{Fore.RED}Error: Audio directory not set, cannot download audio.{Style.RESET_ALL}")
+
+    # -------------- Fix Start for this method(download_audio)-----------
+    async def download_audio(self, url: str, surah_num: int, reciter: str, max_retries: int = 5, fallback_url: str = None) -> Optional[Path]:
+        """
+        Download audio file with resume support and retry handling.
+        Uses correct URL validation for Muhammad Al Luhaidan (quranicaudio.com).
+        Cleans up any leftover .tmp file before starting a new download for a surah/reciter.
+        Handles multiplatform (Windows/Linux) robustly.
+        """
+        if not self.mixer_initialized:
+            print(f"{Fore.RED}Audio system not initialized. Cannot download audio.")
+            return None
+        if not self.audio_dir:
+            print(f"{Fore.RED}Audio directory not set. Cannot download audio.")
             return None
 
-        # Special case for Muhammad Al Luhaidan - validate URL structure
+        # --- Correct URL validation for Muhammad Al Luhaidan ---
         is_luhaidan = reciter == "Muhammad Al Luhaidan"
-        if is_luhaidan and "server8.mp3quran.net/lhdan" not in url:
+        if is_luhaidan and "download.quranicaudio.com/quran/muhammad_alhaidan" not in url:
             print(f"{Fore.RED}Error: Invalid URL format for Muhammad Al Luhaidan recitation.{Style.RESET_ALL}")
             return None
 
         filename_path = self.get_audio_path(surah_num, reciter)
-        if not filename_path: return None # If get_audio_path failed
+        if not filename_path:
+            print(f"{Fore.RED}Could not determine audio file path for surah {surah_num}, reciter {reciter}.")
+            return None
 
-        filename = filename_path # Use the Path object directly
+        filename = filename_path
         temp_file = filename.with_suffix('.tmp')
 
-        # Ensure parent directory exists (should be handled by init, but safe check)
-        try:
-             self.audio_dir.mkdir(parents=True, exist_ok=True)
-        except OSError as e:
-             print(f"{Fore.RED}Error ensuring audio cache directory {self.audio_dir}: {e}")
-             return None
-
-        for attempt in range(max_retries):
+        # --- Clean up any leftover .tmp file before starting download ---
+        if temp_file.exists():
             try:
-                # Check if valid file already exists
-                if filename.exists() and filename.stat().st_size > 0:
-                    try:
-                        MP3(filename) # Use Path object
-                        return filename
-                    except Exception:
-                        print(f"{Fore.YELLOW}Existing audio file {filename.name} seems corrupt, removing.")
-                        filename.unlink(missing_ok=True) # Use Path method
-                elif filename.exists():
-                     filename.unlink(missing_ok=True)
+                temp_file.unlink()
+            except Exception as e:
+                print(f"{Fore.RED}Failed to remove leftover temp file {temp_file}: {e}")
 
-                # Resume logic
-                start_pos = temp_file.stat().st_size if temp_file.exists() else 0
-                headers = {'Range': f'bytes={start_pos}-'} if start_pos > 0 else {}
-                mode = 'ab' if start_pos > 0 else 'wb'
+        def get_host_header(url):
+            if "download.quranicaudio.com" in url:
+                return "download.quranicaudio.com"
+            if "raw.githubusercontent.com" in url:
+                return "raw.githubusercontent.com"
+            return None
 
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url, headers=headers, timeout=30) as response:
-                        if response.status == 416 and start_pos > 0:
-                             if temp_file.exists():
-                                  temp_file.rename(filename) # Use Path method
-                                  print(f"{Fore.GREEN}\n✓ Resumed download appears complete.")
-                                  return filename
-                             else:
-                                   start_pos = 0; headers={}; mode='wb'
-                                   raise aiohttp.ClientError("Resume failed, retrying full download")
-
-                        response.raise_for_status()
-
-                        # Get total size for progress bar
-                        content_length = response.headers.get('content-length')
-                        if content_length is None and start_pos == 0:
-                             total_size = None # Unknown total size
-                             print(Fore.CYAN + "\nStarting download (total size unknown)...")
-                        elif content_length:
-                             total_size = int(content_length) + start_pos
-                             total_mb = total_size / (1024 * 1024)
-                             downloaded_mb = start_pos / (1024 * 1024)
-                             print(Fore.CYAN + f"\nDownloading Surah {surah_num}...")
-                        else: # Resuming but no content-length? Risky.
-                             total_size = None
-                             print(Fore.CYAN + "\nResuming download (remaining size unknown)...")
-
-
-                        # Setup progress bar
-                        pbar_desc = f"{Fore.RED}Downloading (Attempt {attempt + 1}/{max_retries})"
-                        pbar_unit = 'MB'
-                        pbar_total = total_mb if total_size is not None else None
-                        pbar_initial = downloaded_mb if total_size is not None else 0
-                        pbar_kwargs = {
-                            "desc": pbar_desc,
-                            "unit": pbar_unit,
-                            "total": pbar_total,
-                            "initial": pbar_initial,
-                            "bar_format": '{desc}: {percentage:3.0f}%|{bar:30}| {n:.1f}/{total:.1f} MB • {rate_fmt} • ETA: {remaining_s:.0f}s' if total_size else '{desc}: {n:.1f} MB downloaded @ {rate_fmt}',
-                            "colour": 'red',
-                            "mininterval": 0.1,
-                            "smoothing": 0.1,
-                            "unit_scale": True,
-                            "unit_divisor": 1024*1024 if pbar_unit == 'MB' else 1024, # Correct divisor based on unit
-                            "disable": total_size is None # Disable bar if no total size
-                        }
-
-                        # Perform download with progress
-                        downloaded_size_in_loop = start_pos
-                        async with aiofiles.open(temp_file, mode=mode) as f:
-                             with tqdm.tqdm(**pbar_kwargs) as pbar:
-                                 chunk_size = 8192
-                                 async for chunk in response.content.iter_chunked(chunk_size):
-                                     if not chunk: break # Handle empty chunks
-                                     await f.write(chunk)
-                                     chunk_len = len(chunk)
-                                     downloaded_size_in_loop += chunk_len
-                                     if total_size is not None:
-                                         pbar.update(chunk_len / (1024*1024)) # Update in MB if total is known
-                                     else:
-                                         pbar.update(chunk_len / (1024*1024)) # Or just track downloaded amount
-
-                        # Verification after download
-                        final_size = temp_file.stat().st_size
-                        if total_size is not None and final_size != total_size:
-                            raise ValueError(f"Download incomplete: Expected {total_size}, Got {final_size}")
-                        if final_size == 0:
-                             raise ValueError("Download resulted in empty file.")
-
-                        # Validate MP3 and finalize
+        async def try_download(url_to_try):
+            for attempt in range(max_retries):
+                try:
+                    if filename.exists() and filename.stat().st_size > 0:
                         try:
-                            MP3(temp_file) # Use Path object
-                            filename.unlink(missing_ok=True) # Use Path method
-                            temp_file.rename(filename) # Use Path method
-                            print(Fore.GREEN + "\n✓ Audio downloaded and verified!")
+                            MP3(filename)
                             return filename
-                        except Exception as e_verify:
-                            raise ValueError(f"MP3 validation failed: {e_verify}")
+                        except Exception:
+                            filename.unlink(missing_ok=True)
+                    elif filename.exists():
+                        filename.unlink(missing_ok=True)
+
+                    start_pos = temp_file.stat().st_size if temp_file.exists() else 0
+                    host_header = get_host_header(url_to_try)
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0',
+                        'Accept': '*/*',
+                        'Accept-Encoding': 'identity',
+                        'Connection': 'keep-alive',
+                        'Referer': url_to_try
+                    }
+                    if host_header:
+                        headers['Host'] = host_header
+                    if start_pos > 0:
+                        headers['Range'] = f'bytes={start_pos}-'
+                    mode = 'ab' if start_pos > 0 else 'wb'
+
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(url_to_try, headers=headers, timeout=30) as response:
+                            if response.status in (403, 404):
+                                await response.read()
+                                return None  # Signal to try fallback
+                            if response.status == 416 and start_pos > 0:
+                                if temp_file.exists():
+                                    temp_file.rename(filename)
+                                    return filename
+                                else:
+                                    start_pos = 0
+                                    mode = 'wb'
+                                    raise aiohttp.ClientError("Resume failed, retrying full download")
+                            response.raise_for_status()
+
+                            content_length = response.headers.get('content-length')
+                            if content_length:
+                                total_size = int(content_length) + start_pos
+                                total_mb = total_size / (1024 * 1024)
+                                downloaded_mb = start_pos / (1024 * 1024)
+                            else:
+                                total_size = None
+
+                            pbar_desc = f"Downloading (Attempt {attempt + 1}/{max_retries})"
+                            pbar_unit = 'MB'
+                            pbar_total = total_mb if content_length else None
+                            pbar_initial = downloaded_mb if content_length else 0
+                            pbar_kwargs = {
+                                "desc": pbar_desc,
+                                "unit": pbar_unit,
+                                "total": pbar_total,
+                                "initial": pbar_initial,
+                                "bar_format": '{desc}: {percentage:3.0f}%|{bar:30}| {n:.1f}/{total:.1f} MB • {rate_fmt} • ETA: {remaining_s:.0f}s' if total_size else '{desc}: {n:.1f} MB downloaded @ {rate_fmt}',
+                                "colour": 'red',
+                                "mininterval": 0.1,
+                                "smoothing": 0.1,
+                                "unit_scale": True,
+                                "unit_divisor": 1024*1024 if pbar_unit == 'MB' else 1024,
+                                "disable": total_size is None
+                            }
+
+                            downloaded_size_in_loop = start_pos
+                            async with aiofiles.open(temp_file, mode=mode) as f:
+                                with tqdm.tqdm(**pbar_kwargs) as pbar:
+                                    chunk_size = 8192
+                                    async for chunk in response.content.iter_chunked(chunk_size):
+                                        if not chunk:
+                                            break
+                                        await f.write(chunk)
+                                        chunk_len = len(chunk)
+                                        downloaded_size_in_loop += chunk_len
+                                        if total_size is not None:
+                                            pbar.update(chunk_len / (1024*1024))
+                                        else:
+                                            pbar.update(chunk_len / (1024*1024))
+
+                            final_size = temp_file.stat().st_size
+                            if total_size is not None and final_size != total_size:
+                                raise ValueError(f"Download incomplete: Expected {total_size}, Got {final_size}")
+                            if final_size == 0:
+                                raise ValueError("Download resulted in empty file.")
+
+                            try:
+                                MP3(temp_file)
+                                filename.unlink(missing_ok=True)
+                                temp_file.rename(filename)
+                                return filename
+                            except Exception:
+                                raise ValueError("MP3 validation failed")
+                except (aiohttp.ClientError, asyncio.TimeoutError):
+                    pass
+                except ValueError:
+                    temp_file.unlink(missing_ok=True)
+                except Exception:
+                    temp_file.unlink(missing_ok=True)
+                if attempt < max_retries - 1:
+                    retry_delay = (attempt + 1) * 2
+                    await asyncio.sleep(retry_delay)
+            return None
+
+        # Try primary URL first
+        result = await try_download(url)
+        # If failed and fallback_url is provided, try fallback
+        if not result and fallback_url:
+            result = await try_download(fallback_url)
+        if not result:
+            temp_file.unlink(missing_ok=True)
+        return result
+    # -------------- Fix Ended for this method(download_audio)-----------
 
 
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e_net:
-                print(Fore.RED + f"\nNetwork error (Attempt {attempt + 1}/{max_retries}): {e_net}")
-            except ValueError as e_val:
-                 print(Fore.RED + f"\nDownload error (Attempt {attempt + 1}/{max_retries}): {e_val}")
-                 temp_file.unlink(missing_ok=True) # Use Path method
-            except Exception as e_other:
-                print(Fore.RED + f"\nUnexpected download error (Attempt {attempt + 1}/{max_retries}): {e_other}")
-                temp_file.unlink(missing_ok=True) # Use Path method
-
-
-            if attempt < max_retries - 1:
-                retry_delay = (attempt + 1) * 2
-                print(Fore.YELLOW + f"Retrying in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
-
-        # All attempts failed
-        print(Fore.RED + "\n❌ Audio download failed after all attempts.")
-        temp_file.unlink(missing_ok=True) # Use Path method
-        return None
-
-    # --- load_audio, play_audio, _track_progress, seek, etc. remain mostly unchanged ---
     # Ensure they check self.mixer_initialized before using pygame.mixer
     def load_audio(self, file_path: Path):
         """Load audio and get duration"""
