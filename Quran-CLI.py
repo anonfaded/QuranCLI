@@ -418,74 +418,73 @@ class QuranApp:
 
 
 
+# -------------- Fix Start for this method(_display_info)-----------
     def _display_info(self):
-        """Displays detailed information about the application and commands."""
+        """
+        Displays detailed information about the application and commands.
+        Now includes both long and short (Linux-style) command aliases in the help.
+        """
         self._clear_terminal()
-        # Assuming self._display_header() is called before this in the main loop is sufficient
-        # Or call it here if needed: self._display_header()
-
         # Use terminal width for dynamic sizing, fallback for very small terminals
         box_width = self.term_size.columns - 4 if self.term_size.columns > 40 else 60
         separator_major = Fore.RED + Style.BRIGHT + "═" * box_width + Style.RESET_ALL
         separator_minor = Fore.RED + "─" * box_width + Style.RESET_ALL
 
         print(separator_major)
-        print(Fore.GREEN + Style.BRIGHT + "QuranCLI - Information & Help".center(box_width + len(Fore.GREEN + Style.BRIGHT))) # Adjust center for color codes
+        print(Fore.GREEN + Style.BRIGHT + "QuranCLI - Information & Help".center(box_width + len(Fore.GREEN + Style.BRIGHT)))
         print(separator_major)
 
         # --- Description ---
         print(Fore.WHITE + "\nA powerful terminal-based tool for interacting with the Holy Quran.")
         print(Fore.CYAN + "Read, listen to recitations, and generate video subtitles (captions).")
+
+        # --- GitHub and Support Links ---
         print(Fore.GREEN + "\nGitHub Repository:")
         print(Fore.MAGENTA + Style.BRIGHT + "https://github.com/anonfaded/QuranCLI" + Style.RESET_ALL)
-
-
-
+        print(Fore.GREEN + "\nSupport & Buy Me a Ko-fi:")
+        print(Fore.MAGENTA + Style.BRIGHT + "https://ko-fi.com/fadedx" + Style.RESET_ALL)
+        print(Fore.GREEN + "\nJoin our Discord Community:")
+        print(Fore.MAGENTA + Style.BRIGHT + "https://discord.gg/kvAZvdkuuN" + Style.RESET_ALL)
 
         # Function to remove ANSI escape codes for length calculations
         def strip_ansi(s):
             ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
             return ansi_escape.sub('', s)
 
-        # Example separator and box width
         separator_minor = "-" * 120
         box_width = 120
 
-        # --- Commands ---
+        # --- Commands with Short Aliases ---
         print("\n" + separator_minor)
         print(Fore.GREEN + Style.BRIGHT + "Available Commands".center(box_width))
         print(separator_minor)
 
-        # Remove the colon from the description in the tuple so we can insert it in the format.
         commands_info = [
             (Fore.CYAN + "1-114", "Select a Surah directly by its number."),
             (Fore.CYAN + "Surah Name", "Search for a Surah by name (e.g., 'Fatiha', 'Rahman'). Provides suggestions."),
-            (Fore.CYAN + "list", "Display a list of all 114 Surahs with their numbers."),
-            (Fore.CYAN + "sub", "Generate subtitle files (.srt format) for a range of Ayahs."),
+            (Fore.CYAN + "list" + Style.DIM + "/ls" + Style.NORMAL, "Display a list of all 114 Surahs with their numbers."),
+            (Fore.CYAN + "sub" + Style.NORMAL, "Generate subtitle files (.srt format) for a range of Ayahs."),
             (Fore.YELLOW + "  ↳ Use Case", "Ideal for video editors needing Quran captions."),
             (Fore.YELLOW + "  ↳ How", "Creates timestamped Arabic/English text for import into editors (e.g., CapCut)."),
-            (Fore.CYAN + "clearaudio", "Delete all downloaded audio files from the cache."),
-            (Fore.CYAN + "audiopath", "Show and open audio cache folder."),
+            (Fore.CYAN + "clearaudio" + Style.DIM + "/clr" + Style.NORMAL, "Delete all downloaded audio files from the cache."),
+            (Fore.CYAN + "audiopath" + Style.DIM + "/ap" + Style.NORMAL, "Show and open audio cache folder."),
             (Fore.CYAN + "reverse", "Toggle Arabic text display direction within the Ayah reader."),
             (Fore.YELLOW + "  ↳ Use Case", "Fixes display issues on some terminals where Arabic appears reversed."),
             (Fore.YELLOW + "  ↳ Note", "Copied text should generally be correct regardless of display."),
-            (Fore.CYAN + "info", "Display this help and information screen."),
-            (Fore.CYAN + "theme", "Change the color of the Quran CLI ASCII art."),
-            (Fore.CYAN + "readme", "View Notes by the developer & Updates."),
-            (Fore.CYAN + "quit / exit", "Close the QuranCLI application.")
+            (Fore.CYAN + "info" + Style.DIM + "/i" + Style.NORMAL, "Display this help and information screen."),
+            (Fore.CYAN + "theme" + Style.DIM + "/th" + Style.NORMAL, "Change the color of the Quran CLI ASCII art."),
+            (Fore.CYAN + "readme" + Style.DIM + "/rd" + Style.NORMAL, "View Notes by the developer & Updates."),
+            (Fore.CYAN + "quit" + Style.DIM + "/q" + Style.NORMAL + Fore.CYAN + " / exit", "Close the QuranCLI application.")
         ]
 
-        cmd_col_width = 20  # Fixed width for the command part
-        # The description column width is based on the total box width minus the command width and the extra " : " (3 characters)
+        cmd_col_width = 20
         desc_col_width = box_width - cmd_col_width - 3
 
-        # A simple text-wrapping function that respects the width after stripping ANSI codes.
         def wrap_text(text, width):
             words = text.split()
             lines = []
             current_line = ""
             for word in words:
-                # Check length without ANSI codes
                 if len(strip_ansi(current_line + " " + word).strip()) <= width:
                     if current_line:
                         current_line += " " + word
@@ -500,36 +499,27 @@ class QuranApp:
 
         for cmd, desc in commands_info:
             plain_cmd = strip_ansi(cmd)
-            # Calculate the padding needed for a fixed column width
             padding = cmd_col_width - len(plain_cmd)
             if padding < 0:
                 padding = 0
-            cmd_part = cmd + " " * padding  # Fixed-width command string
-
-            # Wrap the description text to fit the description column width
+            cmd_part = cmd + " " * padding
             wrapped_desc = wrap_text(desc, desc_col_width)
             desc_lines = wrapped_desc.split("\n")
-            # Print the first line with the command, a space-colon-space separator, and the first description line
             print(f"{Fore.WHITE}{cmd_part} : {desc_lines[0]}")
-            # Print additional description lines (if any) indented to align with the description column
             for line in desc_lines[1:]:
                 print(" " * (cmd_col_width + 3) + line)
 
-        # --- Credits ---
+        # --- Credits and Feedback remain unchanged ---
         print("\n" + separator_minor)
         print(Fore.GREEN + Style.BRIGHT + "Credits".center(box_width))
         print(separator_minor)
-
         print(Fore.WHITE + "  Quran Data & Audio API provided by:")
         print(f"    {Fore.CYAN}The Quran Project{Fore.WHITE} ({Fore.MAGENTA}https://github.com/The-Quran-Project/Quran-API{Fore.WHITE})")
         print(f"      {Fore.YELLOW}(API has no rate limit)")
-
         print(Fore.WHITE + "\n  Application Icon sourced from Flaticon:")
         print(f"    {Fore.CYAN}Holy icons created by Atif Arshad - Flaticon{Fore.WHITE}")
         print(f"      ({Fore.MAGENTA}https://www.flaticon.com/free-icons/holy{Fore.WHITE})")
 
-
-        # --- Feedback / Bug Reports ---
         print("\n" + separator_minor)
         print(Fore.GREEN + Style.BRIGHT + "Feedback & Bug Reports".center(box_width))
         print(separator_minor)
@@ -544,56 +534,57 @@ class QuranApp:
         print(Fore.WHITE + "  Please open an issue on GitHub:")
         print(f"    {Fore.MAGENTA}{Style.BRIGHT}https://github.com/anonfaded/QuranCLI/issues{Style.RESET_ALL}")
 
-
-        # --- Footer ---
         print("\n" + separator_major)
         input(Fore.YELLOW + "\nPress Enter to return to the main menu..." + Style.RESET_ALL)
-        # No need to clear here, the main loop will handle it before the next prompt
-        # self._clear_terminal()
-        # self._display_header()
+# -------------- Fix Ended for this method(_display_info)-----------
 
+
+
+
+# -------------- Fix Start for this method(_get_surah_number)-----------
     def _get_surah_number(self) -> Optional[int]:
-        # Navigation Menu
-        box_width = 26  # Adjust width if needed
+        """
+        Prompt user for Surah selection or command.
+        Supports both long and short (Linux-style) commands.
+        Displays commands in a clean, aligned, and readable format with colons aligned.
+        """
+        box_width = 38  # Wider for better alignment
         separator = "─" * box_width
+
+        # Command display tuples: (command(s), description)
+        commands = [
+            (f"{Fore.CYAN}1-114{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Select Surah by number"),
+            (f"{Fore.CYAN}Surah Name{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Search Surah {Style.DIM}(e.g., 'Rahman'){Style.RESET_ALL}"),
+            (f"{Fore.CYAN}list{Style.DIM}/ls{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Display list of Surahs"),
+            (f"{Fore.CYAN}sub{Style.DIM}/sub{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Create subtitles for Ayahs"),
+            (f"{Fore.CYAN}clearaudio{Style.DIM}/clr{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Clear audio cache"),
+            (f"{Fore.CYAN}audiopath{Style.DIM}/ap{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Show and open audio cache folder"),
+            (f"{Fore.CYAN}info{Style.DIM}/i{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Show help and information"),
+            (f"{Fore.CYAN}theme{Style.DIM}/th{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Change ASCII art color"),
+            (f"{Fore.RED}readme{Style.DIM}/rd{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}View Notes by the developer & Updates"),
+            (f"{Fore.CYAN}quit{Style.DIM}/q{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Exit the application"),
+        ]
+
+        # Calculate the max length of command strings (without color codes)
+        def strip_ansi(s):
+            import re
+            ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+            return ansi_escape.sub('', s)
+        max_cmd_len = max(len(strip_ansi(cmd)) for cmd, _ in commands)
 
         while True:
             try:
-                # Clear terminal and display header before prompt
                 self._clear_terminal()
                 self._display_header()
-                # List of commands with their descriptions
-                commands = [
-                    (f"{Fore.CYAN}1-114{Fore.WHITE}", "Select Surah by number"),
-                    (f"{Fore.CYAN}Surah Name{Fore.WHITE}", f"Search Surah {Style.DIM}{Fore.WHITE}(e.g., 'Rahman')"),
-                    (f"{Fore.CYAN}list{Fore.WHITE}", "Display list of Surahs"),
-                    (f"{Fore.CYAN}sub{Fore.WHITE}", "Create subtitles for Ayahs"),
-                    (f"{Fore.CYAN}clearaudio{Fore.WHITE}", "Clear audio cache"),
-                    (f"{Fore.CYAN}audiopath{Fore.WHITE}", "Show and open audio cache folder"),
-                    (f"{Fore.CYAN}info{Fore.WHITE}", "Show help and information"),
-                    (f"{Fore.CYAN}theme{Fore.WHITE}", "Change ASCII art color"),
-                    (f"{Fore.RED}readme{Fore.WHITE}", "View Notes by the developer & Updates"),
-                    (f"{Fore.CYAN}quit{Fore.WHITE}", "Exit the application")
-                ]
 
-                # Adjust this value to set the width of the command column
-                command_width = 20
-
-                # Header
+                # Display main menu in a clean, aligned format with colons aligned
                 print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📜 Available Commands")
-
-                # Print each command with aligned descriptions
                 for cmd, desc in commands:
-                    # The colon will be aligned at the same column for every command
-                    print(Fore.RED + f"│ • {cmd:<{command_width}} : {desc}")
-
-                # Footer line (adjust the length as needed)
-                print(Fore.RED + "╰" + "─" * (command_width + 25))
-                
-                # Helper Text
+                    pad = " " * (max_cmd_len - len(strip_ansi(cmd)))
+                    print(Fore.RED + f"│ → {cmd}{pad} : {Style.DIM}{desc}{Style.RESET_ALL}")
+                print(Fore.RED + "╰" + separator)
                 print(Style.DIM + Fore.WHITE + "\nType any of the above commands and press Enter.")
 
-                # Prompt user for input
                 print(Style.BRIGHT + Fore.GREEN + "\nEnter command:" + Style.DIM + Fore.WHITE )
                 try:
                     user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
@@ -607,39 +598,38 @@ class QuranApp:
                         print(Fore.RED + char, end='', flush=True)
                         sleep(delay)
                     print()  # New line at the end
-        
-                if user_input in ['quit', 'exit']:
+
+                # Handle both long and short commands
+                if user_input in ['quit', 'exit', 'q']:
                     message = "\n✨ As-salamu alaykum! Thank you for using QuranCLI!"
-                    typewriter_print(self,message)
-                    sleep(3.0)  # Shorter pause after typewriter effect
+                    typewriter_print(self, message)
+                    sleep(3.0)
                     return None
-                elif user_input == 'list':
+                elif user_input in ['list', 'ls']:
                     self._display_surah_list()
                     continue
                 elif user_input == 'sub':
-                    #Ask the user for the surah they want to generate subtitles for.
                     surah_number = self._get_surah_number_for_subtitle()
                     if surah_number is None:
-                        continue #Return to main selection.
+                        continue
                     surah_info = self.data_handler.get_surah_info(surah_number)
                     self.ui.display_subtitle_menu(surah_info)
-                    continue # After subtitle, return to main
-                elif user_input == 'clearaudio':
+                    continue
+                elif user_input in ['clearaudio', 'clr']:
                     self._clear_audio_cache()
                     continue
-                elif user_input == 'audiopath':
+                elif user_input in ['audiopath', 'ap']:
                     self._show_audio_cache_path()
                     continue
-                elif user_input == 'info': # Handle the 'info' command
+                elif user_input in ['info', 'i']:
                     self._display_info()
-                    continue # Go back to the start of the loop to show the prompt again
-                elif user_input == 'readme':
+                    continue
+                elif user_input in ['readme', 'rd']:
                     self._display_readme_page()
-                    continue # Go back to the main menu prompt
-                elif user_input == 'theme':
+                    continue
+                elif user_input in ['theme', 'th']:
                     self._handle_theme_selection()
-                    continue # Go back to the main menu prompt
-                # Check if input is a number
+                    continue
                 elif user_input.isdigit():
                     number = int(user_input)
                     if 1 <= number <= 114:
@@ -647,22 +637,19 @@ class QuranApp:
                     raise ValueError
 
                 # Attempt fuzzy matching for Surah names
+                import difflib
                 close_matches = difflib.get_close_matches(user_input, self.surah_names.values(), n=5, cutoff=0.5)
-
                 if close_matches:
                     print("\n")
-                    print( Fore.RED + "╭─" + Style.BRIGHT + Fore.MAGENTA + "🤔 Did you mean one of these?")
+                    print(Fore.RED + "╭─" + Style.BRIGHT + Fore.MAGENTA + "🤔 Did you mean one of these?")
                     for idx, match in enumerate(close_matches, 1):
                         surah_number = [num for num, name in self.surah_names.items() if name == match][0]
                         print(f"{Fore.RED}├ {Fore.GREEN}{idx}. {Fore.CYAN}{match} {Style.DIM}{Fore.WHITE}(Surah {surah_number})")
-                    print(Fore.RED + "╰" + separator + '\n')    
-
-                    # Ask user to select a Surah from the suggestions
+                    print(Fore.RED + "╰" + separator + '\n')
                     while True:
                         try:
                             print(Fore.GREEN + "Select a number from the list, or 'r' to retry:")
                             user_choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
-
                             if user_choice.isdigit():
                                 choice_idx = int(user_choice) - 1
                                 if 0 <= choice_idx < len(close_matches):
@@ -671,17 +658,20 @@ class QuranApp:
                                 else:
                                     print(Fore.RED + "Invalid choice. Please select a number from the list or 'r' to retry.")
                             elif user_choice.lower() == 'r':
-                                break  # Restart input prompt
+                                break
                             else:
                                 print(Fore.RED + "Invalid choice. Please select a number from the list or 'r' to retry.")
                         except KeyboardInterrupt:
                             print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to surah selection.")
-                            break # Return to surah selection.
+                            break
             except ValueError:
                 print(Fore.RED + "Invalid input. Enter a number between 1-114, a Surah name, 'list', 'sub', or 'quit'")
-            except KeyboardInterrupt:  # Add this to handle control + c during input
+            except KeyboardInterrupt:
                 print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
-                break # Return to main menu immediately, *without exiting app*.
+                break
+# -------------- Fix Ended for this method(_get_surah_number)-----------
+
+
 
     def _get_surah_number_for_subtitle(self) -> Optional[int]:
             """Helper function to get surah number specifically for subtitle generation."""
