@@ -725,20 +725,27 @@ class QuranApp:
                     return None #Returning none as keyboard interupt.
             
     def _get_ayah_range(self, total_ayah: int) -> tuple:
+        """
+        Prompt the user for an ayah range, or accept 'all' to select the full surah.
+        Returns a tuple (start, end).
+        """
         while True:
             try:
                 print(Fore.RED + "\n┌─" + Fore.GREEN + Style.BRIGHT + f" Ayah Selection (1-{total_ayah})")
-                print(Fore.RED + "├──╼ " + Fore.MAGENTA + "Start" + ":\n" , end="")
-                start = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
-                print(Fore.RED + "├──╼ " + Fore.MAGENTA + "End" + ":\n" , end="")
+                print(Fore.RED + "├──╼ " + Fore.MAGENTA + "Start" + f" {Style.DIM}(or type 'all' for the whole surah){Style.RESET_ALL}:\n", end="")
+                user_input = input(Fore.RED + "│ ❯ " + Fore.WHITE).strip().lower()
+                if user_input == 'all':
+                    return 1, total_ayah
+                start = int(user_input)
+                print(Fore.RED + "├──╼ " + Fore.MAGENTA + "End" + ":\n", end="")
                 end = int(input(Fore.RED + "│ ❯ " + Fore.WHITE))
                 if 1 <= start <= end <= total_ayah:
                     return start, end
             except ValueError:
-                pass
-            except KeyboardInterrupt: # Add this to handle control + c during input
+                print(Fore.RED + "└──╼ " + "Invalid input. Please enter a valid number or 'all'.")
+            except KeyboardInterrupt:
                 print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to surah selection.")
-                raise KeyboardInterrupt # Re-raise to go to surah selection.
+                raise KeyboardInterrupt
 
             print(Fore.RED + "└──╼ " + "Invalid range. Please try again.")
 
