@@ -384,14 +384,21 @@ class UI:
     def display_single_ayah(self, ayah: Ayah):
         """
         Display a single ayah with Arabic, Transliteration, Urdu, and English.
-        Ensures Arabic and Urdu reversal are always in sync with the current reversal state.
+        On Linux/macOS, applies reversal to both Arabic and Urdu if Arabic reversal is enabled.
+        On Windows, displays both normally.
         """
         print(Style.BRIGHT + Fore.GREEN + f"\n[{ayah.number}]")
 
-        # 1. Arabic Text (always use fix_arabic_text to respect reversal)
+        # 1. Arabic Text (reverse only on Linux/macOS if enabled)
         print(Style.BRIGHT + Fore.RED + "Arabic:" + Style.NORMAL + Fore.WHITE)
         try:
             formatted_arabic = self.data_handler.fix_arabic_text(ayah.content)
+            # Apply reversal only on Linux/macOS if enabled
+            if self.data_handler.arabic_reversed and sys.platform != "win32":
+                import arabic_reshaper
+                from bidi.algorithm import get_display
+                reshaped = arabic_reshaper.reshape(formatted_arabic)
+                formatted_arabic = get_display(reshaped)[::-1]
         except Exception as e:
             print(f"[DEBUG] Error formatting Arabic: {e}")
             formatted_arabic = ayah.content
@@ -403,14 +410,13 @@ class UI:
         for line in wrapped_translit.split('\n'):
             print("    " + line)
 
-        # 3. Urdu Translation (always match Arabic reversal state)
+        # 3. Urdu Translation (reverse only on Linux/macOS if enabled)
         if ayah.translation_ur:
             print(Style.BRIGHT + Fore.MAGENTA + "\nUrdu Translation:" + Style.NORMAL + Fore.WHITE)
             try:
-                if self.data_handler.arabic_reversed:
-                    formatted_urdu = ayah.translation_ur[::-1]
-                else:
-                    formatted_urdu = ayah.translation_ur
+                formatted_urdu = ayah.translation_ur
+                if self.data_handler.arabic_reversed and sys.platform != "win32":
+                    formatted_urdu = formatted_urdu[::-1]
             except Exception as e:
                 print(f"[DEBUG] Error formatting Urdu: {e}")
                 formatted_urdu = ayah.translation_ur
