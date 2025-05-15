@@ -380,40 +380,54 @@ class UI:
                 else:
                     return
 
+# -------------- Fix Start for this method(display_single_ayah)-----------
     def display_single_ayah(self, ayah: Ayah):
-        """Display a single ayah with Arabic, Transliteration, Urdu, and English."""
+        """
+        Display a single ayah with Arabic, Transliteration, Urdu, and English.
+        Ensures Arabic and Urdu reversal are always in sync with the current reversal state.
+        """
         print(Style.BRIGHT + Fore.GREEN + f"\n[{ayah.number}]")
 
-        # 1. Arabic Text
+        # 1. Arabic Text (always use fix_arabic_text to respect reversal)
         print(Style.BRIGHT + Fore.RED + "Arabic:" + Style.NORMAL + Fore.WHITE)
-        print("    " + ayah.content) # Assumes content was processed by fix_arabic_text
+        try:
+            formatted_arabic = self.data_handler.fix_arabic_text(ayah.content)
+        except Exception as e:
+            print(f"[DEBUG] Error formatting Arabic: {e}")
+            formatted_arabic = ayah.content
+        print("    " + formatted_arabic)
 
         # 2. Transliteration
         print(Style.BRIGHT + Fore.RED + "\nTransliteration:" + Style.NORMAL + Fore.WHITE)
         wrapped_translit = self.wrap_text(ayah.transliteration, self.term_size.columns - 4)
         for line in wrapped_translit.split('\n'):
-             print("    " + line)
+            print("    " + line)
 
-        # --- 3. ADD Urdu Translation ---
-        if ayah.translation_ur: # Only display if Urdu text exists
+        # 3. Urdu Translation (always match Arabic reversal state)
+        if ayah.translation_ur:
             print(Style.BRIGHT + Fore.MAGENTA + "\nUrdu Translation:" + Style.NORMAL + Fore.WHITE)
-            # Apply BiDi formatting to Urdu text
-            formatted_urdu = self.data_handler.fix_arabic_text(ayah.translation_ur)
-            # Wrap and indent Urdu text
+            try:
+                if self.data_handler.arabic_reversed:
+                    formatted_urdu = ayah.translation_ur[::-1]
+                else:
+                    formatted_urdu = ayah.translation_ur
+            except Exception as e:
+                print(f"[DEBUG] Error formatting Urdu: {e}")
+                formatted_urdu = ayah.translation_ur
             wrapped_urdu = self.wrap_text(formatted_urdu, self.term_size.columns - 4)
             for line in wrapped_urdu.split('\n'):
-                 print("    " + line)
-        # --- END ADD Urdu Translation ---
+                print("    " + line)
 
-        # --- 4. English Translation (Now below Urdu) ---
+        # 4. English Translation
         print(Style.BRIGHT + Fore.MAGENTA + "\nEnglish Translation:" + Style.NORMAL + Fore.WHITE)
         cached_translation = ayah.text
         wrapped_translation = self.wrap_text(cached_translation, self.term_size.columns - 4)
         for line in wrapped_translation.split('\n'):
-             print("    " + line)
+            print("    " + line)
 
         # Separator
         print(Style.BRIGHT + Fore.GREEN + "\n" + "-" * min(40, self.term_size.columns))
+# -------------- Fix Ended for this method(display_single_ayah)-----------
 
 
     def wrap_text(self, text: str, width: int) -> str:
