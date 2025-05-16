@@ -1195,7 +1195,7 @@ class QuranApp:
                     input(Fore.YELLOW + "Press Enter to continue...")
                     continue
                 if choice == '1':
-                    # List all bookmarks with index
+                    # List all bookmarks with index and color same surahs
                     all_bookmarks = []
                     for surah in sorted(grouped, key=lambda x: int(x)):
                         for entry in grouped[surah]:
@@ -1205,11 +1205,20 @@ class QuranApp:
                         input(Fore.YELLOW + "Press Enter to continue...")
                         continue
                     print(Fore.CYAN + "\nSelect a bookmark to jump to:")
+                    # Assign a color to each surah for consistent coloring
+                    surah_color_map = {}
+                    surah_colors = [Fore.CYAN, Fore.GREEN, Fore.MAGENTA, Fore.YELLOW, Fore.BLUE, Fore.LIGHTCYAN_EX, Fore.LIGHTGREEN_EX, Fore.LIGHTMAGENTA_EX, Fore.LIGHTYELLOW_EX, Fore.LIGHTBLUE_EX]
+                    color_idx = 0
+                    for surah, _ in all_bookmarks:
+                        if surah not in surah_color_map:
+                            surah_color_map[surah] = surah_colors[color_idx % len(surah_colors)]
+                            color_idx += 1
                     for idx, (surah, entry) in enumerate(all_bookmarks, 1):
                         surah_name = self.surah_names.get(int(surah), f"Surah {surah}")
                         ayah = entry.get("ayah", '?')
                         note = entry.get("note", "")
-                        print(f"{Fore.GREEN}{idx}. Surah {surah} ({surah_name}), Ayah {ayah} {Fore.LIGHTBLACK_EX}- {note}")
+                        color = surah_color_map[surah]
+                        print(f"{color}{idx}. Surah {surah} ({surah_name}), Ayah {ayah} {Fore.LIGHTBLACK_EX}- {note}{Style.RESET_ALL}")
                     print(Fore.YELLOW + "Enter the number of the bookmark to jump to, or 'b' to cancel.")
                     sel = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
                     if sel.lower() == 'b':
@@ -1217,12 +1226,9 @@ class QuranApp:
                     if sel.isdigit() and 1 <= int(sel) <= len(all_bookmarks):
                         surah, entry = all_bookmarks[int(sel) - 1]
                         ayah = entry.get("ayah", 1)
-                        # Call the main app's ayah display for this surah/ayah
                         try:
                             self._clear_terminal()
                             print(Fore.GREEN + f"Jumping to Surah {surah}, Ayah {ayah}...")
-                            # You may want to call a method like self.app.jump_to_ayah(int(surah), int(ayah))
-                            # For now, just print info and pause
                             input(Fore.YELLOW + "Press Enter to continue...")
                         except Exception as e:
                             print(Fore.RED + f"Error jumping to bookmark: {e}")
@@ -1269,7 +1275,7 @@ class QuranApp:
                     print(Fore.GREEN + f"Bookmark set for Surah {surah_num}, Ayah {ayah_input}.")
                     input(Fore.YELLOW + "Press Enter to continue...")
                 elif choice == '3':
-                    # List all bookmarks with index
+                    # List all bookmarks with index and color same surahs
                     all_bookmarks = []
                     for surah in sorted(grouped, key=lambda x: int(x)):
                         for entry in grouped[surah]:
@@ -1279,11 +1285,20 @@ class QuranApp:
                         input(Fore.YELLOW + "Press Enter to continue...")
                         continue
                     print(Fore.CYAN + "\nSelect a bookmark to edit/delete:")
+                    # Assign a color to each surah for consistent coloring
+                    surah_color_map = {}
+                    surah_colors = [Fore.CYAN, Fore.GREEN, Fore.MAGENTA, Fore.YELLOW, Fore.BLUE, Fore.LIGHTCYAN_EX, Fore.LIGHTGREEN_EX, Fore.LIGHTMAGENTA_EX, Fore.LIGHTYELLOW_EX, Fore.LIGHTBLUE_EX]
+                    color_idx = 0
+                    for surah, _ in all_bookmarks:
+                        if surah not in surah_color_map:
+                            surah_color_map[surah] = surah_colors[color_idx % len(surah_colors)]
+                            color_idx += 1
                     for idx, (surah, entry) in enumerate(all_bookmarks, 1):
                         surah_name = self.surah_names.get(int(surah), f"Surah {surah}")
                         ayah = entry.get("ayah", '?')
                         note = entry.get("note", "")
-                        print(f"{Fore.GREEN}{idx}. Surah {surah} ({surah_name}), Ayah {ayah} {Fore.LIGHTBLACK_EX}- {note}")
+                        color = surah_color_map[surah]
+                        print(f"{color}{idx}. Surah {surah} ({surah_name}), Ayah {ayah} {Fore.LIGHTBLACK_EX}- {note}{Style.RESET_ALL}")
                     print(Fore.YELLOW + "Enter the number of the bookmark to edit/delete, or 'b' to cancel.")
                     sel = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
                     if sel.lower() == 'b':
@@ -1307,6 +1322,12 @@ class QuranApp:
                                     break
                             input(Fore.YELLOW + "Press Enter to continue...")
                         elif action == 'd':
+                            # Ask for confirmation before deletion
+                            confirm = input(Fore.RED + "Are you sure you want to delete this bookmark? (y/n): " + Fore.WHITE).strip().lower()
+                            if confirm != 'y':
+                                print(Fore.YELLOW + "Deletion cancelled.")
+                                input(Fore.YELLOW + "Press Enter to continue...")
+                                continue
                             surah_key = str(surah)
                             before = len(self.preferences["bookmarks"][surah_key])
                             self.preferences["bookmarks"][surah_key] = [
