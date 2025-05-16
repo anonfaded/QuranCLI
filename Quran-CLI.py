@@ -466,6 +466,7 @@ class QuranApp:
             (Fore.CYAN + "sub" + Style.NORMAL, "Generate subtitle files (.srt format) for a range of Ayahs."),
             (Fore.YELLOW + "  ↳ Use Case", "Ideal for video editors needing Quran captions."),
             (Fore.YELLOW + "  ↳ How", "Creates timestamped Arabic/English text for import into editors (e.g., CapCut)."),
+            (Fore.CYAN + "bm" + Style.DIM + "/bookmarks" + Style.NORMAL, "Manage bookmarks."),
             (Fore.CYAN + "clearaudio" + Style.DIM + "/clr" + Style.NORMAL, "Delete all downloaded audio files from the cache."),
             (Fore.CYAN + "audiopath" + Style.DIM + "/ap" + Style.NORMAL, "Show and open audio cache folder."),
             (Fore.CYAN + "reverse", "Toggle Arabic text display direction within the Ayah reader."),
@@ -547,6 +548,7 @@ class QuranApp:
         Prompt user for Surah selection or command.
         Supports both long and short (Linux-style) commands.
         Displays commands in a clean, aligned, and readable format with colons aligned.
+        Now includes a command to open the bookmark management menu.
         """
         box_width = 38  # Wider for better alignment
         separator = "─" * box_width
@@ -557,6 +559,7 @@ class QuranApp:
             (f"{Fore.CYAN}Surah Name{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Search Surah {Style.DIM}(e.g., 'Rahman'){Style.RESET_ALL}"),
             (f"{Fore.CYAN}list{Style.DIM}/ls{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Display list of Surahs"),
             (f"{Fore.CYAN}sub{Style.DIM}/sub{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Create subtitles for Ayahs"),
+            (f"{Fore.CYAN}bm{Style.DIM}/bookmarks{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Manage bookmarks"),
             (f"{Fore.CYAN}clearaudio{Style.DIM}/clr{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Clear audio cache"),
             (f"{Fore.CYAN}audiopath{Style.DIM}/ap{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Show and open audio cache folder"),
             (f"{Fore.CYAN}info{Style.DIM}/i{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Show help and information"),
@@ -615,6 +618,9 @@ class QuranApp:
                     surah_info = self.data_handler.get_surah_info(surah_number)
                     self.ui.display_subtitle_menu(surah_info)
                     continue
+                elif user_input in ['bm', 'bookmarks']:
+                    self._bookmark_menu()
+                    continue
                 elif user_input in ['clearaudio', 'clr']:
                     self._clear_audio_cache()
                     continue
@@ -669,9 +675,124 @@ class QuranApp:
             except KeyboardInterrupt:
                 print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
                 break
-# -------------- Fix Ended for this method(_get_surah_number)-----------
+    # -------------- Fix Ended for this method(_get_surah_number)-----------
 
-
+    # -------------- Fix Start for this method(_bookmark_menu)-----------
+    def _bookmark_menu(self):
+        """
+        Interactive bookmark management menu: view, jump to, add, and remove bookmarks with notes.
+        Supports fuzzy surah search, robust input, and clear helper texts. Each bookmark is for a single ayah.
+        """
+        import difflib
+        while True:
+            try:
+                self._clear_terminal()
+                box_width = 60
+                separator = "─" * box_width
+                print(Fore.RED + Style.BRIGHT + "\n📑 Bookmark Manager".ljust(box_width))
+                print(Fore.RED + separator)
+                print(Fore.YELLOW + "Bookmarks let you pin a single ayah in any surah, with an optional note."
+                      "\nYou can search by surah number or name. Each bookmark is unique per surah.")
+                print(Fore.CYAN + "\nSaved Bookmarks:")
+                bookmarks = self.list_bookmarks()
+                numbered = list(enumerate(bookmarks.items(), 1))
+                if numbered:
+                    for idx, (surah, data) in numbered:
+                        surah_name = self.surah_names.get(int(surah), f"Surah {surah}")
+                        ayah = data.get("ayah", '?')
+                        note = data.get("note", "")
+                        note_disp = (Fore.MAGENTA + f"Note: {note}" if note else Fore.LIGHTBLACK_EX + "No note")
+                        print(f"  {Fore.GREEN}{idx}. Surah {surah} ({surah_name}) - Ayah {ayah}  {note_disp}")
+                else:
+                    print(Fore.LIGHTBLACK_EX + "  No bookmarks saved yet.")
+                print(Fore.RED + separator)
+                print(Fore.CYAN + "\nOptions:")
+                print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "Bookmark Actions")
+                print(Fore.RED + "│ → " + Fore.CYAN + "1 " + Fore.WHITE + ": Jump to a bookmark (by number)")
+                print(Fore.RED + "│ → " + Fore.CYAN + "2 " + Fore.WHITE + ": Add a bookmark (surah name/number, ayah, note)")
+                print(Fore.RED + "│ → " + Fore.CYAN + "3 " + Fore.WHITE + ": Remove a bookmark (by number)")
+                print(Fore.RED + "│ → " + Fore.CYAN + "4 " + Fore.WHITE + ": Back to main menu")
+                print(Fore.RED + "╰" + ("─" * (box_width-2)))
+                choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                if choice == '1':
+                    if not numbered:
+                        print(Fore.YELLOW + "No bookmarks to jump to."); sleep(1.5); continue
+                    print(Fore.CYAN + "Enter bookmark number to jump (see list above):")
+                    sel = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                    if sel.isdigit() and 1 <= int(sel) <= len(numbered):
+                        surah, data = numbered[int(sel)-1][1]
+                        ayah = data.get("ayah")
+                        print(Fore.GREEN + f"Jumping to Surah {surah}, Ayah {ayah}...")
+                        sleep(1)
+                        # Show surah info header and open ayah reader at that ayah
+                        surah_info = self.data_handler.get_surah_info(int(surah))
+                        if surah_info:
+                            self._clear_terminal()
+                            box_width = 52
+                            separator = "─" * box_width
+                            print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📜 Surah Information")
+                            print(Fore.RED + f"│ • {Fore.CYAN}Name:       {Fore.WHITE}{surah_info.surah_name}")
+                            print(Fore.RED + f"│ • {Fore.CYAN}Arabic:     {Fore.WHITE}{surah_info.surah_name_ar}")
+                            print(Fore.RED + f"│ • {Fore.CYAN}Translation:{Fore.WHITE}{surah_info.translation}")
+                            print(Fore.RED + f"│ • {Fore.CYAN}Type:       {Fore.WHITE}{surah_info.type.capitalize()}")
+                            print(Fore.RED + f"│ • {Fore.CYAN}Total Ayahs:{Fore.WHITE} {surah_info.total_verses}")
+                            print(Fore.RED + "╰" + separator)
+                            ayahs = self.data_handler.get_ayahs(int(surah), int(ayah), int(ayah))
+                            self.ui.display_ayahs(ayahs, surah_info)
+                        else:
+                            print(Fore.RED + "Invalid surah in bookmark."); sleep(1.5)
+                    else:
+                        print(Fore.RED + "Invalid bookmark number."); sleep(1.5)
+                elif choice == '2':
+                    print(Fore.CYAN + "Enter surah number or name to bookmark:")
+                    surah_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                    surah_num = None
+                    if surah_input.isdigit() and 1 <= int(surah_input) <= 114:
+                        surah_num = int(surah_input)
+                    else:
+                        matches = difflib.get_close_matches(surah_input, self.surah_names.values(), n=1, cutoff=0.5)
+                        if matches:
+                            surah_num = [num for num, name in self.surah_names.items() if name == matches[0]][0]
+                    if not surah_num:
+                        print(Fore.RED + "Could not find surah. Try again."); sleep(1.5); continue
+                    print(Fore.CYAN + f"Enter ayah number to bookmark in Surah {surah_num}:")
+                    ayah_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                    if not (ayah_input.isdigit() and 1 <= int(ayah_input) <= 286):
+                        print(Fore.RED + "Invalid ayah number."); sleep(1.5); continue
+                    print(Fore.CYAN + "Enter a note for this bookmark (optional, max 100 chars):")
+                    print(Fore.LIGHTBLACK_EX + "e.g. 'Favorite ayah', 'For memorization', 'Check tafsir', etc.")
+                    note = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()[:100]
+                    self.set_bookmark(surah_num, int(ayah_input), extra=None)
+                    # Save note in bookmark
+                    if "bookmarks" not in self.preferences:
+                        self.preferences["bookmarks"] = {}
+                    self.preferences["bookmarks"][str(surah_num)]["note"] = note
+                    self._save_preferences()
+                    print(Fore.GREEN + f"Bookmark set for Surah {surah_num}, Ayah {ayah_input}.")
+                    sleep(1.5)
+                elif choice == '3':
+                    if not numbered:
+                        print(Fore.YELLOW + "No bookmarks to remove."); sleep(1.5); continue
+                    print(Fore.CYAN + "Enter bookmark number to remove (see list above):")
+                    sel = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                    if sel.isdigit() and 1 <= int(sel) <= len(numbered):
+                        surah, _ = numbered[int(sel)-1][1]
+                        self.remove_bookmark(int(surah))
+                        print(Fore.GREEN + f"Bookmark removed for Surah {surah}.")
+                        sleep(1.5)
+                    else:
+                        print(Fore.RED + "Invalid bookmark number."); sleep(1.5)
+                elif choice == '4':
+                    break
+                else:
+                    print(Fore.RED + "Invalid choice. Please enter 1-4."); sleep(1.5)
+            except KeyboardInterrupt:
+                print(Fore.YELLOW + "\nBookmark menu cancelled. Returning to main menu.")
+                break
+            except Exception as e:
+                print(Fore.RED + f"Error in bookmark menu: {e}")
+                sleep(2)
+    # -------------- Fix Ended for this method(_bookmark_menu)-----------
 
     def _get_surah_number_for_subtitle(self) -> Optional[int]:
             """Helper function to get surah number specifically for subtitle generation."""
@@ -845,6 +966,34 @@ class QuranApp:
         print()
         input(f"{Fore.GREEN}Press Enter to continue...")
     # -------------- Fix Ended for this method(_show_audio_cache_path)-----------
+
+    # -------------- Fix Start for this method(QuranApp)-----------
+    def set_bookmark(self, surah_number: int, ayah_number: int, extra: dict = None):
+        """Set a bookmark for a specific surah and ayah. Optionally store extra info (e.g., audio position)."""
+        if "bookmarks" not in self.preferences:
+            self.preferences["bookmarks"] = {}
+        self.preferences["bookmarks"][str(surah_number)] = {
+            "ayah": ayah_number,
+            "extra": extra or {}
+        }
+        self._save_preferences()
+        print(f"[DEBUG] Bookmark set for Surah {surah_number}, Ayah {ayah_number}.")
+
+    def get_bookmark(self, surah_number: int):
+        """Get the bookmark for a surah, or None if not set."""
+        return self.preferences.get("bookmarks", {}).get(str(surah_number))
+
+    def remove_bookmark(self, surah_number: int):
+        """Remove the bookmark for a surah if it exists."""
+        if "bookmarks" in self.preferences and str(surah_number) in self.preferences["bookmarks"]:
+            del self.preferences["bookmarks"][str(surah_number)]
+            self._save_preferences()
+            print(f"[DEBUG] Bookmark removed for Surah {surah_number}.")
+
+    def list_bookmarks(self):
+        """Return all saved bookmarks as a dict."""
+        return self.preferences.get("bookmarks", {})
+    # -------------- Fix Ended for this method(QuranApp)-----------
 
 if __name__ == "__main__":
     # Wrap the entire app execution in a try-except block
