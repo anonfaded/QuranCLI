@@ -353,7 +353,7 @@ class UI:
             nav_options = [
                 (f"{Fore.CYAN}n{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Next page"),
                 (f"{Fore.CYAN}p{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Previous page"),
-                (f"{Fore.YELLOW}bookmark{Style.DIM}/bk{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Add bookmark for an ayah on this page"),
+                (f"{Fore.YELLOW}bookmark{Style.DIM}/bm{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Add bookmark for an ayah on this page"),
                 (f"{Fore.MAGENTA}reverse{Style.DIM}/rev{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Toggle Arabic reversal"),
                 (f"{Fore.YELLOW}a{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Play audio"),
                 (f"{Fore.RED}q{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Return"),
@@ -378,7 +378,7 @@ class UI:
                 self.display_audio_controls(surah_info)
             elif choice in ['reverse', 'rev']:
                 self.data_handler.toggle_arabic_reversal()
-            elif choice in ['bookmark', 'bk']:
+            elif choice in ['bookmark', 'bm']:
                 # List ayahs on this page for user to select
                 print(Fore.CYAN + "\nSelect an ayah to bookmark from this page:")
                 for idx, ayah in enumerate(local_ayahs, 1):
