@@ -312,7 +312,7 @@ class UI:
 
 
 # -------------- Fix Start for this method(paginate_output)-----------
-    def paginate_output(self, ayahs: List[Ayah], page_size: int = None, surah_info: SurahInfo = None):
+    def paginate_output(self, ayahs: List[Ayah], page_size: int = None, surah_info: SurahInfo = None, start_page: int = 1):
         """
         Display ayahs with pagination and allow bookmarking from the reader view.
 
@@ -325,7 +325,7 @@ class UI:
             page_size = max(1, (self.term_size.lines - 10) // 6)
 
         total_pages = math.ceil(len(ayahs) / page_size)
-        current_page = 1
+        current_page = start_page
 
         while True:
             self.clear_terminal()

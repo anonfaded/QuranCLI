@@ -1227,9 +1227,38 @@ class QuranApp:
                         surah, entry = all_bookmarks[int(sel) - 1]
                         ayah = entry.get("ayah", 1)
                         try:
+                            # Jump to the selected surah and ayah using the main app's display logic
                             self._clear_terminal()
                             print(Fore.GREEN + f"Jumping to Surah {surah}, Ayah {ayah}...")
-                            input(Fore.YELLOW + "Press Enter to continue...")
+                            surah_info = self.data_handler.get_surah_info(int(surah))
+                            if not surah_info:
+                                print(Fore.RED + f"Error: Could not retrieve information for Surah {surah}.")
+                                input(Fore.YELLOW + "Press Enter to continue...")
+                                continue
+                            # Get all ayahs for the surah
+                            all_ayahs = self.data_handler.get_ayahs(int(surah), 1, surah_info.total_verses)
+                            if not all_ayahs:
+                                print(Fore.RED + f"Error: Could not retrieve ayahs for Surah {surah}.")
+                                input(Fore.YELLOW + "Press Enter to continue...")
+                                continue
+                            # Find the page containing the bookmarked ayah
+                            page_size = max(1, (self.term_size.lines - 10) // 6)
+                            ayah_idx = None
+                            for idx_, ayah_obj in enumerate(all_ayahs):
+                                ayah_num = getattr(ayah_obj, 'number', None)
+                                if ayah_num is None:
+                                    ayah_num = getattr(ayah_obj, 'ayah_number', None)
+                                if ayah_num == ayah:
+                                    ayah_idx = idx_
+                                    break
+                            if ayah_idx is None:
+                                print(Fore.RED + f"Error: Could not locate Ayah {ayah} in Surah {surah}.")
+                                input(Fore.YELLOW + "Press Enter to continue...")
+                                continue
+                            # Calculate the page number
+                            page_num = (ayah_idx // page_size) + 1
+                            # Use the UI's paginate_output to start at the correct page
+                            self.ui.paginate_output(all_ayahs, page_size=page_size, surah_info=surah_info, start_page=page_num)
                         except Exception as e:
                             print(Fore.RED + f"Error jumping to bookmark: {e}")
                             input(Fore.YELLOW + "Press Enter to continue...")
