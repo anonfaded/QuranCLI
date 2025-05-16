@@ -311,8 +311,16 @@ class UI:
 
 
 
+# -------------- Fix Start for this method(paginate_output)-----------
     def paginate_output(self, ayahs: List[Ayah], page_size: int = None, surah_info: SurahInfo = None):
-        """Display ayahs with pagination"""
+        """
+        Display ayahs with pagination and allow bookmarking from the reader view.
+
+        Args:
+            ayahs (List[Ayah]): List of Ayah objects to display.
+            page_size (int, optional): Number of ayahs per page.
+            surah_info (SurahInfo, optional): Surah metadata.
+        """
         if page_size is None:
             page_size = max(1, (self.term_size.lines - 10) // 6)
 
@@ -321,18 +329,12 @@ class UI:
 
         while True:
             self.clear_terminal()
-            # Single consolidated header
             print(Style.BRIGHT + Fore.RED + "=" * self.term_size.columns)
-            # --- FIX ATTRIBUTE: Use surah_name_ar ---
-            # --- REVERT HEADER to simpler format temporarily to fix error, can enhance later ---
-            print(f"📖 Surah {surah_info.surah_number}: {surah_info.surah_name} ({surah_info.surah_name_ar})")
-            # print(f"📖 {surah_info.surah_name} ({surah_info.surah_name_ar}) • {surah_info.translation} • {surah_info.type.capitalize()}") # Use corrected name
-            # print(f"Total Ayahs: {surah_info.total_verses}")
-            # --- END FIX ATTRIBUTE ---
+            print(f"\U0001F4D6 Surah {surah_info.surah_number}: {surah_info.surah_name} ({surah_info.surah_name_ar})")
             print(f"Page {current_page}/{total_pages}")
             print(Style.BRIGHT + Fore.RED + "=" * self.term_size.columns)
 
-            # Display Surah Description (Keep this part)
+            # Display Surah Description
             if surah_info.description:
                 print(Style.DIM + Fore.YELLOW + "Description:" + Style.RESET_ALL + Style.DIM)
                 wrapped_desc = self.wrap_text(surah_info.description, self.term_size.columns - 4)
@@ -340,29 +342,33 @@ class UI:
                     print(Style.DIM + "  " + line + Style.RESET_ALL)
                 print(Style.BRIGHT + Fore.RED + "-" * self.term_size.columns)
 
-            # Display ayahs for current page (Keep this part)
+            # Display ayahs for current page
             start_idx = (current_page - 1) * page_size
             end_idx = min(start_idx + page_size, len(ayahs))
             local_ayahs = ayahs[start_idx:end_idx]
             for ayah in local_ayahs:
-                # Ensure display_single_ayah uses the correct fields (content, transliteration, translation_eng)
                 self.display_single_ayah(ayah)
-                
-            # Navigation Menu
-            box_width = 26  # Adjust width if needed
-            separator = "─" * box_width
 
-            print(Fore.RED + "\n╭─ " + Style.BRIGHT + Fore.GREEN + "🧭 Navigation")
-            if total_pages > 1:
-                print(Fore.RED + "│ → " + Fore.CYAN + "n " + Fore.WHITE + ": Next page")
-                print(Fore.RED + "│ → " + Fore.CYAN + "p " + Fore.WHITE + ": Previous page")
-            print(Fore.RED + "│ → " + Fore.MAGENTA + "reverse " + Fore.WHITE + ": Toggle Arabic reversal")
-            print(Fore.RED + "│ → " + Fore.YELLOW + "a " + Fore.WHITE + ": Play audio")
-            print(Fore.RED + "│ → " + Fore.RED + "q " + Fore.WHITE + ": Return")
+            # Navigation Menu (aligned, with short commands)
+            nav_options = [
+                (f"{Fore.CYAN}n{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Next page"),
+                (f"{Fore.CYAN}p{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Previous page"),
+                (f"{Fore.YELLOW}bookmark{Style.DIM}/bk{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Add bookmark for an ayah on this page"),
+                (f"{Fore.MAGENTA}reverse{Style.DIM}/rev{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Toggle Arabic reversal"),
+                (f"{Fore.YELLOW}a{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Play audio"),
+                (f"{Fore.RED}q{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Return"),
+            ]
+            max_cmd_len = max(len(self._strip_ansi(cmd)) for cmd, _ in nav_options)
+            box_width = 26
+            separator = "─" * box_width
+            print(Fore.RED + "\n╭─ " + Style.BRIGHT + Fore.GREEN + "\U0001F9ED Navigation")
+            for cmd, desc in nav_options:
+                pad = " " * (max_cmd_len - len(self._strip_ansi(cmd)))
+                print(Fore.RED + f"│ → {cmd}{pad} : {desc}{Style.RESET_ALL}")
             print(Fore.RED + "╰" + separator)
 
-            # User input prompt (aligned with box)
-            choice = input(Fore.RED + "  ❯ " + Fore.WHITE).lower()
+            # User input prompt
+            choice = input(Fore.RED + "  ❯ " + Fore.WHITE).lower().strip()
 
             if choice == 'n' and current_page < total_pages:
                 current_page += 1
@@ -370,8 +376,36 @@ class UI:
                 current_page -= 1
             elif choice == 'a':
                 self.display_audio_controls(surah_info)
-            elif choice == 'reverse':
+            elif choice in ['reverse', 'rev']:
                 self.data_handler.toggle_arabic_reversal()
+            elif choice in ['bookmark', 'bk']:
+                # List ayahs on this page for user to select
+                print(Fore.CYAN + "\nSelect an ayah to bookmark from this page:")
+                for idx, ayah in enumerate(local_ayahs, 1):
+                    ayah_num = getattr(ayah, 'number', None)
+                    if ayah_num is None:
+                        ayah_num = getattr(ayah, 'ayah_number', '?')
+                    print(f"{Fore.GREEN}{idx}. Ayah {ayah_num}: {Fore.WHITE}{ayah.content[:60]}{'...' if len(ayah.content) > 60 else ''}")
+                print(Fore.YELLOW + "Enter the number of the ayah to bookmark, or 'b' to cancel.")
+                while True:
+                    sel = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                    if sel.lower() == 'b':
+                        break
+                    if sel.isdigit() and 1 <= int(sel) <= len(local_ayahs):
+                        selected_ayah = local_ayahs[int(sel) - 1]
+                        ayah_num = getattr(selected_ayah, 'number', None)
+                        if ayah_num is None:
+                            ayah_num = getattr(selected_ayah, 'ayah_number', '?')
+                        note = input(Fore.CYAN + "Enter a note for this bookmark (optional, max 300 chars):\n" + Fore.RED + "  ❯ " + Fore.WHITE).strip()[:300]
+                        try:
+                            self.app.set_bookmark(surah_info.surah_number, ayah_num, note)
+                            print(Fore.GREEN + f"Bookmark added for Surah {surah_info.surah_number}, Ayah {ayah_num}.")
+                        except Exception as e:
+                            print(Fore.RED + f"Failed to add bookmark: {e}")
+                        input(Fore.YELLOW + "Press Enter to continue...")
+                        break
+                    else:
+                        print(Fore.RED + "Invalid selection. Please enter a valid number or 'b' to cancel.")
             elif choice == 'q':
                 return
             elif not choice:
@@ -380,7 +414,14 @@ class UI:
                 else:
                     return
 
-# -------------- Fix Start for this method(display_single_ayah)-----------
+    def _strip_ansi(self, s: str) -> str:
+        """Remove ANSI escape codes for accurate length calculation."""
+        import re
+        ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+        return ansi_escape.sub('', s)
+# -------------- Fix Ended for this method(paginate_output)-----------
+
+
     def display_single_ayah(self, ayah: Ayah):
         """
         Display a single ayah with Arabic, Transliteration, Urdu, and English.
@@ -433,7 +474,6 @@ class UI:
 
         # Separator
         print(Style.BRIGHT + Fore.GREEN + "\n" + "-" * min(40, self.term_size.columns))
-# -------------- Fix Ended for this method(display_single_ayah)-----------
 
 
     def wrap_text(self, text: str, width: int) -> str:
