@@ -987,6 +987,14 @@ class QuranApp:
                 print(Fore.RED + f"Error searching Downloads: {e}")
                 return []
 
+        info_text = (
+            f"{Fore.GREEN}Bookmarks let you save (pin) any ayah in any surah, with an optional note (max 300 chars).\n"
+            f"You can search by surah number or name, and have multiple bookmarks per surah.\n"
+            f"Features: jump to bookmarks, add/edit/delete, quick Ayatul Kursi bookmarking command, open settings folder, backup/restore, and toggle Arabic reversal.\n"
+            f"Tip: Use 'reverse' to toggle Arabic display if it appears inverted or not correct, 'openprefs' to open settings folder, 'backup' to backup/restore.\n"
+            f"Quick Ayatul Kursi: Type 'ayatul-kursi' to instantly bookmark Ayah 255 of Surah 2 (Al-Baqarah).\n"
+        )
+        
         options = [
             ("1", "Jump to a bookmark", "jump", Fore.CYAN),
             ("2", "Add a bookmark", "add", Fore.CYAN),
@@ -995,6 +1003,7 @@ class QuranApp:
             ("openprefs", "Open preferences/settings folder", "op", Fore.CYAN),
             ("backup", "Backup/restore all app settings", "bk", Fore.CYAN),
             ("ayatul-kursi", "Quick bookmark Ayatul Kursi", "ak", Fore.CYAN),
+            ("info", "Show bookmark manager info/help", "i", Fore.CYAN),
             ("4", "Back to main menu", "back", Fore.RED + Style.BRIGHT),
         ]
         def strip_ansi(s):
@@ -1010,11 +1019,6 @@ class QuranApp:
                 separator = "─" * box_width
                 print(Fore.RED + Style.BRIGHT + "\n📑 Bookmark Manager".ljust(box_width))
                 print(Fore.RED + separator)
-                print(Fore.YELLOW + "Bookmarks let you save (pin) any ayah in any surah, with an optional note (max 300 chars).")
-                print(Fore.YELLOW + "You can search by surah number or name, and have multiple bookmarks per surah.")
-                print(Fore.YELLOW + "Features: jump to bookmarks, add/edit/delete, quick Ayatul Kursi, open settings folder, backup/restore, and toggle Arabic reversal.")
-                print(Fore.LIGHTBLACK_EX + "Tip: Use 'reverse' to toggle Arabic display, 'openprefs' to open settings folder, 'backup' to backup/restore.")
-                print(Fore.LIGHTBLACK_EX + "Quick Ayatul Kursi: Type 'ayatul-kursi' to instantly bookmark Ayah 255 of Surah 2 (Al-Baqarah).")
                 print(Fore.GREEN + Style.BRIGHT + "\nSaved Bookmarks".center(box_width))
                 print(Fore.RED + separator)
                 bookmarks = self.list_bookmarks()
@@ -1054,7 +1058,7 @@ class QuranApp:
                 # Map short commands to long
                 cmd_map = {
                     "jump": "1", "add": "2", "edit": "3", "rev": "reverse", "op": "openprefs",
-                    "bk": "backup", "ak": "ayatul-kursi", "back": "4"
+                    "bk": "backup", "ak": "ayatul-kursi", "back": "4", "i": "info"
                 }
                 for _, _, short, _ in options:
                     if choice == short:
@@ -1064,6 +1068,13 @@ class QuranApp:
                     self.data_handler.toggle_arabic_reversal()
                     print(Fore.GREEN + "Arabic reversal toggled.")
                     input(Fore.YELLOW + "Press Enter to continue...")
+                    continue
+                if choice == 'info':
+                    self._clear_terminal()
+                    print(Fore.RED + Style.BRIGHT + "\n📑 Bookmark Manager Info\n" + ("─" * 60))
+                    print(info_text)
+                    print("─" * 60)
+                    input(Fore.YELLOW + "Press Enter to return to the bookmark manager...")
                     continue
                 if choice == 'openprefs':
                     open_preferences_folder()
