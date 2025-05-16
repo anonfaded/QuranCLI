@@ -684,12 +684,20 @@ class QuranApp:
         - Fuzzy surah search with suggestions (like main menu).
         - Grouped bookmarks per surah, separated by red lines.
         - Add, jump, edit, and delete bookmarks (edit/delete in one menu).
-        - Live character count for note input (if possible).
         - Ayah range validation for each surah.
         - Option to go back at every input.
         - Consistent UI, robust multiplatform support, and clear error handling.
+        - Supports 'reverse' command for Arabic reversal toggle.
+        - Supports opening the preferences file location in the system file explorer.
+        - Supports quick Ayatul Kursi bookmark.
+        - Clear, user-friendly explanations for all features.
+        - Note limit is 300 characters.
+        - Backup/restore (import/export) of preferences file.
         """
         import difflib
+        import shutil
+        import sys
+        import os
 
         def get_surah_number_from_input(user_input):
             """Fuzzy match surah name/number, return surah number or None."""
@@ -715,20 +723,11 @@ class QuranApp:
                     print(Fore.RED + "Invalid choice. Please select a number or 'b' to go back.")
             return None
 
-        def input_note_with_counter(max_len):
-            """Input note with live character count (if possible)."""
+        def input_note_with_limit(max_len):
+            """Input note with max length, no live counter (terminal refresh not supported)."""
             print(Fore.CYAN + f"Enter a note for this bookmark (optional, max {max_len} chars, press Enter to skip):")
             print(Fore.LIGHTBLACK_EX + "e.g. 'Favorite ayah', 'For memorization', 'Check tafsir', etc.")
-            note = ""
-            try:
-                import readline
-                while True:
-                    note = input(Fore.RED + f"  ❯ [{max_len-len(note)} left] " + Fore.WHITE)
-                    if len(note) <= max_len:
-                        break
-                    print(Fore.RED + f"Note too long! {len(note)}/{max_len} chars.")
-            except Exception:
-                note = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()[:max_len]
+            note = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()[:max_len]
             return note
 
         def get_ayah_text(surah_num, ayah_num):
@@ -741,6 +740,71 @@ class QuranApp:
                 print(f"[DEBUG] Error fetching ayah text: {e}")
             return ""
 
+        def open_preferences_folder():
+            """Open the folder containing the preferences file in the system file explorer."""
+            pref_path = self.preferences_file
+            if not pref_path:
+                print(Fore.RED + "Preferences file path not found.")
+                input(Fore.YELLOW + "Press Enter to continue...")
+                return
+            folder = os.path.dirname(pref_path)
+            print(Fore.GREEN + f"Preferences file location: {pref_path}")
+            print(Fore.YELLOW + "Opening preferences folder in your file explorer...")
+            try:
+                if sys.platform == "win32":
+                    os.startfile(folder)
+                elif sys.platform == "darwin":
+                    subprocess.run(['open', folder], check=False)
+                else:
+                    try:
+                        subprocess.run(['xdg-open', folder], check=False)
+                    except Exception:
+                        for fm in ['nautilus', 'thunar', 'dolphin', 'pcmanfm']:
+                            if shutil.which(fm):
+                                subprocess.run([fm, folder], check=False)
+                                break
+                        else:
+                            print(Fore.RED + "Could not open folder: No suitable file manager found.")
+                print(Fore.GREEN + "Opened folder in file explorer.")
+            except Exception as e:
+                print(Fore.RED + f"Error opening folder: {e}")
+            input(Fore.YELLOW + "Press Enter to continue...")
+
+        def backup_preferences():
+            """Export or import the preferences file (bookmarks, theme, reciter prefs, etc)."""
+            print(Fore.CYAN + "Type 'export' to backup your preferences, or 'import' to restore from a backup, or 'b' to go back.")
+            print(Fore.LIGHTBLACK_EX + "This includes bookmarks, theme, reciter preferences, and all app settings.")
+            action = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+            if action == 'export':
+                dest = input(Fore.CYAN + "Enter path to save backup file (or 'b' to cancel):\n" + Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                if dest.lower() == 'b':
+                    return
+                try:
+                    shutil.copy2(self.preferences_file, dest)
+                    print(Fore.GREEN + f"Preferences exported to {dest}")
+                except Exception as e:
+                    print(Fore.RED + f"Export failed: {e}")
+                input(Fore.YELLOW + "Press Enter to continue...")
+            elif action == 'import':
+                src = input(Fore.CYAN + "Enter path of backup file to import (or 'b' to cancel):\n" + Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                if src.lower() == 'b':
+                    return
+                if not os.path.isfile(src):
+                    print(Fore.RED + "File not found."); input(Fore.YELLOW + "Press Enter to continue..."); return
+                print(Fore.YELLOW + "Importing will overwrite your current preferences and bookmarks. Continue? (y/n)")
+                confirm = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+                if confirm == 'y':
+                    try:
+                        shutil.copy2(src, self.preferences_file)
+                        print(Fore.GREEN + "Preferences imported successfully.")
+                        # Reload preferences
+                        self.preferences = self._load_preferences()
+                    except Exception as e:
+                        print(Fore.RED + f"Import failed: {e}")
+                else:
+                    print(Fore.YELLOW + "Import cancelled.")
+                input(Fore.YELLOW + "Press Enter to continue...")
+
         while True:
             try:
                 self._clear_terminal()
@@ -748,9 +812,12 @@ class QuranApp:
                 separator = "─" * box_width
                 print(Fore.RED + Style.BRIGHT + "\n📑 Bookmark Manager".ljust(box_width))
                 print(Fore.RED + separator)
-                print(Fore.YELLOW + "Bookmarks pin a single ayah in any surah, with an optional note (max 200 chars).")
-                print(Fore.LIGHTBLACK_EX + "You can search by surah number or name. Each bookmark is unique per surah+ayah.\n")
-                print(Fore.GREEN + Style.BRIGHT + "Saved Bookmarks".center(box_width))
+                print(Fore.YELLOW + "Bookmarks let you save (pin) any ayah in any surah, with an optional note (max 300 chars).")
+                print(Fore.YELLOW + "You can search by surah number or name, and have multiple bookmarks per surah.")
+                print(Fore.YELLOW + "Features: jump to bookmarks, add/edit/delete, quick Ayatul Kursi, open settings folder, backup/restore, and toggle Arabic reversal.")
+                print(Fore.LIGHTBLACK_EX + "Tip: Use 'reverse' to toggle Arabic display, 'openprefs' to open settings folder, 'backup' to backup/restore.")
+                print(Fore.LIGHTBLACK_EX + "Quick Ayatul Kursi: Type 'ayatul-kursi' to instantly bookmark Ayah 255 of Surah 2 (Al-Baqarah).")
+                print(Fore.GREEN + Style.BRIGHT + "\nSaved Bookmarks".center(box_width))
                 print(Fore.RED + separator)
                 # Group bookmarks by surah, show all ayahs for each surah
                 bookmarks = self.list_bookmarks()
@@ -781,9 +848,41 @@ class QuranApp:
                 print(Fore.RED + "│ → " + Fore.CYAN + "1 " + Fore.WHITE + ": Jump to a bookmark (by surah/ayah)")
                 print(Fore.RED + "│ → " + Fore.CYAN + "2 " + Fore.WHITE + ": Add a bookmark")
                 print(Fore.RED + "│ → " + Fore.CYAN + "3 " + Fore.WHITE + ": Edit/Delete a bookmark")
+                print(Fore.RED + "│ → " + Fore.CYAN + "reverse " + Fore.WHITE + ": Toggle Arabic reversal")
+                print(Fore.RED + "│ → " + Fore.CYAN + "openprefs " + Fore.WHITE + ": Open preferences/settings folder")
+                print(Fore.RED + "│ → " + Fore.CYAN + "backup " + Fore.WHITE + ": Backup/restore all app settings")
+                print(Fore.RED + "│ → " + Fore.CYAN + "ayatul-kursi " + Fore.WHITE + ": Quick bookmark Ayatul Kursi")
                 print(Fore.RED + "│ → " + Fore.CYAN + "4 " + Fore.WHITE + ": Back to main menu")
                 print(Fore.RED + "╰" + ("─" * (box_width-2)))
-                choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+                if choice == 'reverse':
+                    self.data_handler.toggle_arabic_reversal()
+                    print(Fore.GREEN + "Arabic reversal toggled.")
+                    input(Fore.YELLOW + "Press Enter to continue...")
+                    continue
+                if choice == 'openprefs':
+                    open_preferences_folder()
+                    continue
+                if choice == 'backup':
+                    backup_preferences()
+                    continue
+                if choice == 'ayatul-kursi':
+                    # Quick add Ayatul Kursi
+                    surah_num = 2
+                    ayah_num = 255
+                    note = "Ayatul Kursi"
+                    surah_key = str(surah_num)
+                    if "bookmarks" not in self.preferences:
+                        self.preferences["bookmarks"] = {}
+                    if surah_key not in self.preferences["bookmarks"]:
+                        self.preferences["bookmarks"][surah_key] = []
+                    if any(int(b.get("ayah")) == ayah_num for b in self.preferences["bookmarks"][surah_key]):
+                        print(Fore.YELLOW + "Ayatul Kursi already bookmarked."); input(Fore.YELLOW + "Press Enter to continue..."); continue
+                    self.preferences["bookmarks"][surah_key].append({"ayah": ayah_num, "note": note})
+                    self._save_preferences()
+                    print(Fore.GREEN + "Ayatul Kursi bookmarked (Surah 2, Ayah 255).")
+                    input(Fore.YELLOW + "Press Enter to continue...")
+                    continue
                 if choice == '1':
                     # Jump to bookmark
                     print(Fore.CYAN + "Enter surah number or name to jump to bookmark (or 'b' to go back):")
@@ -796,7 +895,7 @@ class QuranApp:
                         print(Fore.RED + "No bookmarks for this surah."); input(Fore.YELLOW + "Press Enter to continue..."); continue
                     entries = grouped[str(surah_num)]
                     if len(entries) > 1:
-                        print(Fore.CYAN + "Multiple bookmarks found. Enter ayah number to jump (or 'b' to go back):")
+                        print(Fore.CYAN + f"Multiple bookmarks found for Surah {surah_num} ({self.surah_names.get(int(surah_num),'')}), enter ayah number to jump (or 'b' to go back):")
                         print(Fore.LIGHTBLACK_EX + "Available: " + ", ".join([str(e.get('ayah')) for e in entries]))
                         ayah_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
                         if ayah_input.lower() == 'b':
@@ -826,12 +925,60 @@ class QuranApp:
                     start = 1
                     end = surah_info.total_verses
                     ayahs = self.data_handler.get_ayahs(int(surah_num), start, end)
-                    # Find page containing the bookmarked ayah
+                    # Find page containing the bookmarked ayah and start there
                     try:
                         page_size = max(1, (self.term_size.lines - 10) // 6)
                         idx = int(ayah) - 1
-                        page = idx // page_size + 1
-                        self.ui.paginate_output(ayahs, page_size=page_size, surah_info=surah_info)
+                        total_pages = (len(ayahs) + page_size - 1) // page_size
+                        current_page = idx // page_size + 1
+                        # Custom paginate_output to start at correct page
+                        def paginate_output_start(ayahs, page_size, surah_info, start_page):
+                            total_pages = (len(ayahs) + page_size - 1) // page_size
+                            current_page = start_page
+                            while True:
+                                self.ui.clear_terminal()
+                                print(Style.BRIGHT + Fore.RED + "=" * self.term_size.columns)
+                                print(f"📖 Surah {surah_info.surah_number}: {surah_info.surah_name} ({surah_info.surah_name_ar})")
+                                print(f"Page {current_page}/{total_pages}")
+                                print(Style.BRIGHT + Fore.RED + "=" * self.term_size.columns)
+                                if surah_info.description:
+                                    print(Style.DIM + Fore.YELLOW + "Description:" + Style.RESET_ALL + Style.DIM)
+                                    wrapped_desc = self.ui.wrap_text(surah_info.description, self.term_size.columns - 4)
+                                    for line in wrapped_desc.split('\n'):
+                                        print(Style.DIM + "  " + line + Style.RESET_ALL)
+                                    print(Style.BRIGHT + Fore.RED + "-" * self.term_size.columns)
+                                start_idx = (current_page - 1) * page_size
+                                end_idx = min(start_idx + page_size, len(ayahs))
+                                local_ayahs = ayahs[start_idx:end_idx]
+                                for ayah in local_ayahs:
+                                    self.ui.display_single_ayah(ayah)
+                                box_width = 26
+                                separator = "─" * box_width
+                                print(Fore.RED + "\n╭─ " + Style.BRIGHT + Fore.GREEN + "🧭 Navigation")
+                                if total_pages > 1:
+                                    print(Fore.RED + "│ → " + Fore.CYAN + "n " + Fore.WHITE + ": Next page")
+                                    print(Fore.RED + "│ → " + Fore.CYAN + "p " + Fore.WHITE + ": Previous page")
+                                print(Fore.RED + "│ → " + Fore.MAGENTA + "reverse " + Fore.WHITE + ": Toggle Arabic reversal")
+                                print(Fore.RED + "│ → " + Fore.YELLOW + "a " + Fore.WHITE + ": Play audio")
+                                print(Fore.RED + "│ → " + Fore.RED + "q " + Fore.WHITE + ": Return")
+                                print(Fore.RED + "╰" + separator)
+                                choice = input(Fore.RED + "  ❯ " + Fore.WHITE).lower()
+                                if choice == 'n' and current_page < total_pages:
+                                    current_page += 1
+                                elif choice == 'p' and current_page > 1:
+                                    current_page -= 1
+                                elif choice == 'a':
+                                    self.ui.display_audio_controls(surah_info)
+                                elif choice == 'reverse':
+                                    self.data_handler.toggle_arabic_reversal()
+                                elif choice == 'q':
+                                    return
+                                elif not choice:
+                                    if current_page < total_pages:
+                                        current_page += 1
+                                    else:
+                                        return
+                        paginate_output_start(ayahs, page_size, surah_info, current_page)
                     except Exception as e:
                         print(Fore.RED + f"Error displaying ayah: {e}")
                         input(Fore.YELLOW + "Press Enter to continue...")
@@ -858,7 +1005,7 @@ class QuranApp:
                         print(Fore.RED + f"Invalid ayah number. Enter 1-{surah_info.total_verses} or 'b' to go back.")
                     if ayah_input.lower() == 'b':
                         continue
-                    note = input_note_with_counter(200)
+                    note = input_note_with_limit(200)
                     # Save bookmark (support multiple per surah)
                     if "bookmarks" not in self.preferences:
                         self.preferences["bookmarks"] = {}
@@ -884,7 +1031,7 @@ class QuranApp:
                         print(Fore.RED + "No bookmarks for this surah."); input(Fore.YELLOW + "Press Enter to continue..."); continue
                     entries = grouped[str(surah_num)]
                     if len(entries) > 1:
-                        print(Fore.CYAN + "Multiple bookmarks found. Enter ayah number to edit/delete (or 'b' to go back):")
+                        print(Fore.CYAN + f"Multiple bookmarks found for Surah {surah_num} ({self.surah_names.get(int(surah_num),'')}), enter ayah number to edit/delete (or 'b' to go back):")
                         print(Fore.LIGHTBLACK_EX + "Available: " + ", ".join([str(e.get('ayah')) for e in entries]))
                         ayah_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
                         if ayah_input.lower() == 'b':
@@ -898,7 +1045,7 @@ class QuranApp:
                     print(Fore.CYAN + "Type 'e' to edit note, 'd' to delete, or 'b' to go back:")
                     action = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
                     if action == 'e':
-                        new_note = input_note_with_counter(200)
+                        new_note = input_note_with_limit(200)
                         entry["note"] = new_note
                         self._save_preferences()
                         print(Fore.GREEN + "Note updated."); input(Fore.YELLOW + "Press Enter to continue...")
@@ -924,7 +1071,7 @@ class QuranApp:
                 elif choice == '4':
                     break
                 else:
-                    print(Fore.RED + "Invalid choice. Please enter 1-4."); input(Fore.YELLOW + "Press Enter to continue...")
+                    print(Fore.RED + "Invalid choice. Please enter 1-4 or 'reverse'."); input(Fore.YELLOW + "Press Enter to continue...")
             except KeyboardInterrupt:
                 print(Fore.YELLOW + "\nBookmark menu cancelled. Returning to main menu.")
                 break
