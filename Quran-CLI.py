@@ -7,6 +7,7 @@ import platformdirs
 import subprocess
 import json
 from time import sleep
+from pathlib import Path
 
 # --- Add Path Hook for PyInstaller ---
 try:
@@ -554,7 +555,8 @@ class QuranApp:
             (f"{Fore.CYAN}Surah Name{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Search Surah {Style.DIM}(e.g., 'Rahman'){Style.RESET_ALL}"),
             (f"{Fore.CYAN}list{Style.DIM}/ls{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Display list of Surahs"),
             (f"{Fore.CYAN}sub{Style.DIM}/sub{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Create subtitles for Ayahs"),
-            (f"{Fore.CYAN}bm{Style.DIM}/bookmarks{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Manage bookmarks"),
+            (f"{Fore.CYAN}bookmarks{Style.DIM}/bm{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Manage bookmarks"),
+            (f"{Fore.CYAN}backup{Style.DIM}/bk{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Backup/restore all app settings"),
             (f"{Fore.CYAN}clearaudio{Style.DIM}/clr{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Clear audio cache"),
             (f"{Fore.CYAN}audiopath{Style.DIM}/ap{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Show and open audio cache folder"),
             (f"{Fore.CYAN}info{Style.DIM}/i{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Show help and information"),
@@ -616,6 +618,9 @@ class QuranApp:
                 elif user_input in ['bm', 'bookmarks']:
                     self._bookmark_menu()
                     continue
+                elif user_input in ['bk', 'backup']:
+                    self.backup_restore_menu()
+                    continue
                 elif user_input in ['clearaudio', 'clr']:
                     self._clear_audio_cache()
                     continue
@@ -671,6 +676,173 @@ class QuranApp:
                 print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
                 break
     # -------------- Fix Ended for this method(_get_surah_number)-----------
+
+
+
+
+
+    def backup_restore_menu(self):
+        """
+        Show only the backup/restore menu (for use from main menu).
+        This does not enter the full bookmark manager.
+        Multiplatform, robust, and user-friendly.
+        """
+        downloads_dir = str(Path.home() / "Downloads")
+        default_filename = "QuranCLI-Settings.json"
+        default_path = os.path.join(downloads_dir, default_filename)
+
+        def open_file_picker(save=False, default_path=None):
+            """
+            Open a file picker dialog for import/export.
+            Returns selected path or None.
+            Tries to use a dark theme if available (Linux/Windows).
+            """
+            try:
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes('-topmost', True)
+                try:
+                    root.tk.call("tk", "scaling", 1.2)
+                    root.option_add("*background", "#222222")
+                    root.option_add("*foreground", "#e0e0e0")
+                    root.option_add("*highlightBackground", "#222222")
+                    root.option_add("*highlightColor", "#e0e0e0")
+                except Exception:
+                    pass
+                file_path = None
+                if save:
+                    file_path = filedialog.asksaveasfilename(
+                        initialdir=os.path.dirname(default_path) if default_path else None,
+                        initialfile=os.path.basename(default_path) if default_path else None,
+                        title="Select location to save preferences",
+                        defaultextension=".json",
+                        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+                    )
+                else:
+                    file_path = filedialog.askopenfilename(
+                        initialdir=os.path.dirname(default_path) if default_path else None,
+                        title="Select preferences file to import",
+                        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+                    )
+                root.destroy()
+                return file_path if file_path else None
+            except Exception as e:
+                print(Fore.RED + f"File picker error: {e}")
+                return None
+
+        def confirm_path(path, action):
+            """Ask user to confirm the chosen path before proceeding."""
+            print(Fore.YELLOW + f"\nYou chose: {Fore.CYAN}{path}{Fore.YELLOW} for {action}.")
+            confirm = input(Fore.YELLOW + "Proceed? (y/n): " + Fore.WHITE).strip().lower()
+            return confirm == 'y'
+
+        def find_json_files_in_downloads():
+            """Return a list of .json files in the user's Downloads directory."""
+            try:
+                files = [str(f) for f in Path(downloads_dir).glob("*.json") if f.is_file()]
+                return files
+            except Exception as e:
+                print(Fore.RED + f"Error searching Downloads: {e}")
+                return []
+
+        box_width = 60
+        print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "Backup/Restore Options")
+        print(Fore.RED + f"│ → {Fore.CYAN}export{Style.DIM}/e{Style.NORMAL}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Backup/export your settings")
+        print(Fore.RED + f"│ → {Fore.CYAN}import{Style.DIM}/i{Style.NORMAL}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Restore/import settings from a backup")
+        print(Fore.RED + f"│ → {Fore.RED}b{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Cancel and go back")
+        print(Fore.RED + "╰" + ("─" * (box_width-2)))
+        action = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+        if action in ['export', 'e']:
+            print(Fore.YELLOW + f"\nPress Enter to save backup to {Fore.CYAN}{default_path}{Fore.YELLOW},")
+            print(Fore.YELLOW + "or type 'picker' to open a file picker dialog, or enter a custom path, or 'b' to cancel.")
+            while True:
+                dest = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                if dest.lower() == 'b':
+                    break
+                if dest.lower() == 'picker':
+                    dest = open_file_picker(save=True, default_path=default_path)
+                    if not dest:
+                        print(Fore.YELLOW + "No file selected. Cancelled.")
+                        input(Fore.YELLOW + "Press Enter to continue...")
+                        break
+                if not dest:
+                    dest = default_path
+                if not confirm_path(dest, "backup/export"):
+                    print(Fore.YELLOW + "Cancelled by user.")
+                    input(Fore.YELLOW + "Press Enter to continue...")
+                    break
+                try:
+                    shutil.copy2(self.preferences_file, dest)
+                    print(Fore.GREEN + f"Preferences exported to {Fore.CYAN}{dest}{Fore.GREEN}")
+                except Exception as e:
+                    print(Fore.RED + f"Export failed: {e}")
+                input(Fore.YELLOW + "Press Enter to continue...")
+                break
+        elif action in ['import', 'i']:
+            print(Fore.YELLOW + f"\nPlace your backup file in {Fore.CYAN}{downloads_dir}{Fore.YELLOW} and press Enter to auto-import,")
+            print(Fore.YELLOW + "or type 'picker' to open a file picker dialog, or enter a custom path, or 'b' to cancel.")
+            while True:
+                src = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                if src.lower() == 'b':
+                    break
+                if src.lower() == 'picker':
+                    src = open_file_picker(save=False, default_path=default_path)
+                    if not src:
+                        print(Fore.YELLOW + "No file selected. Cancelled.")
+                        input(Fore.YELLOW + "Press Enter to continue...")
+                        break
+                if not src:
+                    # If no input, search for .json files in Downloads
+                    json_files = find_json_files_in_downloads()
+                    if not json_files:
+                        print(Fore.RED + "No .json files found in Downloads."); input(Fore.YELLOW + "Press Enter to continue..."); break
+                    if len(json_files) == 1:
+                        src = json_files[0]
+                        print(Fore.YELLOW + f"Found backup: {Fore.CYAN}{src}")
+                    else:
+                        print(Fore.YELLOW + "Multiple .json files found in Downloads:")
+                        for idx, f in enumerate(json_files, 1):
+                            print(f"{Fore.CYAN}{idx}. {f}")
+                        while True:
+                            sel = input(Fore.YELLOW + "Select a file by number or 'b' to cancel: " + Fore.WHITE).strip()
+                            if sel.lower() == 'b':
+                                src = None
+                                break
+                            if sel.isdigit() and 1 <= int(sel) <= len(json_files):
+                                src = json_files[int(sel)-1]
+                                break
+                        if not src:
+                            break
+                if not os.path.isfile(src):
+                    print(Fore.RED + "File not found."); input(Fore.YELLOW + "Press Enter to continue..."); break
+                if not confirm_path(src, "import/restore"):
+                    print(Fore.YELLOW + "Cancelled by user.")
+                    input(Fore.YELLOW + "Press Enter to continue...")
+                    break
+                print(Fore.YELLOW + "Importing will overwrite your current preferences and bookmarks. Continue? (y/n)")
+                confirm = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+                if confirm == 'y':
+                    try:
+                        with open(src, "r", encoding="utf-8") as f:
+                            data = f.read()
+                        json.loads(data)  # Validate JSON
+                        with open(self.preferences_file, "w", encoding="utf-8") as f:
+                            f.write(data)
+                        print(Fore.GREEN + "Preferences imported successfully.")
+                        self.preferences = self._load_preferences()
+                    except Exception as e:
+                        print(Fore.RED + f"Import failed: {e}")
+                else:
+                    print(Fore.YELLOW + "Import cancelled.")
+                input(Fore.YELLOW + "Press Enter to continue...")
+                break
+        # Return to main menu after backup/restore
+        return
+
+
+
 
 # -------------- Fix Start for this method(_bookmark_menu)-----------
     def _bookmark_menu(self):
@@ -770,7 +942,6 @@ class QuranApp:
                 root = tk.Tk()
                 root.withdraw()
                 root.attributes('-topmost', True)
-                # Try to set dark theme (works on some Linux/Windows, not all)
                 try:
                     root.tk.call("tk", "scaling", 1.2)
                     root.option_add("*background", "#222222")
@@ -806,7 +977,16 @@ class QuranApp:
             confirm = input(Fore.YELLOW + "Proceed? (y/n): " + Fore.WHITE).strip().lower()
             return confirm == 'y'
 
-        # Option definitions
+        def find_json_files_in_downloads():
+            """Return a list of .json files in the user's Downloads directory."""
+            downloads_dir = str(Path.home() / "Downloads")
+            try:
+                files = [str(f) for f in Path(downloads_dir).glob("*.json") if f.is_file()]
+                return files
+            except Exception as e:
+                print(Fore.RED + f"Error searching Downloads: {e}")
+                return []
+
         options = [
             ("1", "Jump to a bookmark", "jump", Fore.CYAN),
             ("2", "Add a bookmark", "add", Fore.CYAN),
@@ -817,7 +997,6 @@ class QuranApp:
             ("ayatul-kursi", "Quick bookmark Ayatul Kursi", "ak", Fore.CYAN),
             ("4", "Back to main menu", "back", Fore.RED + Style.BRIGHT),
         ]
-        # Calculate max command length for alignment
         def strip_ansi(s):
             import re
             ansi_escape = re.compile(r'\x1B\\[[0-?]*[ -/]*[@-~]')
@@ -870,12 +1049,6 @@ class QuranApp:
                     pad = " " * (max_cmd_len - len(cmd) - (len(short) + 1 if short else 0))
                     print(Fore.RED + f"│ → {cmd_str}{pad} : {Style.NORMAL}{Fore.WHITE}{desc}{Style.RESET_ALL}")
                 print(Fore.RED + "╰" + ("─" * (box_width-2)))
-                print(Fore.LIGHTBLACK_EX + "\n" +
-                    "• To use the default location, just press Enter when prompted for a path.\n"
-                    "• To open a file picker dialog, type 'picker' (recommended for custom locations).\n"
-                    "• To cancel, type 'b' at any prompt.\n"
-                    "• You will be asked to confirm your chosen path before saving or importing.\n"
-                )
                 choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
 
                 # Map short commands to long
@@ -899,14 +1072,15 @@ class QuranApp:
                     downloads_dir = str(Path.home() / "Downloads")
                     default_filename = "QuranCLI-Settings.json"
                     default_path = os.path.join(downloads_dir, default_filename)
-                    print(Fore.CYAN + "Backup/Restore Options:")
-                    print(Fore.CYAN + "  export/e  - Backup/export your settings")
-                    print(Fore.CYAN + "  import/i  - Restore/import settings from a backup")
-                    print(Fore.CYAN + "  b         - Cancel and go back")
+                    print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "Backup/Restore Options")
+                    print(Fore.RED + f"│ → {Fore.CYAN}export{Style.DIM}/e{Style.NORMAL}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Backup/export your settings")
+                    print(Fore.RED + f"│ → {Fore.CYAN}import{Style.DIM}/i{Style.NORMAL}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Restore/import settings from a backup")
+                    print(Fore.RED + f"│ → {Fore.RED}b{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Cancel and go back")
+                    print(Fore.RED + "╰" + ("─" * (box_width-2)))
                     action = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
                     if action in ['export', 'e']:
-                        print(Fore.CYAN + f"\nPress Enter to save backup to {Fore.YELLOW}{default_path}{Fore.CYAN},\n"
-                                          f"or type 'picker' to choose location, or enter a custom path, or 'b' to cancel.")
+                        print(Fore.YELLOW + f"\nPress Enter to save backup to {Fore.CYAN}{default_path}{Fore.YELLOW},")
+                        print(Fore.YELLOW + "or type 'picker' to open a file picker dialog, or enter a custom path, or 'b' to cancel.")
                         while True:
                             dest = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
                             if dest.lower() == 'b':
@@ -931,8 +1105,8 @@ class QuranApp:
                             input(Fore.YELLOW + "Press Enter to continue...")
                             break
                     elif action in ['import', 'i']:
-                        print(Fore.CYAN + f"\nPlace your backup file in {Fore.YELLOW}{downloads_dir}{Fore.CYAN} and press Enter to auto-import,\n"
-                                          f"or type 'picker' to choose file, or enter a custom path, or 'b' to cancel.")
+                        print(Fore.YELLOW + f"\nPlace your backup file in {Fore.CYAN}{downloads_dir}{Fore.YELLOW} and press Enter to auto-import,")
+                        print(Fore.YELLOW + "or type 'picker' to open a file picker dialog, or enter a custom path, or 'b' to cancel.")
                         while True:
                             src = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
                             if src.lower() == 'b':
@@ -944,7 +1118,27 @@ class QuranApp:
                                     input(Fore.YELLOW + "Press Enter to continue...")
                                     break
                             if not src:
-                                src = default_path
+                                # If no input, search for .json files in Downloads
+                                json_files = find_json_files_in_downloads()
+                                if not json_files:
+                                    print(Fore.RED + "No .json files found in Downloads."); input(Fore.YELLOW + "Press Enter to continue..."); break
+                                if len(json_files) == 1:
+                                    src = json_files[0]
+                                    print(Fore.YELLOW + f"Found backup: {Fore.CYAN}{src}")
+                                else:
+                                    print(Fore.YELLOW + "Multiple .json files found in Downloads:")
+                                    for idx, f in enumerate(json_files, 1):
+                                        print(f"{Fore.CYAN}{idx}. {f}")
+                                    while True:
+                                        sel = input(Fore.YELLOW + "Select a file by number or 'b' to cancel: " + Fore.WHITE).strip()
+                                        if sel.lower() == 'b':
+                                            src = None
+                                            break
+                                        if sel.isdigit() and 1 <= int(sel) <= len(json_files):
+                                            src = json_files[int(sel)-1]
+                                            break
+                                    if not src:
+                                        break
                             if not os.path.isfile(src):
                                 print(Fore.RED + "File not found."); input(Fore.YELLOW + "Press Enter to continue..."); break
                             if not confirm_path(src, "import/restore"):
