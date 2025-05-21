@@ -11,6 +11,7 @@ import arabic_reshaper
 import platformdirs
 import subprocess  # Added for Linux/Mac folder opening
 import re
+import pygame
 
 if sys.platform == "win32":
     import msvcrt
@@ -531,6 +532,36 @@ class UI:
         try:
             if choice == 'p':
                 surah_num = surah_info.surah_number
+                # Check if current audio is finished playing
+                is_finished = (self.audio_manager.current_audio and 
+                              self.audio_manager.duration > 0 and 
+                              self.audio_manager.current_position >= self.audio_manager.duration - 0.1)
+                
+                # New condition: replay from beginning if finished
+                if is_finished:
+                    # Make sure the audio file is still available
+                    if self.audio_manager.current_audio and os.path.exists(self.audio_manager.current_audio):
+                        try:
+                            # Directly reload and play the audio instead of using seek
+                            pygame.mixer.music.stop()
+                            pygame.mixer.music.load(str(self.audio_manager.current_audio))
+                            pygame.mixer.music.play()
+                            
+                            # Reset tracking variables
+                            self.audio_manager.current_position = 0
+                            self.audio_manager.start_time = time.time()
+                            self.audio_manager.is_playing = True
+                            
+                            # Start progress tracking
+                            self.audio_manager.start_progress_tracking()
+                            
+                            # Redraw UI immediately
+                            self._redraw_audio_ui(surah_info)
+                            return
+                        except Exception as e:
+                            print(Fore.RED + f"\nError replaying audio: {e}")
+                            # Don't sleep here as it would block UI
+                
                 load_new = (not self.audio_manager.current_audio or
                             self.audio_manager.current_surah != surah_num)
 
