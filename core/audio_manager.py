@@ -34,6 +34,7 @@ class AudioManager:
     def __init__(self):
         self.current_surah = None
         self.audio_dir = None # Initialize path attribute
+        self.last_was_ayatul_kursi = False # Flag to track if last playback was Ayatul Kursi
 
         # --- Platform-Specific Path for Audio Cache ---
         try:
@@ -77,14 +78,32 @@ class AudioManager:
         self.start_time = 0
 
     def get_audio_path(self, surah_num: int, reciter: str) -> Path:
-        """Get audio file path using the initialized audio_dir"""
+        """
+        Get audio file path using the initialized audio_dir.
+        
+        Special case handling for Ayatul Kursi recitations to keep them separate from
+        regular surah audio files.
+        """
         if not self.audio_dir: # Check if path determination failed
             print(f"{Fore.RED}Error: Audio directory not set, cannot get path.{Style.RESET_ALL}")
             return None
+            
+        # Check if this is an Ayatul Kursi recitation
+        is_ayatul_kursi = reciter.startswith("AyatulKursi_")
+        
         # Sanitize reciter name
-        safe_reciter = "".join(c for c in reciter if c.isalnum() or c in (' ', '_')).rstrip()
-        safe_reciter = safe_reciter.replace(' ', '_')
-        return self.audio_dir / f"surah_{surah_num}_reciter_{safe_reciter}.mp3"
+        if is_ayatul_kursi:
+            # Extract the actual reciter name from the prefix
+            original_reciter = reciter[len("AyatulKursi_"):]
+            safe_reciter = "".join(c for c in original_reciter if c.isalnum() or c in (' ', '_')).rstrip()
+            safe_reciter = safe_reciter.replace(' ', '_')
+            # Use a special naming format for Ayatul Kursi files
+            return self.audio_dir / f"ayatul_kursi_{safe_reciter}.mp3"
+        else:
+            # Regular surah audio file path
+            safe_reciter = "".join(c for c in reciter if c.isalnum() or c in (' ', '_')).rstrip()
+            safe_reciter = safe_reciter.replace(' ', '_')
+            return self.audio_dir / f"surah_{surah_num}_reciter_{safe_reciter}.mp3"
 
 
     # -------------- Fix Start for this method(download_audio)-----------
@@ -270,8 +289,15 @@ class AudioManager:
              self.duration = 0
              return None
 
-    def play_audio(self, file_path: Path, reciter: str):
-        """Play audio file with progress tracking"""
+    def play_audio(self, file_path: Path, reciter: str, is_ayatul_kursi: bool = False):
+        """
+        Play audio file with progress tracking
+        
+        Args:
+            file_path: Path to the audio file
+            reciter: Name of the reciter
+            is_ayatul_kursi: Whether this is an Ayatul Kursi specific audio (default: False)
+        """
         if not self.mixer_initialized:
             print(Fore.RED + "Audio system not initialized. Cannot play.")
             return
@@ -291,11 +317,19 @@ class AudioManager:
             self.current_reciter = reciter
             self.current_position = 0
             self.start_time = time.time()
+            
+            # Set the Ayatul Kursi flag
+            self.last_was_ayatul_kursi = is_ayatul_kursi
 
-            try: # Extract surah number from filename for context
-                self.current_surah = int(file_path.stem.split('_')[1])
-            except (IndexError, ValueError):
-                self.current_surah = None
+            if is_ayatul_kursi:
+                # For Ayatul Kursi, specifically set it to Surah 2 (Al-Baqarah)
+                self.current_surah = 2
+            else:
+                # Regular playback - extract surah number from filename
+                try:
+                    self.current_surah = int(file_path.stem.split('_')[1])
+                except (IndexError, ValueError):
+                    self.current_surah = None
 
             self.start_progress_tracking() # Start thread to update position
 
@@ -416,6 +450,8 @@ class AudioManager:
             self.start_time = 0
             # Don't reset mixer_initialized here
 
+        self.last_was_ayatul_kursi = self.current_surah == 2 if self.current_surah else False
+
     def pause_audio(self):
         """Pause audio playback."""
         if not self.mixer_initialized: return
@@ -467,4 +503,4 @@ class AudioManager:
                Fore.WHITE + "░" * empty_width + Style.RESET_ALL) # Use standard blocks
         current_time_str = self.format_time(self.current_position)
         total_time_str = self.format_time(self.duration)
-        return f"{bar} {Fore.CYAN}{current_time_str}{Fore.WHITE}/{Fore.CYAN}{total_time_str}"
+        return f"[{bar}] {current_time_str}/{total_time_str}"

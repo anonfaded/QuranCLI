@@ -356,8 +356,14 @@ class UI:
                 (f"{Fore.YELLOW}bookmark{Style.DIM}/bm{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Add bookmark for an ayah on this page"),
                 (f"{Fore.MAGENTA}reverse{Style.DIM}/rev{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Toggle Arabic reversal"),
                 (f"{Fore.YELLOW}a{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Play audio"),
-                (f"{Fore.RED}q{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Return"),
             ]
+            
+            # Add special Ayatul Kursi option only for Surah 2
+            if surah_info and surah_info.surah_number == 2:
+                nav_options.insert(-1, (f"{Fore.GREEN}k{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Play Ayatul Kursi"))
+                
+            nav_options.append((f"{Fore.RED}q{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Return"))
+            
             max_cmd_len = max(len(self._strip_ansi(cmd)) for cmd, _ in nav_options)
             box_width = 26
             separator = "─" * box_width
@@ -376,6 +382,9 @@ class UI:
                 current_page -= 1
             elif choice == 'a':
                 self.display_audio_controls(surah_info)
+            elif choice == 'k' and surah_info and surah_info.surah_number == 2:
+                # Special handling for Ayatul Kursi audio
+                self.display_ayatul_kursi_audio_controls()
             elif choice in ['reverse', 'rev']:
                 self.data_handler.toggle_arabic_reversal()
             elif choice in ['bookmark', 'bm']:
@@ -528,24 +537,60 @@ class UI:
                 if load_new:
                     self.audio_manager.stop_audio(reset_state=True)
                     print(Fore.YELLOW + "\nℹ Loading default reciter...") # Show status before potential long wait
-                    reciter_pref = self.preferences.get(str(surah_num))
-                    # ... (logic to determine audio_url and reciter_name - keep as before) ...
+                    
+                    # Determine if we should use Ayatul Kursi or regular surah preferences
+                    # Check both the surah_info and whether last playback was Ayatul Kursi
+                    using_ayatul_kursi_player = (surah_info.surah_name == "Ayatul Kursi" and 
+                                               any(key.startswith("ayatul_kursi_") for key in surah_info.audio.keys()))
+                    
+                    # We only want to use normal Surah 2 preferences when:
+                    # 1. We're in normal Surah 2 view (not Ayatul Kursi view)
+                    # 2. We didn't just play Ayatul Kursi
+                    force_regular_surah = (surah_num == 2 and 
+                                          not using_ayatul_kursi_player and 
+                                          not self.audio_manager.last_was_ayatul_kursi)
+                    
+                    if using_ayatul_kursi_player or (surah_num == 2 and self.audio_manager.last_was_ayatul_kursi and not force_regular_surah):
+                        # Use the Ayatul Kursi-specific preferences
+                        reciter_pref = self.preferences.get("ayatul_kursi")
+                        pref_key = "ayatul_kursi"
+                        is_ayatul_kursi = True
+                    else:
+                        # Use regular surah preferences
+                        reciter_pref = self.preferences.get(str(surah_num))
+                        pref_key = str(surah_num)
+                        is_ayatul_kursi = False
+                    
                     if reciter_pref and "reciter_url" in reciter_pref and "reciter_name" in reciter_pref:
-                        audio_url, reciter_name = reciter_pref["reciter_url"], reciter_pref["reciter_name"]
+                        audio_url = reciter_pref["reciter_url"]
+                        reciter_name = reciter_pref["reciter_name"]
                         print(Fore.GREEN + f" ✅ Using saved reciter: {reciter_name}")
                     elif surah_info.audio:
                         reciter_id = next(iter(surah_info.audio))
-                        audio_url, reciter_name = surah_info.audio[reciter_id]["url"], surah_info.audio[reciter_id]["reciter"]
+                        audio_url = surah_info.audio[reciter_id]["url"] 
+                        reciter_name = surah_info.audio[reciter_id]["reciter"]
                         print(Fore.YELLOW + f" ⚠️ No preference saved, using default: {reciter_name}")
                     else:
                         print(Fore.RED + "\n❌ No audio data found."); return
 
                     # --- Run download and play ---
-                    asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_name))
+                    if is_ayatul_kursi:
+                        # Add special prefix for Ayatul Kursi
+                        reciter_with_prefix = f"AyatulKursi_{reciter_name}"
+                        asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_with_prefix))
+                        # Set the flag to remember we're playing Ayatul Kursi
+                        self.audio_manager.last_was_ayatul_kursi = True
+                    else:
+                        # Regular surah audio
+                        asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_name))
+                        # Clear the flag when playing regular surah
+                        self.audio_manager.last_was_ayatul_kursi = False
+                        
                     # --- Directly redraw after async call completes ---
                     self._redraw_audio_ui(surah_info) # Call the redraw helper
                     # --- End Direct Redraw ---
-
+                
+                # Add missing pause/resume handling
                 elif self.audio_manager.is_playing:
                     self.audio_manager.pause_audio()
                     needs_redraw = True # Redraw after pause
@@ -562,6 +607,10 @@ class UI:
                 surah_num = surah_info.surah_number
                 if not surah_info.audio:
                     print(Fore.RED + "\n❌ No reciters available."); return
+                
+                # Check if this is Ayatul Kursi playback
+                is_ayatul_kursi = (surah_info.surah_name == "Ayatul Kursi" and 
+                                  any(key.startswith("ayatul_kursi_") for key in surah_info.audio.keys()))
 
                 original_display_needs_restore = True
                 while True: # Reciter selection loop
@@ -588,13 +637,31 @@ class UI:
                                  self.audio_manager.stop_audio(reset_state=True)
 
                                  # --- Run download and play ---
-                                 asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_name))
+                                 if is_ayatul_kursi:
+                                     # For Ayatul Kursi, use special reciter naming
+                                     reciter_prefix = f"AyatulKursi_{reciter_name}"
+                                     asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_prefix))
+                                     # Set the flag to remember we're playing Ayatul Kursi
+                                     self.audio_manager.last_was_ayatul_kursi = True
+                                 else:
+                                     # Regular surah audio
+                                     asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_name))
+                                     # Clear the flag when playing regular surah
+                                     self.audio_manager.last_was_ayatul_kursi = False
+                                     
                                  # --- Directly redraw after async call ---
                                  self._redraw_audio_ui(surah_info)
                                  # --- End Direct Redraw ---
 
-                                 # Save preference
-                                 self.preferences[str(surah_num)] = {"reciter_name": reciter_name, "reciter_url": audio_url}
+                                 # Save preference - special handling for Ayatul Kursi
+                                 if is_ayatul_kursi:
+                                     # Create special Ayatul Kursi preference key
+                                     pref_key = "ayatul_kursi"
+                                     self.preferences[pref_key] = {"reciter_name": reciter_name, "reciter_url": audio_url}
+                                 else:
+                                     # Normal surah preference
+                                     self.preferences[str(surah_num)] = {"reciter_name": reciter_name, "reciter_url": audio_url}
+                                     
                                  self.save_preferences()
                                  print(Fore.GREEN + " Preference saved.") # Add space
                                  original_display_needs_restore = False
@@ -654,7 +721,10 @@ class UI:
                 
             file_path = await self.audio_manager.download_audio(url, surah_num, reciter)
             print(Fore.GREEN + "\n✓ Starting playback...")
-            self.audio_manager.play_audio(file_path, reciter)
+            
+            # Check if this is an Ayatul Kursi reciter
+            is_ayatul_kursi = reciter.startswith("AyatulKursi_")
+            self.audio_manager.play_audio(file_path, reciter, is_ayatul_kursi)
         except Exception as e:
             print(Fore.RED + f"\nError: {str(e)}")
             print(Fore.YELLOW + "Please try again or choose a different reciter.")
@@ -670,11 +740,15 @@ class UI:
             print(Fore.RED + "\n❌ Audio not available for this surah")
             time.sleep(1.5)
             return
+            
+        # Check if this is Ayatul Kursi special case
+        is_ayatul_kursi = (surah_info.surah_name == "Ayatul Kursi" and 
+                          any(key.startswith("ayatul_kursi_") for key in surah_info.audio.keys()))
 
         fd = None
         is_unix = sys.platform != "win32"
         # --- Define new_settings variable here to be accessible later ---
-        new_settings = None # Initialize for non-unix cases
+        new_settings = None
 
         # --- Setup Terminal for Non-Blocking Input (Unix) ---
         if is_unix:
@@ -795,8 +869,21 @@ class UI:
                                             "surah_num": surah_num
                                         }
                                         print(f"\n{Fore.CYAN}Selected: {selected_reciter_data['name']}")
-                                        # Save preference
-                                        self.preferences[str(surah_num)] = {"reciter_name": selected_reciter_data['name'], "reciter_url": selected_reciter_data['url']}
+                                        
+                                        # Save preference based on content type
+                                        if is_ayatul_kursi:
+                                            # Save Ayatul Kursi preference separately
+                                            self.preferences["ayatul_kursi"] = {
+                                                "reciter_name": selected_reciter_data['name'],
+                                                "reciter_url": selected_reciter_data['url']
+                                            }
+                                        else:
+                                            # Normal surah preference
+                                            self.preferences[str(surah_num)] = {
+                                                "reciter_name": selected_reciter_data['name'],
+                                                "reciter_url": selected_reciter_data['url']
+                                            }
+                                            
                                         self.save_preferences()
                                         print(Fore.GREEN + " Preference saved.")
                                         original_display_needs_restore = False
@@ -824,12 +911,29 @@ class UI:
                         # --- Play selected reciter if chosen ---
                         if selected_reciter_data:
                             self.audio_manager.stop_audio(reset_state=True)
-                            # Run download and play (handle_audio_playback now redraws)
-                            asyncio.run(self.handle_audio_playback(
-                                selected_reciter_data["url"],
-                                selected_reciter_data["surah_num"],
-                                selected_reciter_data["name"]
-                            ))
+                            
+                            # Prepare playback based on content type
+                            reciter_name = selected_reciter_data["name"]
+                            surah_num = selected_reciter_data["surah_num"]
+                            audio_url = selected_reciter_data["url"]
+                            
+                            # For Ayatul Kursi, we need to add the special prefix
+                            if is_ayatul_kursi:
+                                reciter_with_prefix = f"AyatulKursi_{reciter_name}"
+                                # Run download and play with Ayatul Kursi prefix
+                                asyncio.run(self.handle_audio_playback(
+                                    audio_url,
+                                    surah_num,
+                                    reciter_with_prefix
+                                ))
+                            else:
+                                # Regular surah playback
+                                asyncio.run(self.handle_audio_playback(
+                                    audio_url,
+                                    surah_num,
+                                    reciter_name
+                                ))
+                                
                             # Update last_display after potential redraw in handle_audio_playback
                             last_display = self.get_audio_display(surah_info)
 
@@ -890,6 +994,11 @@ class UI:
             # --- Stop Audio ---
             print(Fore.YELLOW + "\nExiting audio player.")
             self.audio_manager.stop_audio(reset_state=True)
+            
+            # If we are in a regular Surah view (not Ayatul Kursi), explicitly clear the flag
+            if surah_info.surah_name != "Ayatul Kursi":
+                self.audio_manager.last_was_ayatul_kursi = False
+                
             time.sleep(0.5)
 
 
@@ -1510,3 +1619,127 @@ class UI:
         seconds = milliseconds // 1000
         milliseconds %= 1000
         return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
+
+    def display_ayatul_kursi_audio_controls(self):
+        """
+        Display audio control options specifically for Ayatul Kursi (Verse 255 of Surah 2).
+        Presents a list of reciters with dedicated Ayatul Kursi audio files and then uses the main audio player.
+        """
+        # Ayatul Kursi audio URLs from github.com/fadsec-lab/quran-audios
+        ayatul_kursi_reciters = [
+            {
+                "name": "Abu Bakr Al-Shatri",
+                "url": "https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/abu-bakr-al-shatri/abu-bakr-al-shatri-ayatul-kursi.mp3"
+            },
+            {
+                "name": "Mishary Rashid Alafasy",
+                "url": "https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/al-afasy/al-afasy-ayatul-kursi.mp3"
+            },
+            {
+                "name": "Muhammad Al Luhaidan",
+                "url": "https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/muhammad_al_luhaidan/muhammad-al-luhaidan-ayatul-kursi.MP3"
+            },
+            {
+                "name": "Nasser Al-Qatami",
+                "url": "https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/nasser-al-qatami/nasser-al-qatami-ayatul-kursi.mp3"
+            },
+            {
+                "name": "Yasser Al-Dossari",
+                "url": "https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/yasser-al-dossari/yasser-al-dossari-ayatul-kursi.mp3"
+            }
+        ]
+        
+        self.clear_terminal()
+        print(Style.BRIGHT + Fore.GREEN + "🎧 Ayatul Kursi Audio Player" + Style.RESET_ALL)
+        print(Fore.YELLOW + "\nAyatul Kursi - \"The Throne Verse\" - Surah Al-Baqarah (2:255)" + Style.RESET_ALL)
+        print(Fore.CYAN + "\nSelect a reciter:" + Style.RESET_ALL)
+        
+        # Display reciter options
+        for i, reciter in enumerate(ayatul_kursi_reciters, 1):
+            print(f"{Fore.GREEN}{i}.{Fore.WHITE} {reciter['name']}")
+        
+        print(f"\n{Fore.RED}q.{Fore.WHITE} Return to Surah view")
+        
+        # Get user choice
+        try:
+            choice = input(Fore.RED + "\n  ❯ " + Fore.WHITE).strip().lower()
+            
+            if choice == 'q':
+                return
+                
+            if choice.isdigit() and 1 <= int(choice) <= len(ayatul_kursi_reciters):
+                selected_idx = int(choice) - 1
+                selected_reciter = ayatul_kursi_reciters[selected_idx]
+                
+                print(f"\n{Fore.CYAN}Selected: {selected_reciter['name']}")
+                
+                # Create a temporary SurahInfo object to pass to display_audio_controls
+                # This allows us to reuse the full audio player interface
+                from core.models import SurahInfo
+                
+                # Build audio dictionary with all available reciters, not just the selected one
+                audio_dict = {}
+                for i, reciter_data in enumerate(ayatul_kursi_reciters):
+                    reciter_id = f"ayatul_kursi_{i+1}"
+                    audio_dict[reciter_id] = {
+                        "reciter": reciter_data["name"],
+                        "url": reciter_data["url"]
+                    }
+                
+                ayatul_kursi_info = SurahInfo(
+                    surah_number=2,  # Surah Al-Baqarah
+                    surah_name="Ayatul Kursi",
+                    surah_name_ar="آية الكرسي",
+                    total_verses=1,  # Just one verse (Ayatul Kursi)
+                    description="The Throne Verse (2:255)",
+                    translation="The Throne Verse",  # Add required translation field
+                    type="medinan",  # Add required type field - Al-Baqarah is Medinan
+                    audio=audio_dict  # Include all reciters
+                )
+                
+                # Stop any current audio
+                self.audio_manager.stop_audio(reset_state=True)
+                
+                # Download and play Ayatul Kursi audio using the existing infrastructure
+                # We'll directly start the download and playback to avoid showing reciter selection again
+                audio_url = selected_reciter["url"]
+                reciter_name = selected_reciter["name"]
+                
+                print(Fore.YELLOW + "\n⏳ Downloading Ayatul Kursi audio, please wait...")
+                print(Fore.CYAN + "This may take a moment depending on your internet speed.")
+                
+                try:
+                    # Use existing download/playback infrastructure with special Ayatul Kursi prefix
+                    reciter_prefix = f"AyatulKursi_{reciter_name}"
+                    file_path = asyncio.run(self.audio_manager.download_audio(
+                        url=audio_url, 
+                        surah_num=2,  # Al-Baqarah
+                        reciter=reciter_prefix  # Special prefix
+                    ))
+                    
+                    # Also save the preference
+                    pref_key = "ayatul_kursi"
+                    self.preferences[pref_key] = {"reciter_name": reciter_name, "reciter_url": audio_url}
+                    self.save_preferences()
+                    
+                    if file_path and os.path.exists(file_path):
+                        print(Fore.GREEN + "\n✓ Starting playback...")
+                        # Play the audio and mark as Ayatul Kursi
+                        self.audio_manager.play_audio(file_path, reciter_name, is_ayatul_kursi=True)
+                        # Now show the full audio player interface
+                        self.display_audio_controls(ayatul_kursi_info)
+                    else:
+                        print(Fore.RED + "\nFailed to download Ayatul Kursi audio.")
+                        input(Fore.YELLOW + "\nPress Enter to return to Surah view...")
+                except Exception as e:
+                    print(Fore.RED + f"\nError: {e}")
+                    input(Fore.YELLOW + "\nPress Enter to return to Surah view...")
+            else:
+                print(Fore.RED + "\nInvalid choice.")
+                time.sleep(1)
+                
+        except KeyboardInterrupt:
+            print(Fore.YELLOW + "\nReturning to Surah view...")
+        except Exception as e:
+            print(Fore.RED + f"\nError: {e}")
+            time.sleep(1)

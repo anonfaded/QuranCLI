@@ -154,10 +154,10 @@ class QuranApp:
             data_handler=self.data_handler,
             github_updater=self.updater,
             preferences=self.preferences,
-            preferences_file_path=self.preferences_file, # Pass the determined path
+            preferences_file_path=self.preferences_file or "", # Convert None to empty string
             download_counter=self.download_counter
         )
-        self.ui.app = self # Set the app reference in UI    
+        setattr(self.ui, 'app', self) # Set app reference via setattr
         self._clear_terminal()
         self.surah_names = self._load_surah_names()
 
