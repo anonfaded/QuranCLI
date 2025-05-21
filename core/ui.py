@@ -398,10 +398,21 @@ class UI:
                             ayah_num = getattr(selected_ayah, 'ayah_number', '?')
                         note = input(Fore.CYAN + "Enter a note for this bookmark (optional, max 300 chars):\n" + Fore.RED + "  ❯ " + Fore.WHITE).strip()[:300]
                         try:
+                            # Ensure we're working with proper integer values for ayah number
+                            ayah_num = int(ayah_num) if isinstance(ayah_num, (int, str)) and str(ayah_num).isdigit() else None
+                            
+                            if ayah_num is None:
+                                print(Fore.RED + "Invalid ayah number. Cannot bookmark.")
+                                input(Fore.YELLOW + "Press Enter to continue...")
+                                break
+                                
+                            # Make the bookmark call
                             self.app.set_bookmark(surah_info.surah_number, ayah_num, note)
                             print(Fore.GREEN + f"Bookmark added for Surah {surah_info.surah_number}, Ayah {ayah_num}.")
                         except Exception as e:
                             print(Fore.RED + f"Failed to add bookmark: {e}")
+                            # Add more details for debugging
+                            print(Fore.YELLOW + f"Surah: {surah_info.surah_number}, Ayah: {ayah_num}")
                         input(Fore.YELLOW + "Press Enter to continue...")
                         break
                     else:

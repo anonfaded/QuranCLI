@@ -8,6 +8,7 @@ import subprocess
 import json
 from time import sleep
 from pathlib import Path
+from datetime import datetime
 
 # --- Add Path Hook for PyInstaller ---
 try:
@@ -225,10 +226,39 @@ class QuranApp:
             pref_dir = os.path.dirname(self.preferences_file)
             if pref_dir:
                 os.makedirs(pref_dir, exist_ok=True)
-            with open(self.preferences_file, 'w', encoding='utf-8') as f:
-                json.dump(self.preferences, f, ensure_ascii=False, indent=2)
+            
+            # Add debug to check data validity
+            try:
+                # Make a copy to avoid JSON serialization issues
+                import copy
+                prefs_to_save = copy.deepcopy(self.preferences)
+                
+                # Test JSON serialization before writing
+                json_data = json.dumps(prefs_to_save, ensure_ascii=False, indent=2)
+                
+                # If we get here, JSON serialization succeeded
+                with open(self.preferences_file, 'w', encoding='utf-8') as f:
+                    f.write(json_data)
+            except TypeError as json_error:
+                print(Fore.RED + f"JSON serialization error: {json_error}")
+                # Identify the problematic part
+                print(Fore.YELLOW + "Checking preferences for non-JSON-serializable objects...")
+                for key, value in self.preferences.items():
+                    try:
+                        json.dumps({key: value})
+                    except TypeError:
+                        print(Fore.RED + f"Problem found in key: {key}, value type: {type(value)}")
+                        if key == "bookmarks":
+                            for surah_key, bookmarks in value.items():
+                                try:
+                                    json.dumps({surah_key: bookmarks})
+                                except TypeError:
+                                    print(Fore.RED + f"Problem in surah {surah_key}, bookmarks: {bookmarks}")
+                raise
         except Exception as e:
             print(Fore.RED + f"Error saving preferences to '{self.preferences_file}': {e}")
+            import traceback
+            print(traceback.format_exc())
 
     def _load_surah_names(self):
         """Load simpler surah names directly from the CACHED data for search functionality."""
@@ -444,8 +474,10 @@ class QuranApp:
 
         # Function to remove ANSI escape codes for length calculations
         def strip_ansi(s):
-            ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+            import re
+            ansi_escape = re.compile(r'\x1B[\[][0-?]*[ -/]*[@-~]')
             return ansi_escape.sub('', s)
+        max_cmd_len = max(len(cmd) + (len(short) + 3 if short else 0) for cmd, _, short, _ in options)
 
         separator_minor = "-" * 120
         box_width = 120
@@ -568,7 +600,7 @@ class QuranApp:
         # Calculate the max length of command strings (without color codes)
         def strip_ansi(s):
             import re
-            ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+            ansi_escape = re.compile(r'\x1B[\[][0-?]*[ -/]*[@-~]')
             return ansi_escape.sub('', s)
         max_cmd_len = max(len(strip_ansi(cmd)) for cmd, _ in commands)
 
@@ -1008,7 +1040,7 @@ class QuranApp:
         ]
         def strip_ansi(s):
             import re
-            ansi_escape = re.compile(r'\x1B\\[[0-?]*[ -/]*[@-~]')
+            ansi_escape = re.compile(r'\x1B[\[][0-?]*[ -/]*[@-~]')
             return ansi_escape.sub('', s)
         max_cmd_len = max(len(cmd) + (len(short) + 3 if short else 0) for cmd, _, short, _ in options)
 
@@ -1026,11 +1058,19 @@ class QuranApp:
                 for surah, data in bookmarks.items():
                     # Ensure each surah's bookmarks are a list of dicts
                     if isinstance(data, list):
-                        grouped[surah] = [b for b in data if isinstance(b, dict)]
+                        bookmarks_list = [b for b in data if isinstance(b, dict)]
+                        # Only add surah if it has valid bookmarks
+                        if bookmarks_list:
+                            grouped[surah] = bookmarks_list
                     elif isinstance(data, dict):
                         grouped[surah] = [data]
                     else:
                         grouped[surah] = []
+                    
+                    # Remove any surah that ended up with an empty list
+                    if surah in grouped and not grouped[surah]:
+                        del grouped[surah]
+                        
                 if grouped:
                     for surah in sorted(grouped, key=lambda x: int(x)):
                         surah_name = self.surah_names.get(int(surah), f"Surah {surah}")
@@ -1039,8 +1079,15 @@ class QuranApp:
                             ayah = entry.get("ayah", '?')
                             ayah_text = get_ayah_text(surah, ayah)
                             note = entry.get("note", "")
+                            date_added = entry.get("date_added", "")
+                            
                             note_disp = (Fore.MAGENTA + f"Note: {note}" if note else Fore.LIGHTBLACK_EX + "No note")
-                            print(f"  {Fore.GREEN}{idx}. Ayah {ayah} {Fore.LIGHTBLACK_EX}- {ayah_text}\n     {note_disp}")
+                            date_disp = (Fore.YELLOW + f"Added: {date_added}" if date_added else "")
+                            
+                            print(f"  {Fore.GREEN}{idx}. Ayah {ayah} {Fore.LIGHTBLACK_EX}- {ayah_text}")
+                            print(f"     {note_disp}")
+                            if date_added:
+                                print(f"     {date_disp}")
                         print(Fore.RED + ("─" * box_width))
                 else:
                     print(Fore.LIGHTBLACK_EX + "  No bookmarks saved yet.")
@@ -1111,8 +1158,11 @@ class QuranApp:
                                 input(Fore.YELLOW + "Press Enter to continue...")
                                 break
                             try:
-                                shutil.copy2(self.preferences_file, dest)
-                                print(Fore.GREEN + f"Preferences exported to {Fore.CYAN}{dest}{Fore.GREEN}")
+                                if self.preferences_file:
+                                    shutil.copy2(self.preferences_file, dest)
+                                    print(Fore.GREEN + f"Preferences exported to {Fore.CYAN}{dest}{Fore.GREEN}")
+                                else:
+                                    print(Fore.RED + "Error: No preferences file path found.")
                             except Exception as e:
                                 print(Fore.RED + f"Export failed: {e}")
                             input(Fore.YELLOW + "Press Enter to continue...")
@@ -1165,10 +1215,13 @@ class QuranApp:
                                     with open(src, "r", encoding="utf-8") as f:
                                         data = f.read()
                                     json.loads(data)  # Validate JSON
-                                    with open(self.preferences_file, "w", encoding="utf-8") as f:
-                                        f.write(data)
-                                    print(Fore.GREEN + "Preferences imported successfully.")
-                                    self.preferences = self._load_preferences()
+                                    if self.preferences_file:
+                                        with open(self.preferences_file, "w", encoding="utf-8") as f:
+                                            f.write(data)
+                                        print(Fore.GREEN + "Preferences imported successfully.")
+                                        self.preferences = self._load_preferences()
+                                    else:
+                                        print(Fore.RED + "Error: No preferences file path found.")
                                 except Exception as e:
                                     print(Fore.RED + f"Import failed: {e}")
                             else:
@@ -1179,93 +1232,48 @@ class QuranApp:
                         continue
                     continue
                 if choice == 'ayatul-kursi':
-                    surah_num = 2
+                    print(Fore.GREEN + "Quick-adding Ayatul Kursi bookmark (Surah 2, Ayah 255)")
+                    surah_key = "2" 
                     ayah_num = 255
-                    note = "Ayatul Kursi"
-                    surah_key = str(surah_num)
+                    note = "Ayatul Kursi (The Throne Verse)"
                     if "bookmarks" not in self.preferences:
                         self.preferences["bookmarks"] = {}
                     if surah_key not in self.preferences["bookmarks"]:
                         self.preferences["bookmarks"][surah_key] = []
-                    if any(int(b.get("ayah")) == ayah_num for b in self.preferences["bookmarks"][surah_key] if isinstance(b, dict)):
-                        print(Fore.YELLOW + "Ayatul Kursi already bookmarked."); input(Fore.YELLOW + "Press Enter to continue..."); continue
-                    self.preferences["bookmarks"][surah_key].append({"ayah": ayah_num, "note": note})
-                    self._save_preferences()
-                    print(Fore.GREEN + "Ayatul Kursi bookmarked (Surah 2, Ayah 255).")
+                    
+                    # Check if bookmark already exists
+                    already_exists = False
+                    for b in self.preferences["bookmarks"][surah_key]:
+                        if isinstance(b, dict) and b.get("ayah") == ayah_num:
+                            already_exists = True
+                            break
+                            
+                    if already_exists:
+                        print(Fore.YELLOW + "Ayatul Kursi already bookmarked.")
+                        input(Fore.YELLOW + "Press Enter to continue...")
+                        continue
+                    
+                    # Add current date and time in the desired format
+                    current_datetime = datetime.now()
+                    date_str = current_datetime.strftime("%A, %d %b %Y %I:%M %p")
+                    
+                    # Remove debug prints
+                    try:
+                        # Create bookmark object
+                        new_bookmark = {
+                            "ayah": ayah_num,
+                            "note": note,
+                            "date_added": date_str
+                        }
+                        
+                        # Append to bookmarks and save
+                        self.preferences["bookmarks"][surah_key].append(new_bookmark)
+                        self._save_preferences()
+                        print(Fore.GREEN + "Ayatul Kursi bookmarked (Surah 2, Ayah 255).")
+                    except Exception as e:
+                        print(Fore.RED + f"Error adding bookmark: {e}")
+                        
                     input(Fore.YELLOW + "Press Enter to continue...")
-                    continue
-                if choice == '1':
-                    # List all bookmarks with index and color same surahs
-                    all_bookmarks = []
-                    for surah in sorted(grouped, key=lambda x: int(x)):
-                        for entry in grouped[surah]:
-                            all_bookmarks.append((surah, entry))
-                    if not all_bookmarks:
-                        print(Fore.YELLOW + "No bookmarks to jump to.")
-                        input(Fore.YELLOW + "Press Enter to continue...")
-                        continue
-                    print(Fore.CYAN + "\nSelect a bookmark to jump to:")
-                    # Assign a color to each surah for consistent coloring
-                    surah_color_map = {}
-                    surah_colors = [Fore.CYAN, Fore.GREEN, Fore.MAGENTA, Fore.YELLOW, Fore.BLUE, Fore.LIGHTCYAN_EX, Fore.LIGHTGREEN_EX, Fore.LIGHTMAGENTA_EX, Fore.LIGHTYELLOW_EX, Fore.LIGHTBLUE_EX]
-                    color_idx = 0
-                    for surah, _ in all_bookmarks:
-                        if surah not in surah_color_map:
-                            surah_color_map[surah] = surah_colors[color_idx % len(surah_colors)]
-                            color_idx += 1
-                    for idx, (surah, entry) in enumerate(all_bookmarks, 1):
-                        surah_name = self.surah_names.get(int(surah), f"Surah {surah}")
-                        ayah = entry.get("ayah", '?')
-                        note = entry.get("note", "")
-                        color = surah_color_map[surah]
-                        print(f"{color}{idx}. Surah {surah} ({surah_name}), Ayah {ayah} {Fore.LIGHTBLACK_EX}- {note}{Style.RESET_ALL}")
-                    print(Fore.YELLOW + "Enter the number of the bookmark to jump to, or 'b' to cancel.")
-                    sel = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
-                    if sel.lower() == 'b':
-                        continue
-                    if sel.isdigit() and 1 <= int(sel) <= len(all_bookmarks):
-                        surah, entry = all_bookmarks[int(sel) - 1]
-                        ayah = entry.get("ayah", 1)
-                        try:
-                            # Jump to the selected surah and ayah using the main app's display logic
-                            self._clear_terminal()
-                            print(Fore.GREEN + f"Jumping to Surah {surah}, Ayah {ayah}...")
-                            surah_info = self.data_handler.get_surah_info(int(surah))
-                            if not surah_info:
-                                print(Fore.RED + f"Error: Could not retrieve information for Surah {surah}.")
-                                input(Fore.YELLOW + "Press Enter to continue...")
-                                continue
-                            # Get all ayahs for the surah
-                            all_ayahs = self.data_handler.get_ayahs(int(surah), 1, surah_info.total_verses)
-                            if not all_ayahs:
-                                print(Fore.RED + f"Error: Could not retrieve ayahs for Surah {surah}.")
-                                input(Fore.YELLOW + "Press Enter to continue...")
-                                continue
-                            # Find the page containing the bookmarked ayah
-                            page_size = max(1, (self.term_size.lines - 10) // 6)
-                            ayah_idx = None
-                            for idx_, ayah_obj in enumerate(all_ayahs):
-                                ayah_num = getattr(ayah_obj, 'number', None)
-                                if ayah_num is None:
-                                    ayah_num = getattr(ayah_obj, 'ayah_number', None)
-                                if ayah_num == ayah:
-                                    ayah_idx = idx_
-                                    break
-                            if ayah_idx is None:
-                                print(Fore.RED + f"Error: Could not locate Ayah {ayah} in Surah {surah}.")
-                                input(Fore.YELLOW + "Press Enter to continue...")
-                                continue
-                            # Calculate the page number
-                            page_num = (ayah_idx // page_size) + 1
-                            # Use the UI's paginate_output to start at the correct page
-                            self.ui.paginate_output(all_ayahs, page_size=page_size, surah_info=surah_info, start_page=page_num)
-                        except Exception as e:
-                            print(Fore.RED + f"Error jumping to bookmark: {e}")
-                            input(Fore.YELLOW + "Press Enter to continue...")
-                    else:
-                        print(Fore.RED + "Invalid selection.")
-                        input(Fore.YELLOW + "Press Enter to continue...")
-                    continue
                 elif choice == '2':
                     # Add bookmark
                     print(Fore.CYAN + "Enter surah number or name to bookmark (or 'b' to go back):")
@@ -1290,25 +1298,59 @@ class QuranApp:
                     if ayah_input.lower() == 'b':
                         continue
                     note = input_note_with_limit(300)
+                    
+                    # Initialize bookmarks structure if needed
                     if "bookmarks" not in self.preferences:
                         self.preferences["bookmarks"] = {}
                     surah_key = str(surah_num)
-                    # Ensure the surah's bookmarks are always a list of dicts
-                    if not isinstance(self.preferences["bookmarks"].get(surah_key, []), list):
+                    if surah_key not in self.preferences["bookmarks"]:
                         self.preferences["bookmarks"][surah_key] = []
-                    # Only add if not already present for this ayah
-                    if any(isinstance(b, dict) and str(b.get("ayah")) == ayah_input for b in self.preferences["bookmarks"][surah_key]):
-                        print(Fore.YELLOW + "Bookmark for this ayah already exists."); input(Fore.YELLOW + "Press Enter to continue..."); continue
-                    self.preferences["bookmarks"][surah_key].append({"ayah": int(ayah_input), "note": note})
-                    self._save_preferences()
-                    print(Fore.GREEN + f"Bookmark set for Surah {surah_num}, Ayah {ayah_input}.")
+                    
+                    # Check if bookmark already exists - fixed the comparison logic
+                    already_exists = False
+                    ayah_num = int(ayah_input)
+                    for b in self.preferences["bookmarks"][surah_key]:
+                        if isinstance(b, dict) and b.get("ayah") == ayah_num:
+                            already_exists = True
+                            break
+                            
+                    if already_exists:
+                        print(Fore.YELLOW + "Bookmark for this ayah already exists.")
+                        input(Fore.YELLOW + "Press Enter to continue...")
+                        continue
+                    
+                    # Add current date and time in the desired format
+                    current_datetime = datetime.now()
+                    date_str = current_datetime.strftime("%A, %d %b %Y %I:%M %p")
+                    
+                    try:
+                        # Create bookmark object
+                        new_bookmark = {
+                            "ayah": ayah_num,
+                            "note": note,
+                            "date_added": date_str
+                        }
+                        
+                        # Append to bookmarks and save
+                        self.preferences["bookmarks"][surah_key].append(new_bookmark)
+                        self._save_preferences()
+                        print(Fore.GREEN + f"Bookmark set for Surah {surah_num}, Ayah {ayah_input}.")
+                    except Exception as e:
+                        print(Fore.RED + f"Error adding bookmark: {e}")
+                        
                     input(Fore.YELLOW + "Press Enter to continue...")
                 elif choice == '3':
                     # List all bookmarks with index and color same surahs
                     all_bookmarks = []
-                    for surah in sorted(grouped, key=lambda x: int(x)):
-                        for entry in grouped[surah]:
-                            all_bookmarks.append((surah, entry))
+                    
+                    # Get all bookmarks that exist and are properly formatted
+                    if "bookmarks" in self.preferences:
+                        for surah in sorted(self.preferences["bookmarks"].keys(), key=lambda x: int(x)):
+                            if isinstance(self.preferences["bookmarks"][surah], list):
+                                for entry in self.preferences["bookmarks"][surah]:
+                                    if isinstance(entry, dict):
+                                        all_bookmarks.append((surah, entry))
+                                        
                     if not all_bookmarks:
                         print(Fore.YELLOW + "No bookmarks to edit or delete.")
                         input(Fore.YELLOW + "Press Enter to continue...")
@@ -1326,8 +1368,16 @@ class QuranApp:
                         surah_name = self.surah_names.get(int(surah), f"Surah {surah}")
                         ayah = entry.get("ayah", '?')
                         note = entry.get("note", "")
+                        date_added = entry.get("date_added", "")
                         color = surah_color_map[surah]
-                        print(f"{color}{idx}. Surah {surah} ({surah_name}), Ayah {ayah} {Fore.LIGHTBLACK_EX}- {note}{Style.RESET_ALL}")
+                        
+                        bookmark_info = f"Surah {surah} ({surah_name}), Ayah {ayah}"
+                        if date_added:
+                            bookmark_info += f" {Fore.LIGHTBLACK_EX}- Added: {date_added}"
+                        if note:
+                            bookmark_info += f" {Fore.LIGHTBLACK_EX}- {note}"
+                            
+                        print(f"{color}{idx}. {bookmark_info}{Style.RESET_ALL}")
                     print(Fore.YELLOW + "Enter the number of the bookmark to edit/delete, or 'b' to cancel.")
                     sel = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
                     if sel.lower() == 'b':
@@ -1336,6 +1386,7 @@ class QuranApp:
                         surah, entry = all_bookmarks[int(sel) - 1]
                         ayah = entry.get("ayah", 1)
                         note = entry.get("note", "")
+                        date_added = entry.get("date_added", "")
                         print(Fore.CYAN + f"Selected Surah {surah}, Ayah {ayah}.")
                         print(Fore.YELLOW + "Enter 'e' to edit note, 'd' to delete, or 'b' to cancel.")
                         action = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
@@ -1346,6 +1397,7 @@ class QuranApp:
                             for b in self.preferences["bookmarks"][surah_key]:
                                 if isinstance(b, dict) and b.get("ayah") == ayah:
                                     b["note"] = new_note
+                                    b["date_added"] = datetime.now().strftime("%A, %d %b %Y %I:%M %p")  # Update date when modifying bookmark
                                     self._save_preferences()
                                     print(Fore.GREEN + "Note updated.")
                                     break
@@ -1388,6 +1440,12 @@ class QuranApp:
                 break
             except Exception as e:
                 print(Fore.RED + f"Error in bookmark menu: {e}")
+                # Add the following debug information
+                import traceback
+                print(Fore.YELLOW + "Debug information:")
+                print(Fore.YELLOW + f"Choice: {choice}")
+                print(Fore.YELLOW + f"Error type: {type(e).__name__}")
+                print(Fore.YELLOW + f"Full traceback: {traceback.format_exc()}")
                 input(Fore.YELLOW + "Press Enter to continue...")
 # -------------- Fix Ended for this method(_bookmark_menu)-----------
 
@@ -1570,26 +1628,39 @@ class QuranApp:
         Add a bookmark for a specific surah and ayah, supporting multiple bookmarks per surah.
         Stores the note (no 'extra' field, matches bookmark manager logic).
         """
-        if "bookmarks" not in self.preferences:
-            self.preferences["bookmarks"] = {}
-        surah_key = str(surah_number)
-        # Ensure the surah's bookmarks are always a list
-        if not isinstance(self.preferences["bookmarks"].get(surah_key, []), list):
-            self.preferences["bookmarks"][surah_key] = []
-        # Prevent duplicate for same ayah, update note if exists
-        for b in self.preferences["bookmarks"][surah_key]:
-            if isinstance(b, dict) and b.get("ayah") == ayah_number:
-                b["note"] = note
-                self._save_preferences()
-                print(f"[DEBUG] Updated bookmark for Surah {surah_number}, Ayah {ayah_number}.")
-                return
-        # Add new bookmark
-        self.preferences["bookmarks"][surah_key].append({
-            "ayah": ayah_number,
-            "note": note
-        })
-        self._save_preferences()
-        print(f"[DEBUG] Bookmark set for Surah {surah_number}, Ayah {ayah_number}.")
+        try:
+            # Initialize bookmarks structure if needed
+            if "bookmarks" not in self.preferences:
+                self.preferences["bookmarks"] = {}
+                
+            surah_key = str(surah_number)
+            
+            # Initialize the surah's bookmark list if it doesn't exist
+            if surah_key not in self.preferences["bookmarks"]:
+                self.preferences["bookmarks"][surah_key] = []
+            
+            # Add current date and time in the desired format
+            current_datetime = datetime.now()
+            date_str = current_datetime.strftime("%A, %d %b %Y %I:%M %p")
+            
+            # Prevent duplicate for same ayah, update note if exists
+            for b in self.preferences["bookmarks"][surah_key]:
+                if isinstance(b, dict) and b.get("ayah") == ayah_number:
+                    b["note"] = note
+                    b["date_added"] = date_str  # Update date when modifying bookmark
+                    self._save_preferences()
+                    return
+                    
+            # Add new bookmark
+            self.preferences["bookmarks"][surah_key].append({
+                "ayah": ayah_number,
+                "note": note,
+                "date_added": date_str
+            })
+            self._save_preferences()
+        except Exception as e:
+            # Wrap the exception with a more descriptive message including surah number
+            raise Exception(f"Error in set_bookmark: Surah {surah_number}, Ayah {ayah_number} - {str(e)}")
     # -------------- Fix Ended for this method(set_bookmark)-----------
 
     def get_bookmark(self, surah_number: int):
