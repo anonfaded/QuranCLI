@@ -1493,14 +1493,15 @@ class QuranApp:
     def _get_ayah_range(self, total_ayah: int) -> tuple:
         """
         Prompt the user for an ayah range, or accept 'all' to select the full surah.
+        Empty input (just pressing Enter) also selects the full surah.
         Returns a tuple (start, end).
         """
         while True:
             try:
                 print(Fore.RED + "\n┌─" + Fore.GREEN + Style.BRIGHT + f" Ayah Selection (1-{total_ayah})")
-                print(Fore.RED + "├──╼ " + Fore.MAGENTA + "Start" + f" {Style.DIM}(or type 'all' for the whole surah){Style.RESET_ALL}:\n", end="")
+                print(Fore.RED + "├──╼ " + Fore.MAGENTA + "Start" + f" {Style.DIM}(or type 'all' or press Enter for the whole surah){Style.RESET_ALL}:\n", end="")
                 user_input = input(Fore.RED + "│ ❯ " + Fore.WHITE).strip().lower()
-                if user_input == 'all':
+                if user_input == 'all' or user_input == '':
                     return 1, total_ayah
                 start = int(user_input)
                 print(Fore.RED + "├──╼ " + Fore.MAGENTA + "End" + ":\n", end="")
