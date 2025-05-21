@@ -826,6 +826,14 @@ class UI:
                 if choice:
                     if choice == 'q': running = False
 
+                    # --- Handle Loop Toggle ('l') ---
+                    elif choice == 'l':
+                        self.audio_manager.toggle_loop()
+                        # Force redraw to show updated loop status
+                        last_display = self._redraw_audio_ui(surah_info) or ""
+                        time.sleep(0.3) # Slight feedback delay
+                        continue
+
                     # --- Handle Reciter Selection ('r') ---
                     elif choice == 'r':
                         surah_num = surah_info.surah_number
@@ -1069,6 +1077,12 @@ class UI:
         output.append(f"\nState  : {state_color}{state}{_RESET}")
         output.append(f"Reciter: {_Fore_CYAN}{current_reciter_display}{_RESET}")
         
+        # --- ADD Loop status display ---
+        loop_status = "Enabled" if self.audio_manager.loop_enabled else "Disabled"
+        loop_color = _Fore_GREEN if self.audio_manager.loop_enabled else _Fore_RED
+        output.append(f"Loop   : {loop_color}{loop_status}{_RESET}")
+        # --- End ADD ---
+        
         # Progress Bar
         if self.audio_manager.duration > 0:
             output.append("\nProgress:")
@@ -1088,7 +1102,9 @@ class UI:
         output.append(_Fore_RED + "\n╭─ " + _Style_BRIGHT + _Fore_GREEN + "🎛️  Audio Controls" + _RESET)
         output.append(_Fore_RED + "│ • " + _Fore_CYAN + "p " + _Fore_WHITE + ": Play/Pause/Replay" + _RESET)
         output.append(_Fore_RED + "│ • " + _Fore_YELLOW + "s " + _Fore_WHITE + ": Stop & Reset" + _RESET)
-        # ... (rest of controls using safe variables) ...
+        # --- ADD loop control ---
+        output.append(_Fore_RED + "│ • " + _Fore_MAGENTA + "l " + _Fore_WHITE + ": Toggle Loop Mode" + _RESET)
+        # --- END ADD ---
         output.append(_Fore_RED + "│ • " + _Fore_RED + "r " + _Fore_WHITE + ": Change Reciter" + _RESET)
         output.append(_Fore_RED + "│ • " + _Fore_GREEN + "[ " + _Fore_WHITE + ": Seek Back 5s" + _RESET)
         output.append(_Fore_RED + "│ • " + _Fore_GREEN + "] " + _Fore_WHITE + ": Seek Forward 5s" + _RESET)

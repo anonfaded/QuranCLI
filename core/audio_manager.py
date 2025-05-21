@@ -35,6 +35,7 @@ class AudioManager:
         self.current_surah = None
         self.audio_dir = None # Initialize path attribute
         self.last_was_ayatul_kursi = False # Flag to track if last playback was Ayatul Kursi
+        self.loop_enabled = False # Flag to control audio looping behavior
 
         # --- Platform-Specific Path for Audio Cache ---
         try:
@@ -349,7 +350,23 @@ class AudioManager:
                     # Audio finished playing naturally or was stopped externally
                     # Check if position roughly matches duration before declaring finished
                     if self.duration > 0 and abs((time.time() - self.start_time) - self.duration) < 0.5:
-                         self.current_position = self.duration # Snap to end
+                        self.current_position = self.duration # Snap to end
+                        
+                        # --- ADD loop handling ---
+                        if self.loop_enabled and self.current_audio:
+                            # Restart playback if looping is enabled
+                            try:
+                                pygame.mixer.music.load(str(self.current_audio))
+                                pygame.mixer.music.play()
+                                self.current_position = 0
+                                self.start_time = time.time()
+                                # Continue the tracking thread without breaking
+                                time.sleep(0.1)
+                                continue
+                            except Exception as e:
+                                print(f"{Fore.RED}Loop replay error: {e}")
+                                break # Exit thread on error
+                        # --- End Add ---
                     # Don't call stop_audio here, let the main loop handle state transition
                     break # Exit thread
 
@@ -504,3 +521,15 @@ class AudioManager:
         current_time_str = self.format_time(self.current_position)
         total_time_str = self.format_time(self.duration)
         return f"[{bar}] {current_time_str}/{total_time_str}"
+
+    def toggle_loop(self):
+        """
+        Toggle the loop_enabled flag for audio playback.
+        
+        When enabled, audio will automatically restart after completion.
+        The UI will display the current loop status (Enabled/Disabled).
+        Works on both Windows and Linux systems.
+        """
+        self.loop_enabled = not self.loop_enabled
+        loop_status = "ENABLED" if self.loop_enabled else "DISABLED"
+        print(f"{Fore.GREEN if self.loop_enabled else Fore.YELLOW}Loop mode {loop_status}")
