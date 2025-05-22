@@ -3,7 +3,7 @@
 ### Run "man equivs-build" for more information.
 # Package name (lowercase, digits, hyphens)
 Package: qurancli
-Version: 1.2.0
+Version: 1.3.0
 # Maintainer details
 Maintainer: FadSec Lab <fadedhood@proton.me>
 # Architecture: Should match your build system (usually amd64)
