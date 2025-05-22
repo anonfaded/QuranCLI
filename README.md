@@ -5,7 +5,7 @@
 
 
 
-![icon](https://github.com/user-attachments/assets/b82e6f7b-850d-4561-8290-083ef4bebfd6)
+<img src="https://github.com/anonfaded/QuranCLI/blob/main/core/img/icon.png?raw=true" height="260">
 
 
 
