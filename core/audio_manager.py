@@ -36,6 +36,13 @@ class AudioManager:
         self.audio_dir = None # Initialize path attribute
         self.last_was_ayatul_kursi = False # Flag to track if last playback was Ayatul Kursi
         self.loop_enabled = False # Flag to control audio looping behavior
+        
+        # Timer related variables
+        self.timer_enabled = False
+        self.timer_duration = 0  # Duration in seconds
+        self.timer_start_time = 0  # When the timer was started
+        self.timer_thread = None
+        self.timer_stop_event = threading.Event()
 
         # --- Platform-Specific Path for Audio Cache ---
         try:
@@ -442,32 +449,50 @@ class AudioManager:
             self.progress_thread.start()
 
     def stop_audio(self, reset_state=False):
-        """Stops audio playback and cleans up resources."""
-        if not self.mixer_initialized: return
-
-        self.should_stop = True # Signal tracking thread to stop
-        if self.progress_thread and self.progress_thread.is_alive():
-            self.progress_thread.join(timeout=0.5) # Wait briefly for thread exit
-        self.progress_thread = None # Clear thread reference
-
+        """
+        Stop audio playback and optionally reset the audio state.
+        This method ensures all threads are properly stopped.
+        
+        Args:
+            reset_state (bool): If True, reset the audio state (current_audio, etc.)
+        """
         try:
-             pygame.mixer.music.stop()
-             pygame.mixer.music.unload() # Important to release file handles
-        except pygame.error as e:
-             print(f"{Fore.YELLOW}Note: Pygame mixer error during stop/unload: {e}")
-
-        self.is_playing = False # Update state
-
-        if reset_state:
-            self.current_position = 0
-            self.current_audio = None
-            self.current_reciter = None
-            self.current_surah = None
-            self.duration = 0
-            self.start_time = 0
-            # Don't reset mixer_initialized here
-
-        self.last_was_ayatul_kursi = self.current_surah == 2 if self.current_surah else False
+            # Nothing to do if not initialized
+            if not self.mixer_initialized:
+                return
+                
+            # Stop pygame mixer
+            pygame.mixer.music.stop()
+            pygame.mixer.music.unload()
+            self.is_playing = False
+            
+            # Stop the progress tracking thread
+            self.should_stop = True
+            if self.progress_thread and self.progress_thread.is_alive():
+                self.update_event.set()  # Signal thread to check should_stop
+                self.progress_thread.join(timeout=1.0)  # Wait for thread with timeout
+            
+            # Also cancel timer if resetting state
+            if reset_state:
+                self.cancel_timer()
+                
+            # Reset audio data if requested
+            if reset_state:
+                self.current_audio = None
+                self.current_reciter = None
+                # Don't reset current_surah or we might lose track of which chapter we're in
+                self.current_position = 0
+                self.duration = 0
+                # self.loop_enabled is not affected by stop
+        except Exception as e:
+            print(f"{Fore.RED}Error stopping audio: {e}{Style.RESET_ALL}")
+            # Still reset state if that was requested, even if stopping failed
+            if reset_state:
+                self.current_audio = None
+                self.current_reciter = None
+                self.current_position = 0
+                self.duration = 0
+                self.is_playing = False
 
     def pause_audio(self):
         """Pause audio playback."""
@@ -533,3 +558,110 @@ class AudioManager:
         self.loop_enabled = not self.loop_enabled
         loop_status = "ENABLED" if self.loop_enabled else "DISABLED"
         print(f"{Fore.GREEN if self.loop_enabled else Fore.YELLOW}Loop mode {loop_status}")
+
+    def set_timer(self, minutes: int, seconds: int = 0):
+        """
+        Set a timer to stop audio playback after specified duration.
+        
+        Args:
+            minutes (int): Minutes for timer
+            seconds (int): Additional seconds for timer (default 0)
+        """
+        # Cancel any existing timer
+        self.cancel_timer()
+        
+        # Set up the new timer
+        duration_seconds = minutes * 60 + seconds
+        
+        if duration_seconds <= 0:
+            return False
+            
+        self.timer_duration = duration_seconds
+        self.timer_enabled = True
+        self.timer_start_time = time.time()
+        
+        # Start the timer thread
+        self.timer_stop_event.clear()
+        self.timer_thread = threading.Thread(target=self._timer_thread, daemon=True)
+        self.timer_thread.start()
+        
+        return True
+    
+    def cancel_timer(self):
+        """Cancel the currently running timer if one exists."""
+        if self.timer_enabled:
+            self.timer_enabled = False
+            if self.timer_thread and self.timer_thread.is_alive():
+                self.timer_stop_event.set()
+                # Don't join the thread here to avoid blocking
+            self.timer_duration = 0
+            self.timer_start_time = 0
+    
+    def _timer_thread(self):
+        """Background thread that monitors the timer and stops playback when it expires."""
+        end_time = self.timer_start_time + self.timer_duration
+        
+        while time.time() < end_time:
+            # Check if the timer was cancelled
+            if self.timer_stop_event.is_set() or not self.timer_enabled:
+                return
+                
+            # Sleep for a short time to prevent CPU usage
+            time.sleep(0.1)
+        
+        # Timer expired - stop the audio if it's playing
+        if self.timer_enabled:
+            print(f"\n{Fore.YELLOW}⏰ Timer expired! Audio playback stopped. Press 'p' to play again.{Style.RESET_ALL}")
+            try:
+                self.stop_audio(reset_state=True)
+            finally:
+                # Make sure to reset the timer state even if stopping fails
+                self.timer_enabled = False
+    
+    def get_timer_status(self):
+        """
+        Returns information about the current timer status.
+        
+        Returns:
+            dict: Dictionary with timer status information
+                'enabled': Whether timer is enabled
+                'remaining': Time remaining in seconds
+                'total': Total timer duration in seconds
+                'elapsed': Time elapsed in seconds
+        """
+        if not self.timer_enabled:
+            return {
+                'enabled': False,
+                'remaining': 0,
+                'total': 0,
+                'elapsed': 0,
+            }
+            
+        elapsed = time.time() - self.timer_start_time
+        remaining = max(0, self.timer_duration - elapsed)
+        
+        return {
+            'enabled': self.timer_enabled,
+            'remaining': remaining,
+            'total': self.timer_duration,
+            'elapsed': elapsed,
+        }
+    
+    def format_timer_display(self) -> str:
+        """Format timer information for display in a readable format."""
+        if not self.timer_enabled:
+            return "Disabled"
+            
+        status = self.get_timer_status()
+        remaining = status['remaining']
+        
+        # Calculate hours, minutes, seconds
+        hours = int(remaining // 3600)
+        minutes = int((remaining % 3600) // 60)
+        seconds = int(remaining % 60)
+        
+        # Format based on how much time is left
+        if hours > 0:
+            return f"{hours}h {minutes}m {seconds}s remaining"
+        else:
+            return f"{minutes}m {seconds}s remaining"

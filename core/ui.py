@@ -13,16 +13,44 @@ import subprocess  # Added for Linux/Mac folder opening
 import re
 import pygame
 
-if sys.platform == "win32":
-    import msvcrt
+# Import termios conditionally - it's only available on Unix systems
+import sys
+if sys.platform != "win32":
+    try:
+        import termios
+        import select
+        HAS_TERMIOS = True
+    except ImportError:
+        HAS_TERMIOS = False
 else:
-    # Imports for Unix-like systems (Linux, macOS, Termux)
-    import select
-    import tty
-    import termios
-    # Keep track of original terminal settings
-    _original_termios_settings = None
-     
+    HAS_TERMIOS = False
+    # These are needed for type checking
+    termios = None
+    select = None
+
+# Import platform-specific modules
+import sys
+
+# Windows-specific modules
+if sys.platform == "win32":
+    try:
+        import msvcrt
+        HAS_MSVCRT = True
+    except ImportError:
+        HAS_MSVCRT = False
+# Unix-specific modules (Linux, macOS, etc.)
+else:
+    try:
+        import select
+        import tty
+        import termios
+        HAS_TERMIOS = True
+    except ImportError:
+        # Fallbacks for environments without termios (like non-terminal environments)
+        HAS_TERMIOS = False
+        select = None
+        termios = None
+
 from typing import List, Optional, TYPE_CHECKING
 if TYPE_CHECKING: # Avoid circular import issues for type hints
     from core.download_counter import DownloadCounter
@@ -39,49 +67,43 @@ import threading #Add threading for server
 import http.server
 import socketserver
 
+# Keep track of original terminal settings
+_original_termios_settings = None
 
 # --- Terminal Control for Unix-like systems ---
 def _unix_getch_non_blocking():
-    """Gets a single character from standard input on Unix without blocking.
-       Returns None if no key is pressed. Needs terminal in cbreak mode."""
-    # Check if stdin has data to read with a timeout of 0 (non-blocking)
-    # Use select for portability (works on more Unix variants)
-    rlist, _, _ = select.select([sys.stdin], [], [], 0)
-    if rlist:
-        # Data is available, read one character
-        try:
-            # Use os.read for lower-level reading after tty.setcbreak
-            # Read up to 4 bytes to handle potential escape sequences
-            char_bytes = os.read(sys.stdin.fileno(), 4)
-            # Decode carefully
-            try:
-                return char_bytes.decode('utf-8')
-            except UnicodeDecodeError:
-                # If decoding fails, might be a special key - return bytes?
-                # Or return a placeholder/None? Let's return None for simplicity.
-                return None
-        except Exception:
-             # Handle potential errors during read
-             return None
-    else:
-        # No data available
+    """Non-blocking character read function for Unix platforms.
+    Returns a single character if available, or None if no input is available.
+    """
+    # Check if termios is available
+    if 'HAS_TERMIOS' not in globals() or not HAS_TERMIOS or not select:
+        return None
+        
+    try:
+        # Check for available input with no timeout
+        rlist, _, _ = select.select([sys.stdin], [], [], 0)
+        if rlist:
+            # Input is available, read one character
+            char = sys.stdin.read(1)
+            return char
+        return None  # No input available
+    except Exception:
+        # Handle any errors during read
         return None
 
 
 def _restore_terminal_settings():
-    """Restores terminal settings on Unix-like systems."""
+    """Helper function to restore terminal settings if modified"""
     global _original_termios_settings
-    if sys.platform != "win32" and _original_termios_settings is not None:
+    
+    # Only attempt restoration if the global is set and termios is available
+    if _original_termios_settings is not None and 'HAS_TERMIOS' in globals() and HAS_TERMIOS:
         try:
-            # print("DEBUG: Attempting to restore terminal settings...") # Optional debug
-            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, _original_termios_settings)
-            # print("DEBUG: Restored terminal settings successfully.") # Optional debug
+            fd = sys.stdin.fileno()
+            termios.tcsetattr(fd, termios.TCSADRAIN, _original_termios_settings)
         except Exception as e:
-            # Use stderr for errors potentially interfering with UI redraw
-            print(f"\n{Fore.RED}Warning: Failed to restore terminal settings: {e}{Style.RESET_ALL}", file=sys.stderr)
-        finally:
-             # Always clear the stored settings after attempting restore
-            _original_termios_settings = None
+            # Don't print anything (might interfere with rendering)
+            pass
 
 # --- End Terminal Control ---
 
@@ -361,7 +383,7 @@ class UI:
             
             # Add special Ayatul Kursi option only for Surah 2
             if surah_info and surah_info.surah_number == 2:
-                nav_options.insert(-1, (f"{Fore.GREEN}k{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Play Ayatul Kursi"))
+                nav_options.insert(-1, (f"{Fore.GREEN}k{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Play Ayatul Kursi (Quick Link)"))
                 
             nav_options.append((f"{Fore.RED}q{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Return"))
             
@@ -633,6 +655,15 @@ class UI:
                 print(Fore.RED + "⏹ Audio stopped and reset.")
                 needs_redraw = True # Redraw after stop
 
+            elif choice == 'l':  # Toggle loop mode
+                self.audio_manager.toggle_loop()
+                needs_redraw = True  # Redraw after toggling loop mode
+                
+            elif choice == 't':  # Set sleep timer
+                # Show timer setting interface
+                self._show_timer_settings(surah_info)
+                needs_redraw = True  # Redraw after setting timer
+
             elif choice == 'r': # Change Reciter
                 surah_num = surah_info.surah_number
                 if not surah_info.audio:
@@ -721,6 +752,113 @@ class UI:
             # Try to redraw even on error to restore some UI state
             self._redraw_audio_ui(surah_info)
 
+
+    def _show_timer_settings(self, surah_info: SurahInfo):
+        """Display the timer setting interface."""
+        # Use the global _restore_terminal_settings function
+        global _restore_terminal_settings
+        if '_restore_terminal_settings' in globals():
+            _restore_terminal_settings()
+        
+        try:
+            self.clear_terminal()
+            print(Style.BRIGHT + Fore.RED + "\nAudio Player - Sleep Timer Settings" + Style.RESET_ALL)
+            
+            # Show current timer status
+            timer_status = self.audio_manager.get_timer_status()
+            if timer_status['enabled']:
+                remaining = timer_status['remaining']
+                hours = int(remaining // 3600)
+                minutes = int((remaining % 3600) // 60)
+                seconds = int(remaining % 60)
+                
+                if hours > 0:
+                    print(Fore.GREEN + f"\nCurrent timer: {hours}h {minutes}m {seconds}s remaining")
+                else:
+                    print(Fore.GREEN + f"\nCurrent timer: {minutes}m {seconds}s remaining")
+            else:
+                print(Fore.YELLOW + "\nNo timer currently set")
+            
+            # Helper text about the timer
+            print(Fore.CYAN + "\n📌 About the Sleep Timer:")
+            print(Fore.WHITE + "• The timer will automatically stop audio playback when it expires")
+            print(Fore.WHITE + "• Make sure audio is playing before setting a timer")
+            print(Fore.WHITE + "• You can cancel the timer at any time")
+            print(Fore.WHITE + "• When timer expires, press 'p' to play the audio again")
+            
+            # Display options
+            print(Fore.CYAN + "\nSelect an option:")
+            print(Fore.GREEN + "1. Set timer (minutes)")
+            print(Fore.GREEN + "2. Set timer (hours and minutes)")
+            print(Fore.RED + "3. Cancel current timer")
+            print(Fore.YELLOW + "0. Back to audio player")
+            
+            choice = input(Fore.RED + "\n> " + Fore.WHITE).strip()
+            
+            if choice == "1":
+                # Set timer in minutes
+                try:
+                    print(Fore.CYAN + "\nEnter minutes for timer (1-300):" + Fore.WHITE)
+                    minutes = int(input(Fore.RED + "> " + Fore.WHITE).strip())
+                    
+                    if 1 <= minutes <= 300:  # Reasonable limit
+                        if self.audio_manager.set_timer(minutes):
+                            print(Fore.GREEN + f"\n✅ Timer set for {minutes} minute(s)")
+                            time.sleep(1.5)
+                    else:
+                        print(Fore.RED + "\n❌ Invalid time. Please enter a value between 1-300 minutes.")
+                        time.sleep(1.5)
+                except ValueError:
+                    print(Fore.RED + "\n❌ Invalid input. Please enter a number.")
+                    time.sleep(1.5)
+                    
+            elif choice == "2":
+                # Set timer with hours and minutes
+                try:
+                    print(Fore.CYAN + "\nEnter hours (0-24):" + Fore.WHITE)
+                    hours = int(input(Fore.RED + "> " + Fore.WHITE).strip())
+                    
+                    print(Fore.CYAN + "\nEnter minutes (0-59):" + Fore.WHITE)
+                    minutes = int(input(Fore.RED + "> " + Fore.WHITE).strip())
+                    
+                    if 0 <= hours <= 24 and 0 <= minutes <= 59:
+                        total_minutes = hours * 60 + minutes
+                        if total_minutes > 0:
+                            if self.audio_manager.set_timer(total_minutes):
+                                if hours > 0:
+                                    print(Fore.GREEN + f"\n✅ Timer set for {hours} hour(s) and {minutes} minute(s)")
+                                else:
+                                    print(Fore.GREEN + f"\n✅ Timer set for {minutes} minute(s)")
+                                time.sleep(1.5)
+                        else:
+                            print(Fore.RED + "\n❌ Timer must be at least 1 minute.")
+                            time.sleep(1.5)
+                    else:
+                        print(Fore.RED + "\n❌ Invalid time. Hours must be 0-24, minutes 0-59.")
+                        time.sleep(1.5)
+                except ValueError:
+                    print(Fore.RED + "\n❌ Invalid input. Please enter a number.")
+                    time.sleep(1.5)
+                    
+            elif choice == "3":
+                # Cancel the current timer
+                if timer_status['enabled']:
+                    self.audio_manager.cancel_timer()
+                    print(Fore.YELLOW + "\n⏹ Timer cancelled")
+                    time.sleep(1.5)
+                else:
+                    print(Fore.YELLOW + "\nNo timer was set")
+                    time.sleep(1.5)
+            
+            # Option "0" or any other input just returns to audio player
+                    
+        except KeyboardInterrupt:
+            print(Fore.YELLOW + "\nTimer setting cancelled.")
+            time.sleep(1)
+        except Exception as e:
+            print(Fore.RED + f"\nError in timer settings: {e}")
+            time.sleep(1.5)
+
 # core/ui.py (inside class UI)
 
     def _redraw_audio_ui(self, surah_info: SurahInfo):
@@ -765,6 +903,7 @@ class UI:
     def display_audio_controls(self, surah_info: SurahInfo):
         """Display audio controls with real-time updates (Cross-Platform Input)."""
         global _original_termios_settings # Access the global variable
+        global HAS_TERMIOS # Check if termios is available
 
         if not surah_info.audio:
             print(Fore.RED + "\n❌ Audio not available for this surah")
@@ -781,33 +920,32 @@ class UI:
         new_settings = None
 
         # --- Setup Terminal for Non-Blocking Input (Unix) ---
-        if is_unix:
+        if is_unix and 'HAS_TERMIOS' in globals() and HAS_TERMIOS and termios is not None:
             try:
                 fd = sys.stdin.fileno()
-                _original_termios_settings = termios.tcgetattr(fd)
-                # --- Make a copy to modify and store in new_settings ---
-                new_settings = termios.tcgetattr(fd)
-                new_settings[3] &= ~(termios.ECHO | termios.ECHONL | termios.ICANON | termios.ISIG | termios.IEXTEN) # lflags
-                new_settings[6][termios.VMIN] = 1
-                new_settings[6][termios.VTIME] = 0
-                termios.tcsetattr(fd, termios.TCSADRAIN, new_settings)
+                if termios is not None:
+                    _original_termios_settings = termios.tcgetattr(fd)
+                    # --- Make a copy to modify and store in new_settings ---
+                    new_settings = termios.tcgetattr(fd)
+                    new_settings[3] &= ~(termios.ECHO | termios.ECHONL | termios.ICANON | termios.ISIG | termios.IEXTEN) # lflags
+                    new_settings[6][termios.VMIN] = 1
+                    new_settings[6][termios.VTIME] = 0
+                    termios.tcsetattr(fd, termios.TCSADRAIN, new_settings)
 
-                # --- Check if it actually worked ---
-                if (termios.tcgetattr(fd)[3] & termios.ICANON) or \
-                (termios.tcgetattr(fd)[3] & termios.ECHO):
-                    print(f"\n{Fore.YELLOW}Warning: Terminal did not fully enter cbreak mode (ICANON or ECHO still set).")
-                    _restore_terminal_settings() # Use helper
-                    is_unix = False
-                    _original_termios_settings = None
-                    new_settings = None # Clear modified settings as well
-                    print(f"{Fore.YELLOW}Audio controls will require pressing Enter.{Style.RESET_ALL}")
-                # else:
-                    # print("DEBUG: Terminal successfully set to cbreak-like mode.") # Optional success debug
+                    # --- Check if it actually worked ---
+                    if (termios.tcgetattr(fd)[3] & termios.ICANON) or \
+                    (termios.tcgetattr(fd)[3] & termios.ECHO):
+                        print(f"\n{Fore.YELLOW}Warning: Terminal did not fully enter cbreak mode (ICANON or ECHO still set).")
+                        _restore_terminal_settings() # Use helper
+                        is_unix = False
+                        _original_termios_settings = None
+                        new_settings = None # Clear modified settings as well
+                        print(f"{Fore.YELLOW}Audio controls will require pressing Enter.{Style.RESET_ALL}")
 
             except Exception as e:
                 print(f"\n{Fore.YELLOW}Warning: Could not set terminal for instant key input: {e}")
                 print(f"{Fore.YELLOW}Audio controls will require pressing Enter.{Style.RESET_ALL}")
-                if _original_termios_settings: # Attempt restore if we got original settings
+                if _original_termios_settings is not None and termios is not None: 
                     try: termios.tcsetattr(fd, termios.TCSADRAIN, _original_termios_settings)
                     except: pass
                 is_unix = False
@@ -826,18 +964,21 @@ class UI:
                 reciter_selection_active = False # Flag to know if we are inside reciter menu
 
                 # --- Platform-Specific Non-Blocking Input ---
-                # (This part remains the same as the previous version)
                 try:
                     if sys.platform == "win32":
+                        # Handle Windows-specific input
+                        import msvcrt  # Import inside the try block for safety
                         if msvcrt.kbhit():
                             key_byte = msvcrt.getch()
                             if key_byte == b'\x00' or key_byte == b'\xe0':
-                                msvcrt.getch()
+                                msvcrt.getch()  # Consume the second byte of extended keys
                                 continue
                             else:
-                                try: choice = key_byte.decode('utf-8', errors='ignore').lower()
-                                except UnicodeDecodeError: continue
-                    elif is_unix: # Use the Unix non-blocking method if setup succeeded
+                                try: 
+                                    choice = key_byte.decode('utf-8', errors='ignore').lower()
+                                except UnicodeDecodeError: 
+                                    continue
+                    elif is_unix and 'HAS_TERMIOS' in globals() and HAS_TERMIOS: # Use the Unix non-blocking method if setup succeeded
                         char_read = _unix_getch_non_blocking()
                         if char_read:
                             if len(char_read) > 1 and char_read.startswith('\x1b'):
@@ -846,6 +987,10 @@ class UI:
                                 choice = char_read.lower()
                     else: # Fallback (shouldn't be reached often now)
                         pass
+                except ImportError:
+                    print(f"\n{Fore.YELLOW}Warning: Missing module for keyboard input.{Style.RESET_ALL}")
+                    time.sleep(1)
+                    continue
                 except Exception as e_input:
                     print(f"\n{Fore.RED}Input Error: {e_input}{Style.RESET_ALL}")
                     time.sleep(1)
@@ -854,6 +999,9 @@ class UI:
 
                 # --- Process Input Choice ---
                 if choice:
+                    # Remove debug message that prints key pressed
+                    # print(f"\n{Fore.BLUE}Debug: Key pressed '{choice}'{Style.RESET_ALL}")
+                    
                     if choice == 'q': running = False
 
                     # --- Handle Loop Toggle ('l') ---
@@ -862,6 +1010,27 @@ class UI:
                         # Force redraw to show updated loop status
                         last_display = self._redraw_audio_ui(surah_info) or ""
                         time.sleep(0.3) # Slight feedback delay
+                        continue
+                        
+                    # --- Handle Timer Setting ('t') ---
+                    elif choice == 't':
+                        # Call our timer settings method and handle any errors
+                        try:
+                            print(f"\n{Fore.YELLOW}Opening timer settings...{Style.RESET_ALL}")
+                            
+                            # Restore terminal for input - call helper function instead of using termios directly
+                            if is_unix and 'HAS_TERMIOS' in globals() and HAS_TERMIOS and '_restore_terminal_settings' in globals():
+                                _restore_terminal_settings()
+                            
+                            # Call timer settings directly
+                            self._show_timer_settings(surah_info)
+                            
+                        except Exception as e:
+                            print(f"\n{Fore.RED}Error in timer settings: {e}{Style.RESET_ALL}")
+                            time.sleep(1.5)
+                        finally:
+                            # Always redraw UI after timer setting
+                            last_display = self._redraw_audio_ui(surah_info) or ""
                         continue
 
                     # --- Handle Reciter Selection ('r') ---
@@ -1107,11 +1276,24 @@ class UI:
         output.append(f"\nState  : {state_color}{state}{_RESET}")
         output.append(f"Reciter: {_Fore_CYAN}{current_reciter_display}{_RESET}")
         
-        # --- ADD Loop status display ---
+        # --- Loop status display ---
         loop_status = "Enabled" if self.audio_manager.loop_enabled else "Disabled"
         loop_color = _Fore_GREEN if self.audio_manager.loop_enabled else _Fore_RED
         output.append(f"Loop   : {loop_color}{loop_status}{_RESET}")
-        # --- End ADD ---
+        
+        # --- Timer status display ---
+        timer_display = self.audio_manager.format_timer_display()
+        timer_color = _Fore_GREEN if self.audio_manager.timer_enabled else _Fore_RED
+        
+        # Special case: if audio is stopped or finished and timer was previously enabled
+        if state in ["⏹ Stopped", "✅ Finished"] and not self.audio_manager.timer_enabled:
+            # Check if we should show the timer expired message
+            if self.audio_manager.duration > 0 and not self.audio_manager.is_playing:
+                timer_display = "Timer expired! Press 'p' to play again"
+                timer_color = _Fore_YELLOW
+                
+        output.append(f"Timer  : {timer_color}{timer_display}{_RESET}")
+        # --- End Timer status display ---
         
         # Progress Bar
         if self.audio_manager.duration > 0:
@@ -1134,6 +1316,8 @@ class UI:
         output.append(_Fore_RED + "│ • " + _Fore_YELLOW + "s " + _Fore_WHITE + ": Stop & Reset" + _RESET)
         # --- ADD loop control ---
         output.append(_Fore_RED + "│ • " + _Fore_MAGENTA + "l " + _Fore_WHITE + ": Toggle Loop Mode" + _RESET)
+        # --- ADD timer control ---
+        output.append(_Fore_RED + "│ • " + _Fore_CYAN + "t " + _Fore_WHITE + ": Set Sleep Timer" + _RESET)
         # --- END ADD ---
         output.append(_Fore_RED + "│ • " + _Fore_RED + "r " + _Fore_WHITE + ": Change Reciter" + _RESET)
         output.append(_Fore_RED + "│ • " + _Fore_GREEN + "[ " + _Fore_WHITE + ": Seek Back 5s" + _RESET)
