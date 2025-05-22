@@ -31,7 +31,7 @@ Files: dist/QuranCLI /opt/QuranCLI/
 
 # Install the icon into the standard hicolor theme directory
 # Adjust source path if your icon is elsewhere. Choose an appropriate size.
-Files: core/icon.png /usr/share/icons/hicolor/128x128/apps/qurancli.png
+Files: core/img/icon.png /usr/share/icons/hicolor/128x128/apps/qurancli.png
 
 # Install the .desktop file for menu integration
 Files: qurancli.desktop /usr/share/applications/
