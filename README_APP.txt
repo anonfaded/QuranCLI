@@ -2,11 +2,21 @@
 
 Welcome to QuranCLI! This space holds notes from the developer and highlights recent updates to help you make the most of this tool.
 
---- What's New (v1.2.0) ---
-• Added new reciter: Shiekh Mohammad Al Luhaidan.
-• Added Urdu translation database.
-• Added transliteration database.
-• In SRT files, users can now choose to include or exclude English translation, Urdu translation, and transliteration.
+--- What's New (v1.3.0) ---
+
+New Features:
+• Added 'audiopath' command to view and open audio cache folder
+• Added comprehensive bookmark management with notes and Ayatul Kursi quicklink
+• Added backup/restore feature for app settings and data export/import
+• Added Linux-style short commands (e.g. 'ls' for list)
+• Added dedicated Ayatul Kursi audio player
+• Added audio loop functionality for continuous playback
+• Added sleep timer for auto-stopping audio playback
+• Added 'all' command to open entire Surah at first input
+
+Bug Fixes:
+• Fixed Arabic text reverse command functionality
+• Fixed audio replay after playback completion
 
 --- Upcoming Features Roadmap ---
 • Additional reciters.
