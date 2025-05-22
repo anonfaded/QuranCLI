@@ -37,17 +37,27 @@ QuranCLI brings the Quran to your Windows command line with a rich set of featur
 
 ## 🌟 Key Features
 
-*   **📖 Read Anywhere:** Access all 114 Surahs with English translation (Simple & Uthmani Arabic scripts).
-*   **🎧 Listen:** Stream audio recitations from various renowned reciters with full playback controls (play/pause/seek).
-*   **🎬 Subtitle Generation:** Create `.srt` subtitle files (Arabic + English) for Ayah ranges – perfect for video editing!
-*   **🌐 Subtitle Sharing:** **Built-in web server** to easily share generated subtitle files with other devices (phone, tablet, other PCs) on the same Wi-Fi network.
-*   **💾 Smart Caching:** Works offline by caching Quran text and audio locally.
-*   **🎨 Intuitive Interface:** Colorful, responsive, and easy-to-navigate terminal UI with custom `theme` command to customize colors.
-*   **🔄 App Auto-Updates:** Notifies you of new app versions available on GitHub.
-*   **📊 Stats:** See total download counts directly in the header.
-*   **🖥️ Multi Platform:** Available on `Windows` and `Linux` platforms.
-*   **⌨️ Command Alias:** Launch the app directly from the terminal using the `qurancli` command.
-*   **🌐 Translation & Transliteration:** Provides Urdu and English translations along with transliteration.
+*   **📖 Read Anywhere:** Access all 114 Surahs with English translation (Simple & Uthmani Arabic scripts).  
+*   **🎧 Listen:** Stream audio recitations from various renowned reciters with full playback controls (play/pause/seek).  
+*   **🎬 Subtitle Generation:** Create `.srt` subtitle files (Arabic + English) for Ayah ranges – perfect for video editing!  
+*   **🌐 Subtitle Sharing:** **Built-in web server** to easily share generated subtitle files with other devices (phone, tablet, other PCs) on the same Wi-Fi network.  
+*   **💾 Smart Caching:** Works offline by caching Quran text and audio locally.  
+*   **🎨 Intuitive Interface:** Colorful, responsive, and easy-to-navigate terminal UI with custom `theme` command to customize colors.  
+*   **🔄 App Auto-Updates:** Notifies you of new app versions available on GitHub.  
+*   **📊 Stats:** See total download counts directly in the header.  
+*   **🖥️ Multi Platform:** Available on `Windows` and `Linux` platforms.  
+*   **⌨️ Command Alias:** Launch the app directly from the terminal using the `qurancli` command.  
+*   **🌐 Translation & Transliteration:** Provides Urdu and English translations along with transliteration.  
+*   **🎨 Redesigned app icon for a fresh look.**  
+*   **📂 `audiopath` command to view and open the audio cache folder.**  
+*   **🔖 Comprehensive bookmark management with notes and quick access to Ayatul Kursi.**  
+*   **💾 Backup and restore capabilities for app settings and data import/export.**  
+*   **🧩 Linux-style short commands such as `ls` for listing items.**  
+*   **🎵 Dedicated Ayatul Kursi audio player for focused listening.**  
+*   **🔁 Audio loop feature enabling continuous playback.**  
+*   **⏰ Sleep timer to auto-stop audio playback after a set time.**  
+*   **📖 `all` command for opening an entire Surah from the first input.**
+
 
 ---
 
