@@ -477,7 +477,9 @@ class QuranApp:
             import re
             ansi_escape = re.compile(r'\x1B[\[][0-?]*[ -/]*[@-~]')
             return ansi_escape.sub('', s)
-        max_cmd_len = max(len(cmd) + (len(short) + 3 if short else 0) for cmd, _, short, _ in options)
+        
+        # This line was using an undefined 'options' variable - we'll use commands_info instead
+        # max_cmd_len = max(len(cmd) + (len(short) + 3 if short else 0) for cmd, _, short, _ in options)
 
         separator_minor = "-" * 120
         box_width = 120
@@ -545,9 +547,9 @@ class QuranApp:
         print(Fore.WHITE + "  Quran Data & Audio API provided by:")
         print(f"    {Fore.CYAN}The Quran Project{Fore.WHITE} ({Fore.MAGENTA}https://github.com/The-Quran-Project/Quran-API{Fore.WHITE})")
         print(f"      {Fore.YELLOW}(API has no rate limit)")
-        print(Fore.WHITE + "\n  Application Icon sourced from Flaticon:")
-        print(f"    {Fore.CYAN}Holy icons created by Atif Arshad - Flaticon{Fore.WHITE}")
-        print(f"      ({Fore.MAGENTA}https://www.flaticon.com/free-icons/holy{Fore.WHITE})")
+        print(Fore.WHITE + "\n  Databases used:")
+        print(f"    ({Fore.MAGENTA}https://github.com/saikothasan/quran-cloud{Fore.WHITE})")
+        print(f"    ({Fore.MAGENTA}https://gist.github.com/raz0229/ad8cb85f6a92c08f7acf50d245524a5f{Fore.WHITE})")
 
         print("\n" + separator_minor)
         print(Fore.GREEN + Style.BRIGHT + "Feedback & Bug Reports".center(box_width))

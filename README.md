@@ -259,7 +259,7 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
 
 - Quran Data & Audio API: Provided by [The Quran Project](https://github.com/The-Quran-Project/Quran-API). An API for the Holy Quran with no rate limit.
 
-- Application Icon: Holy icon created by Atif Arshad - Flaticon.
+- Databases used: https://gist.github.com/raz0229/ad8cb85f6a92c08f7acf50d245524a5f, https://github.com/saikothasan/quran-cloud
 
 ## 📄 License
 
