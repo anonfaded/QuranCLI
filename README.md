@@ -186,7 +186,7 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
   1. **Copy Codebase from /mnt/c/ (WSL only)**  
      Due to the WSL `/mnt/c/` structure, copy the whole codebase to the root to match the filesystem as linux would expect:
      ```bash
-     cp -r /mnt/c/Users/username/Desktop/QuranCLI .
+     cp -r /mnt/c/Users/username/Desktop/QuranCLI /
      ```
 
   2. **Create the Executable:**  
