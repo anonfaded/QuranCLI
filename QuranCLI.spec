@@ -7,7 +7,7 @@ block_cipher = None
 # --- Configuration ---
 app_name = 'QuranCLI'
 main_script = 'Quran-CLI.py'
-icon_file = 'core/icon.ico' # Icon in the root directory
+icon_file = 'core/img/icon.ico' # Icon in the img directory
 
 # --- Data files to bundle (Read-Only Assets) ---
 datas = [

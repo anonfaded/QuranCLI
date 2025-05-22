@@ -28,15 +28,15 @@ ArchitecturesAllowed=x64compatible
 ; the 64-bit view of the registry.
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
-LicenseFile=C:\Users\faded\Desktop\QuranCLI\LICENSE
-InfoBeforeFile=C:\Users\faded\Desktop\QuranCLI\InnoSetup\InfoBeforeInstall.txt
-InfoAfterFile=C:\Users\faded\Desktop\QuranCLI\InnoSetup\InfoAfterInstall.txt
+LicenseFile=D:\ubuntu-shared\Documents\Documents\repos\QuranCLI\LICENSE
+InfoBeforeFile=D:\ubuntu-shared\Documents\Documents\repos\QuranCLI\InnoSetup\InfoBeforeInstall.txt
+InfoAfterFile=D:\ubuntu-shared\Documents\Documents\repos\QuranCLI\InnoSetup\InfoAfterInstall.txt
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
-OutputDir=C:\Users\faded\Desktop\QuranCLI\InnoSetup
+OutputDir=D:\ubuntu-shared\Documents\Documents\repos\QuranCLI\InnoSetup
 OutputBaseFilename=QuranCLI-Setup
-SetupIconFile=C:\Users\faded\Desktop\QuranCLI\core\icon.ico
+SetupIconFile=D:\ubuntu-shared\Documents\Documents\repos\QuranCLI\core\img\icon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -98,8 +98,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "C:\Users\faded\Desktop\QuranCLI\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\faded\Desktop\QuranCLI\qurancli.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\ubuntu-shared\Documents\Documents\repos\QuranCLI\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\ubuntu-shared\Documents\Documents\repos\QuranCLI\qurancli.bat"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]

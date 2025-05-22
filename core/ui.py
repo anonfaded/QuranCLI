@@ -446,8 +446,7 @@ class UI:
     def display_single_ayah(self, ayah: Ayah):
         """
         Display a single ayah with Arabic, Transliteration, Urdu, and English.
-        On Linux/macOS, applies reversal to both Arabic and Urdu if Arabic reversal is enabled.
-        On Windows, displays both normally.
+        On Linux/macOS/Windows, applies reversal to both Arabic and Urdu if Arabic reversal is enabled.
         """
         print(Style.BRIGHT + Fore.GREEN + f"\n[{ayah.number}]")
 
@@ -455,8 +454,8 @@ class UI:
         print(Style.BRIGHT + Fore.RED + "Arabic:" + Style.NORMAL + Fore.WHITE)
         try:
             formatted_arabic = self.data_handler.fix_arabic_text(ayah.content)
-            # Apply reversal only on Linux/macOS if enabled
-            if self.data_handler.arabic_reversed and sys.platform != "win32":
+            # Apply reversal on Linux/macOS/Windows if enabled
+            if self.data_handler.arabic_reversed:
                 import arabic_reshaper
                 from bidi.algorithm import get_display
                 reshaped = arabic_reshaper.reshape(formatted_arabic)
@@ -472,12 +471,12 @@ class UI:
         for line in wrapped_translit.split('\n'):
             print("    " + line)
 
-        # 3. Urdu Translation (reverse only on Linux/macOS if enabled)
+        # 3. Urdu Translation (reverse on Linux/macOS/Windows if enabled)
         if ayah.translation_ur:
             print(Style.BRIGHT + Fore.MAGENTA + "\nUrdu Translation:" + Style.NORMAL + Fore.WHITE)
             try:
                 formatted_urdu = ayah.translation_ur
-                if self.data_handler.arabic_reversed and sys.platform != "win32":
+                if self.data_handler.arabic_reversed:
                     formatted_urdu = formatted_urdu[::-1]
             except Exception as e:
                 print(f"[DEBUG] Error formatting Urdu: {e}")
