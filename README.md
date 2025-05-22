@@ -74,14 +74,14 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
 <br> 
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/be3ae1e9-ca4d-4d8d-abee-7a4d3e854450" alt="Reading View" width="550">
-  <p><em>Reading View (Simple & Uthmani Scripts + Translation)</em></p>
+  <img src="https://github.com/anonfaded/QuranCLI/blob/main/demo/Reading-View.png" alt="Reading View" width="550">
+  <p><em>Reading View (Transliteration + en & ur Translations)</em></p>
 </div>
 
 <br>
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/a60fd008-24df-4e41-90cb-92f77e6ffba6" alt="Audio Player" width="550">
+  <img src="https://github.com/anonfaded/QuranCLI/blob/main/demo/Audio-Player.png" alt="Audio Player" width="550">
   <p><em>Audio Player (with Progress Bar & Controls)</em></p>
 </div>
 
@@ -109,7 +109,7 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
 <br>
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/7ce2b6e0-eff8-4180-8ca3-2587c7549f0b" alt="Info Page" width="550">
+  <img src="https://github.com/anonfaded/QuranCLI/blob/main/demo/Help-Page.png" alt="Info Page" width="550">
   <p><em>Information / Help Page (`info` command)</em></p>
 </div>
 
@@ -125,6 +125,11 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
 <div align="center">
   <img src="https://github.com/user-attachments/assets/fa1d8b3c-d6d2-41fa-9722-f4b36848aecd" alt="Web Server Interface" width="550">
   <p><em>Subtitle Web Server Interface (Accessible on Local Network)</em></p>
+</div>
+
+<div align="center">
+  <img src="https://github.com/anonfaded/QuranCLI/blob/main/demo/bookmark-manager.png" alt="Bookmark manager" width="550">
+  <p><em>Bookmark Manager</em></p>
 </div>
 
 <br>
