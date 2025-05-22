@@ -7,14 +7,15 @@ block_cipher = None
 # --- Configuration ---
 app_name = 'QuranCLI'
 main_script = 'Quran-CLI.py'
-icon_file = 'core/img/icon.ico' # Icon in the img directory
+icon_files = ['core/img/icon.ico', 'core/img/icon.png'] # Both icons for cross-platform
 
 # --- Data files to bundle (Read-Only Assets) ---
 datas = [
     ('core/web', 'core/web'),  # Bundle the web server assets
     ('README_APP.txt', '.'),
     ('core/database/quran-translation-and-transliteration.json', 'core/database'),
-    ('core/database/quran_ur.json', 'core/database')
+    ('core/database/quran_ur.json', 'core/database'),
+    ('core/img/icon.png', 'core/img'),  # Include PNG icon in the bundle
 ]
 
 # --- Hidden Imports ---
@@ -91,7 +92,7 @@ exe = EXE(
     target_arch=None,       # Auto-detect architecture
     codesign_identity=None,
     entitlements_file=None,
-    icon=[icon_file],       # Specify icon (using list like FadCrypt) 
+    icon=icon_files,       # Use both icons for cross-platform support
 )
 
 # No COLLECT block needed for --onefile build
