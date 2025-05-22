@@ -5,6 +5,7 @@ Welcome to QuranCLI! This space holds notes from the developer and highlights re
 --- What's New (v1.3.0) ---
 
 New Features:
+• Redesigned the app icon.
 • Added 'audiopath' command to view and open audio cache folder
 • Added comprehensive bookmark management with notes and Ayatul Kursi quicklink
 • Added backup/restore feature for app settings and data export/import
