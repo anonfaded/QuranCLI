@@ -256,9 +256,7 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
 
 ## 🚀 Upcoming Features Roadmap
 
-- **Full Quran Transliteration:** Complete transliteration of the entire.
-- **Integrated Urdu Translation:** Built-in support for Urdu translations.
-- **New Reciters:** Additional reciter options (e.g., Shiekh Mohammad Al Luhaidan and more).
+- **New Reciters:** Additional reciter options.
 - **Tafsir Integration:** In-depth explanations for each ayah.
 - **I'm-Feeling Feature:** A mood-based recommendation system that suggests ayahs based on the user's current feelings.
 
