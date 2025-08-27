@@ -2,22 +2,17 @@
 
 Welcome to QuranCLI! This space holds notes from the developer and highlights recent updates to help you make the most of this tool.
 
---- What's New (v1.3.0) ---
+--- What's New (v1.4.0) ---
 
 New Features:
-• Redesigned the app icon.
-• Added 'audiopath' command to view and open audio cache folder
-• Added comprehensive bookmark management with notes and Ayatul Kursi quicklink
-• Added backup/restore feature for app settings and data export/import
-• Added Linux-style short commands (e.g. 'ls' for list)
-• Added dedicated Ayatul Kursi audio player
-• Added audio loop functionality for continuous playback
-• Added sleep timer for auto-stopping audio playback
-• Added 'all' command to open entire Surah at first input
+• Added Turkish database for translation
+• Enhanced UI consistency across various screens
+• Implemented audio download manager for bulk surah downloads (all or specific surahs) with new `audio` command for easy access
+• Added size fetching with progress bars for accurate download size estimation
+• Added translation settings to toggle Urdu, English, and Turkish translations in reader mode
+• Added toast message notifications for download completion and failures
+• Categorized and moved configuration commands to settings screen for better access
 
-Bug Fixes:
-• Fixed Arabic text reverse command functionality
-• Fixed audio replay after playback completion
 
 --- Upcoming Features Roadmap ---
 • Additional reciters.

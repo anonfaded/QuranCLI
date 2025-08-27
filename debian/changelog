@@ -1,3 +1,17 @@
+qurancli (1.4.0) stable; urgency=medium
+
+  * Version bumped to 1.4.0.
+  * New Features:
+    - Added Turkish database for translation.
+    - Enhanced UI consistency across various screens.
+    - Implemented audio download manager for bulk surah downloads (all or specific surahs) with new `audio` command for easy access.
+    - Added size fetching with progress bars for accurate download size estimation.
+    - Added translation settings to toggle Urdu, English, and Turkish translations in reader mode.
+    - Added toast message notifications for download completion and failures.
+    - Categorized and moved configuration commands to settings screen for better access.
+
+ -- FadSec Lab <fadedhood@proton.me>  Thu, 28 Aug 2025 03:41:00 +0000
+
 qurancli (1.3.0) stable; urgency=medium
 
   * Version bumped to 1.3.0.
