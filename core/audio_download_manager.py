@@ -634,18 +634,20 @@ class AudioDownloadManager:
             print(f"{Fore.YELLOW}Warning: Could not check disk space: {e}{Style.RESET_ALL}")
             return 0, 0
 
-    def run_download_wizard(self) -> bool:
+    def run_download_wizard(self) -> Optional[bool]:
         """Run the complete download wizard"""
         try:
             # Step 1: Select reciter
             reciter = self._select_reciter()
-            if not reciter:
-                return False
+            # If user chose to go back from reciter selection, return None to indicate
+            # a user-initiated cancellation/back action (distinct from an error).
+            if reciter is None:
+                return None
 
             # Step 2: Select surahs
             surah_numbers = self._select_surahs()
-            if not surah_numbers:
-                return False
+            if surah_numbers is None:
+                return None
 
             # Step 3: Confirm and download
             return self._confirm_and_download(reciter, surah_numbers)

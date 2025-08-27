@@ -211,9 +211,11 @@ class SettingsManager:
         download_manager = AudioDownloadManager(self.app.audio_manager, self.app.data_handler, self.app)
 
         # Run the download wizard
-        if download_manager.run_download_wizard():
+        result = download_manager.run_download_wizard()
+        # None => user backed out; True => success; False => failed/cancelled
+        if result is True:
             print(f"{Fore.GREEN}Audio download completed!{Style.RESET_ALL}")
-        else:
+        elif result is False:
             print(f"{Fore.YELLOW}Audio download cancelled or failed.{Style.RESET_ALL}")
 
         self.app._wait_for_key()
