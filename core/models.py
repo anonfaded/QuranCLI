@@ -29,4 +29,5 @@ class Ayah(BaseModel):
     text: str               # English Translation (from CACHE)
     # --- ADD THIS FIELD ---
     translation_ur: str     # Urdu Translation (from new urdu DB)
+    translation_tr: str     # Turkish Translation (from Turkish DB)
     # --- END ADD ---

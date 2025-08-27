@@ -137,6 +137,7 @@ class UI:
         # --- ADD Subtitle Config Loading with Defaults ---
         default_subtitle_config = {
             "include_urdu": True,
+            "include_turkish": False,
             "include_english": True,
             "include_transliteration": False
         }
@@ -148,58 +149,98 @@ class UI:
             for key, default_value in default_subtitle_config.items():
                 if key not in self.preferences["subtitle_config"]:
                     self.preferences["subtitle_config"][key] = default_value
+        
+        # --- ADD Reading Config Loading with Defaults ---
+        default_reading_config = {
+            "show_urdu": True,
+            "show_turkish": False,
+            "show_english": True,
+            "show_transliteration": True
+        }
+        # Load existing or set default
+        if "reading_config" not in self.preferences:
+            self.preferences["reading_config"] = default_reading_config
+        else:
+            # Ensure all keys exist in loaded config, add defaults if missing
+            for key, default_value in default_reading_config.items():
+                if key not in self.preferences["reading_config"]:
+                    self.preferences["reading_config"][key] = default_value
         # --- END ADD ---
         
         self.httpd = None
         self.server_thread = None # Initialize server_thread attribute
 
     def _display_subtitle_settings_menu(self):
-        """Displays and handles the subtitle content settings menu."""
+        """Displays and handles the subtitle content settings menu with box design."""
         while True:
             self.clear_terminal()
-            print(Fore.RED + Style.BRIGHT + "⚙️ Subtitle Content Settings")
-            print(Fore.WHITE + "--------------------------------")
-            print(Fore.YELLOW + "Configure what content appears below the Arabic text in the SRT file.")
-            print(Fore.WHITE + "Arabic text is always included.")
-            print(Fore.WHITE + "--------------------------------\n")
+            box_width = 55  # Adjust as needed
+            separator = "─" * box_width
 
-            config = self.preferences.get("subtitle_config", {}) # Get current config safely
+            # Header with box design
+            print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "🎬 Subtitle Content Settings")
+            print(Fore.RED + f"│ {Fore.WHITE}Configure what content appears in SRT files")
+            print(Fore.RED + f"│ {Fore.WHITE}Arabic text is always included")
+            print(Fore.RED + "├" + separator)
+
+            config = self.preferences.get("subtitle_config", {})
 
             # Display options with current status
             options = [
+                ("include_transliteration", "Transliteration"),
                 ("include_urdu", "Urdu Translation"),
-                ("include_english", "English Translation"),
-                ("include_transliteration", "Transliteration")
+                ("include_turkish", "Turkish Translation"),
+                ("include_english", "English Translation")
             ]
 
+            print(Fore.RED + f"│ {Fore.YELLOW}Current Settings:")
             for i, (key, label) in enumerate(options):
-                status = config.get(key, False) # Get status, default to False if missing
+                status = config.get(key, False)
+                status_icon = Fore.GREEN + "✓" if status else Fore.RED + "✗"
                 status_text = Fore.GREEN + "Enabled" if status else Fore.RED + "Disabled"
-                print(f"{Fore.CYAN}{i+1}. {Fore.WHITE}{label.ljust(25)} [{status_text}{Fore.WHITE}]")
+                pad = " " * (20 - len(label))
+                print(Fore.RED + f"│   • {Fore.CYAN}{i+1}{Fore.WHITE} : {label}{pad} : [{status_icon} {status_text}{Fore.WHITE}]")
 
-            print(f"\n{Fore.CYAN}b. {Fore.WHITE}Back to Subtitle Menu")
+            print(Fore.RED + "├" + separator)
+            print(Fore.RED + f"│ {Style.BRIGHT}{Fore.GREEN}Choose an action{Style.RESET_ALL}:")
 
-            # Prompt for choice
+            # Calculate max length for proper alignment
+            actions = [
+                ("1-4", "Toggle content on/off"),
+                ("b", "Back to Subtitle Menu")
+            ]
+
+            max_action_len = max(len(action[0]) for action in actions)
+            for action, desc in actions:
+                pad = " " * (max_action_len - len(action))
+                print(Fore.RED + f"│   • {Fore.CYAN}{action}{pad} {Style.DIM}: {desc}{Style.RESET_ALL}")
+
+            print(Fore.RED + "╰" + separator)
+
+            # Helper text
+            print(Style.DIM + Fore.WHITE + "\n  Enter number to toggle setting, or 'b' to go back.")
+            print(" ")
+
             try:
-                choice = input(f"\n{Fore.BLUE}Enter number to toggle, or 'b' to go back: {Fore.WHITE}").strip().lower()
+                choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
 
                 if choice == 'b':
-                    break # Exit settings menu
+                    break
 
                 if choice.isdigit():
                     index = int(choice) - 1
                     if 0 <= index < len(options):
                         key_to_toggle = options[index][0]
-                        # Toggle the boolean value
-                        self.preferences["subtitle_config"][key_to_toggle] = not self.preferences["subtitle_config"].get(key_to_toggle, False)
-                        self.save_preferences() # Save immediately after toggle
-                        print(f"{Fore.GREEN}Setting '{options[index][1]}' updated.{Style.RESET_ALL}")
-                        time.sleep(0.8) # Brief pause to see feedback
+                        current_value = self.preferences["subtitle_config"].get(key_to_toggle, False)
+                        self.preferences["subtitle_config"][key_to_toggle] = not current_value
+                        self.save_preferences()
+                        print(f"{Fore.GREEN}✓ Setting '{options[index][1]}' updated.{Style.RESET_ALL}")
+                        time.sleep(1)
                     else:
-                        print(Fore.RED + "Invalid number.")
+                        print(Fore.RED + "❌ Invalid number.")
                         time.sleep(1)
                 else:
-                    print(Fore.RED + "Invalid input.")
+                    print(Fore.RED + "❌ Invalid input.")
                     time.sleep(1)
 
             except ValueError:
@@ -212,7 +253,114 @@ class UI:
                 print(Fore.RED + f"An error occurred: {e}")
                 time.sleep(1)
                 
-    def _load_preferences(self) -> dict:
+    def _display_reading_settings_menu(self):
+        """Displays and handles the reading view content settings menu with box design."""
+        while True:
+            self.clear_terminal()
+            box_width = 55  # Adjust as needed
+            separator = "─" * box_width
+
+            # Header with box design
+            print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📖 Reading View Settings")
+            print(Fore.RED + f"│ {Fore.WHITE}Configure which translations appear in reading view")
+            print(Fore.RED + f"│ {Fore.WHITE}Arabic text is always shown")
+            print(Fore.RED + "├" + separator)
+
+            config = self.preferences.get("reading_config", {})
+
+            # Separate transliteration from translations
+            transliteration_option = [("show_transliteration", "Transliteration")]
+            translation_options = [
+                ("show_urdu", "Urdu Translation"),
+                ("show_turkish", "Turkish Translation"),
+                ("show_english", "English Translation")
+            ]
+
+            print(Fore.RED + f"│ {Fore.YELLOW}Current Settings:")
+
+            # Compute label column width from all labels so the right-hand colon aligns
+            all_labels = [lab for _, lab in transliteration_option] + [lab for _, lab in translation_options]
+            label_width = max(len(lab) for lab in all_labels) + 2
+            index_width = 2
+
+            # Display transliteration separately using 't' index to match style of numbered translations
+            for key, label in transliteration_option:
+                status = config.get(key, True)
+                status_icon = Fore.GREEN + "✓" if status else Fore.RED + "✗"
+                status_text = Fore.GREEN + "Enabled" if status else Fore.RED + "Disabled"
+                pad = " " * (label_width - len(label))
+                index_field = 't'.rjust(index_width)
+                print(Fore.RED + f"│   • {Fore.CYAN}{index_field}{Fore.WHITE} : {label}{pad} : [{status_icon} {status_text}{Fore.WHITE}]")
+
+            # Display translations (no extra "Translations:" header — it's already shown above)
+            for i, (key, label) in enumerate(translation_options, start=1):
+                status = config.get(key, True if key in ["show_urdu", "show_english"] else False)
+                status_icon = Fore.GREEN + "✓" if status else Fore.RED + "✗"
+                status_text = Fore.GREEN + "Enabled" if status else Fore.RED + "Disabled"
+                pad = " " * (label_width - len(label))
+                index_field = str(i).rjust(index_width)
+                print(Fore.RED + f"│   • {Fore.CYAN}{index_field}{Fore.WHITE} : {label}{pad} : [{status_icon} {status_text}{Fore.WHITE}]")
+
+            print(Fore.RED + "├" + separator)
+            print(Fore.RED + f"│ {Style.BRIGHT}{Fore.GREEN}Choose an action{Style.RESET_ALL}:")
+
+            # Calculate max length for proper alignment
+            actions = [
+                ("1-3", "Toggle translation on/off"),
+                ("t", "Toggle transliteration on/off"),
+                ("b", "Back to Main Menu")
+            ]
+
+            max_action_len = max(len(action[0]) for action in actions)
+            for action, desc in actions:
+                pad = " " * (max_action_len - len(action))
+                # Action key in blue, colon and description in white (no dim)
+                print(Fore.RED + f"│   • {Fore.CYAN}{action}{pad} {Fore.WHITE}: {desc}{Style.RESET_ALL}")
+
+            print(Fore.RED + "╰" + separator)
+
+            # Helper text
+            print(Style.DIM + Fore.WHITE + "\nEnter your input.")
+            print(" ")
+
+            try:
+                choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+
+                if choice == 'b':
+                    break
+                elif choice == 't':
+                    # Toggle transliteration
+                    key_to_toggle = "show_transliteration"
+                    current_value = self.preferences["reading_config"].get(key_to_toggle, True)
+                    self.preferences["reading_config"][key_to_toggle] = not current_value
+                    self.save_preferences()
+                    print(f"{Fore.GREEN}✓ Transliteration setting updated.{Style.RESET_ALL}")
+                    time.sleep(1)
+                elif choice.isdigit():
+                    index = int(choice) - 1
+                    if 0 <= index < len(translation_options):
+                        key_to_toggle = translation_options[index][0]
+                        current_value = self.preferences["reading_config"].get(key_to_toggle, True if key in ["show_urdu", "show_english"] else False)
+                        self.preferences["reading_config"][key_to_toggle] = not current_value
+                        self.save_preferences()
+                        print(f"{Fore.GREEN}✓ Setting '{translation_options[index][1]}' updated.{Style.RESET_ALL}")
+                        time.sleep(1)
+                    else:
+                        print(Fore.RED + "❌ Invalid number. Please enter 1-3.")
+                        time.sleep(1)
+                else:
+                    print(Fore.RED + "❌ Invalid input. Please enter 1-3, 't', or 'b'.")
+                    time.sleep(1)
+
+            except ValueError:
+                print(Fore.RED + "Invalid input. Please enter a number or 'b'.")
+                time.sleep(1)
+            except KeyboardInterrupt:
+                print(Fore.YELLOW + "\nSettings cancelled. Returning to Main Menu.")
+                break # Exit settings menu on Ctrl+C
+            except Exception as e:
+                print(Fore.RED + f"An error occurred: {e}")
+                time.sleep(1)
         """Fallback method to load preferences if not provided or path is missing."""
         if not self.preferences_file or not os.path.exists(self.preferences_file):
             # print(Fore.YELLOW + "Preferences file path not set or file not found.") # Optional logging
@@ -467,12 +615,15 @@ class UI:
 
     def display_single_ayah(self, ayah: Ayah):
         """
-        Display a single ayah with Arabic, Transliteration, Urdu, and English.
-        On Linux/macOS/Windows, applies reversal to both Arabic and Urdu if Arabic reversal is enabled.
+        Display a single ayah with Arabic, Transliteration, Urdu, Turkish, and English.
+        Display is controlled by reading_config settings - each translation can be toggled on/off.
+        On Linux/macOS/Windows, applies reversal to Arabic and Urdu if Arabic reversal is enabled.
+        Turkish is in Latin script so no reversal is applied.
         """
         print(Style.BRIGHT + Fore.GREEN + f"\n[{ayah.number}]")
 
-        # 1. Arabic Text (reverse only on Linux/macOS if enabled)
+        # Get reading config for conditional display
+        reading_config = self.preferences.get("reading_config", {})
         print(Style.BRIGHT + Fore.RED + "Arabic:" + Style.NORMAL + Fore.WHITE)
         try:
             formatted_arabic = self.data_handler.fix_arabic_text(ayah.content)
@@ -487,14 +638,15 @@ class UI:
             formatted_arabic = ayah.content
         print("    " + formatted_arabic)
 
-        # 2. Transliteration
-        print(Style.BRIGHT + Fore.RED + "\nTransliteration:" + Style.NORMAL + Fore.WHITE)
-        wrapped_translit = self.wrap_text(ayah.transliteration, self.term_size.columns - 4)
-        for line in wrapped_translit.split('\n'):
-            print("    " + line)
+        # 2. Transliteration (conditional based on reading config)
+        if reading_config.get("show_transliteration", True) and ayah.transliteration:
+            print(Style.BRIGHT + Fore.RED + "\nTransliteration:" + Style.NORMAL + Fore.WHITE)
+            wrapped_translit = self.wrap_text(ayah.transliteration, self.term_size.columns - 4)
+            for line in wrapped_translit.split('\n'):
+                print("    " + line)
 
-        # 3. Urdu Translation (reverse on Linux/macOS/Windows if enabled)
-        if ayah.translation_ur:
+        # 3. Urdu Translation (conditional based on reading config)
+        if reading_config.get("show_urdu", True) and ayah.translation_ur:
             print(Style.BRIGHT + Fore.MAGENTA + "\nUrdu Translation:" + Style.NORMAL + Fore.WHITE)
             try:
                 formatted_urdu = ayah.translation_ur
@@ -507,12 +659,28 @@ class UI:
             for line in wrapped_urdu.split('\n'):
                 print("    " + line)
 
-        # 4. English Translation
-        print(Style.BRIGHT + Fore.MAGENTA + "\nEnglish Translation:" + Style.NORMAL + Fore.WHITE)
-        cached_translation = ayah.text
-        wrapped_translation = self.wrap_text(cached_translation, self.term_size.columns - 4)
-        for line in wrapped_translation.split('\n'):
-            print("    " + line)
+        # 4. Turkish Translation (conditional based on reading config)
+        if reading_config.get("show_turkish", False) and ayah.translation_tr:
+            print(Style.BRIGHT + Fore.MAGENTA + "\nTurkish Translation:" + Style.NORMAL + Fore.WHITE)
+            try:
+                formatted_turkish = ayah.translation_tr
+                # Turkish is in Latin script, no reversal needed
+                # if self.data_handler.arabic_reversed:
+                #     formatted_turkish = formatted_turkish[::-1]
+            except Exception as e:
+                print(f"[DEBUG] Error formatting Turkish: {e}")
+                formatted_turkish = ayah.translation_tr
+            wrapped_turkish = self.wrap_text(formatted_turkish, self.term_size.columns - 4)
+            for line in wrapped_turkish.split('\n'):
+                print("    " + line)
+
+        # 5. English Translation (conditional based on reading config)
+        if reading_config.get("show_english", True) and ayah.text:
+            print(Style.BRIGHT + Fore.MAGENTA + "\nEnglish Translation:" + Style.NORMAL + Fore.WHITE)
+            cached_translation = ayah.text
+            wrapped_translation = self.wrap_text(cached_translation, self.term_size.columns - 4)
+            for line in wrapped_translation.split('\n'):
+                print("    " + line)
 
         # Separator
         print(Style.BRIGHT + Fore.GREEN + "\n" + "-" * min(40, self.term_size.columns))
@@ -679,7 +847,7 @@ class UI:
                     print(Style.BRIGHT + Fore.RED + "\nAudio Player - Select Reciter" + Style.RESET_ALL)
                     # ... (display reciter options - keep as before) ...
                     reciter_options = list(surah_info.audio.items())
-                    for i, (rid, info) in enumerate(reciter_options): print(f"{Fore.GREEN}{i+1}{Fore.WHITE}: {info['reciter']}")
+                    for i, (rid, info) in enumerate(reciter_options): print(f"{Fore.GREEN}{i+1}{Fore.WHITE} : {info['reciter']}")
 
                     print(Fore.WHITE + "\nEnter number ('q' to cancel): ", end="", flush=True)
 
@@ -1059,7 +1227,7 @@ class UI:
                                 self.clear_terminal() # Clear before showing options
                                 print(Style.BRIGHT + Fore.RED + "\nAudio Player - Select Reciter" + Style.RESET_ALL)
                                 reciter_options = list(surah_info.audio.items())
-                                for i, (rid, info) in enumerate(reciter_options): print(f"{Fore.GREEN}{i+1}{Fore.WHITE}: {info['reciter']}")
+                                for i, (rid, info) in enumerate(reciter_options): print(f"{Fore.GREEN}{i+1}{Fore.WHITE} : {info['reciter']}")
                                 print(Fore.WHITE + "\nEnter number ('q' to cancel): ", end="", flush=True) # Prompt
 
                                 # *** Use standard input() now ***
@@ -1414,6 +1582,7 @@ class UI:
                     ("Arabic Ayah", True, Fore.GREEN), # Arabic is always included
                     ("Transliteration", subtitle_config.get("include_transliteration", False), Fore.CYAN),
                     ("Urdu Translation", subtitle_config.get("include_urdu", False), Fore.MAGENTA),
+                    ("Turkish Translation", subtitle_config.get("include_turkish", False), Fore.BLUE),
                     ("English Translation", subtitle_config.get("include_english", False), Fore.YELLOW),
                 ]
 
@@ -1424,14 +1593,24 @@ class UI:
                 print(Fore.RED + "├" + separator) # Use full separator
 
                 # --- Redesigned Options with Numbers ---
-                print(Fore.RED + f"│ {Fore.WHITE}Choose an action:")
-                print(Fore.RED + f"│   • {Fore.CYAN}1{Fore.WHITE}: Generate SRT with current settings")
-                print(Fore.RED + f"│   • {Fore.CYAN}2{Fore.WHITE}: Change Content Settings")
-                print(Fore.RED + f"│   • {Fore.CYAN}3{Fore.WHITE}: Cancel (Back to Main Menu)")
+                print(Fore.RED + f"│ {Style.BRIGHT}{Fore.GREEN}Choose an action{Style.RESET_ALL}:")
+
+                # Calculate max length for proper alignment
+                actions = [
+                    ("1", "Generate SRT with current settings"),
+                    ("2", "Change Content Settings"),
+                    ("3", "Cancel (Back to Main Menu)")
+                ]
+
+                max_action_len = max(len(action[0]) for action in actions)
+                for action, desc in actions:
+                    pad = " " * (max_action_len - len(action))
+                    print(Fore.RED + f"│   • {Fore.CYAN}{action}{pad} {Style.DIM}: {desc}{Style.RESET_ALL}")
+
                 print(Fore.RED + "╰" + separator)
 
                 # --- Helper Text ---
-                print(Style.DIM + Fore.WHITE + "\n  Enter the number corresponding to your choice.")
+                print(Style.DIM + Fore.WHITE + "\nEnter your input.")
 
                 try:
                     confirm_choice = input(f"\n{Fore.BLUE}Enter choice (1-3): {Fore.WHITE}").strip()
@@ -1466,6 +1645,7 @@ class UI:
             final_content_parts = ["Arabic"]
             if final_subtitle_config.get("include_transliteration"): final_content_parts.append("Translit")
             if final_subtitle_config.get("include_urdu"): final_content_parts.append("Urdu")
+            if final_subtitle_config.get("include_turkish"): final_content_parts.append("Turkish")
             if final_subtitle_config.get("include_english"): final_content_parts.append("English")
             final_config_str = " + ".join(final_content_parts)
 
@@ -1546,6 +1726,8 @@ class UI:
                     current_config_parts.append("Translit")
                 if subtitle_config.get("include_urdu"):
                     current_config_parts.append("Urdu")
+                if subtitle_config.get("include_turkish"):
+                    current_config_parts.append("Turkish")
                 if subtitle_config.get("include_english"):
                     current_config_parts.append("English")
                 current_config_str = " + ".join(current_config_parts)
@@ -1569,8 +1751,8 @@ class UI:
                 box_width = 26
                 separator = "─" * box_width
                 print("\n" + Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📜 Available Commands")
-                print(Fore.RED + f"│ • {Fore.CYAN}open{Fore.WHITE}: Open folder containing subtitle")
-                print(Fore.RED + f"│ • {Fore.CYAN}back{Fore.WHITE}: Return to Main Menu")
+                print(Fore.RED + f"│ • {Fore.CYAN}open{Fore.WHITE} : Open folder containing subtitle")
+                print(Fore.RED + f"│ • {Fore.CYAN}back{Fore.WHITE} : Return to Main Menu")
                 print(Fore.RED + "╰" + separator)
                 print(Style.DIM + Fore.WHITE + "\nType command and press Enter.")
                 print(" ")
@@ -1789,8 +1971,8 @@ class UI:
 
     def generate_srt_content(self, surah_number: int, start_ayah: int, end_ayah: int, ayah_duration: float, config: dict) -> str:
         """Generates the SRT content based on the provided configuration,
-        applying letter reshaping to Urdu and ordering content as:
-        Arabic -> Transliteration -> Urdu -> English."""
+        applying letter reshaping to Urdu and Turkish, ordering content as:
+        Arabic -> Transliteration -> Urdu -> Turkish -> English."""
         try:
             ayahs = self.data_handler.get_ayahs_raw(surah_number, start_ayah, end_ayah)
             if not ayahs:
@@ -1801,6 +1983,7 @@ class UI:
             start_time = 0.0
 
             include_urdu = config.get("include_urdu", False)
+            include_turkish = config.get("include_turkish", False)
             include_english = config.get("include_english", False)
             include_translit = config.get("include_transliteration", False)
 
@@ -1825,7 +2008,12 @@ class UI:
                         print(Fore.YELLOW + f"Warning: Could not reshape Urdu text for ayah {ayah.number}: {reshape_err}")
                         srt_content += f"{ayah.translation_ur}\n" # Fallback
 
-                # --- REORDERED: 4. Conditionally include English (Translation) ---
+                # --- 4. Conditionally include Turkish (Translation) ---
+                if include_turkish and ayah.translation_tr:
+                    # Turkish is in Latin script, no need for Arabic reshaping
+                    srt_content += f"{ayah.translation_tr}\n"
+
+                # --- REORDERED: 5. Conditionally include English (Translation) ---
                 if include_english and ayah.text:
                     srt_content += f"{ayah.text}\n"
 

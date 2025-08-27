@@ -590,6 +590,7 @@ class QuranApp:
             (f"{Fore.CYAN}list{Style.DIM}/ls{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Display list of Surahs"),
             (f"{Fore.CYAN}sub{Style.DIM}/sub{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Create subtitles for Ayahs"),
             (f"{Fore.CYAN}bookmarks{Style.DIM}/bm{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Manage bookmarks"),
+            (f"{Fore.CYAN}settings{Style.DIM}/st{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Translation Display Settings"),
             (f"{Fore.CYAN}backup{Style.DIM}/bk{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Backup/restore all app settings"),
             (f"{Fore.CYAN}clearaudio{Style.DIM}/clr{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Clear audio cache"),
             (f"{Fore.CYAN}audiopath{Style.DIM}/ap{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Show and open audio cache folder"),
@@ -651,6 +652,9 @@ class QuranApp:
                     continue
                 elif user_input in ['bm', 'bookmarks']:
                     self._bookmark_menu()
+                    continue
+                elif user_input in ['settings', 'st']:
+                    self._reading_settings_menu()
                     continue
                 elif user_input in ['bk', 'backup']:
                     self.backup_restore_menu()
@@ -1463,8 +1467,8 @@ class QuranApp:
 
                     # Descriptive command list with colors
                     print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📜 Available Commands (Subtitle Creation)")
-                    print(Fore.RED + f"│ • {Fore.CYAN}1-114{Fore.WHITE}: Select Surah by number")
-                    print(Fore.RED + f"│ • {Fore.CYAN}q{Fore.WHITE}: Return to main menu")
+                    print(Fore.RED + f"│ • {Fore.CYAN}1-114{Fore.WHITE} : Select Surah by number")
+                    print(Fore.RED + f"│ • {Fore.CYAN}q{Fore.WHITE} : Return to main menu")
                     print(Fore.RED + "╰" + separator)
                         
                     # Helper Text
@@ -1680,6 +1684,10 @@ class QuranApp:
     def list_bookmarks(self):
         """Return all saved bookmarks as a dict."""
         return self.preferences.get("bookmarks", {})
+
+    def _reading_settings_menu(self):
+        """Display the reading view settings menu."""
+        self.ui._display_reading_settings_menu()
 
 if __name__ == "__main__":
     # Wrap the entire app execution in a try-except block

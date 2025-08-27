@@ -47,7 +47,7 @@ QuranCLI brings the Quran to your Windows command line with a rich set of featur
 *   **📊 Stats:** See total download counts directly in the header.  
 *   **🖥️ Multi Platform:** Available on `Windows` and `Linux` platforms.  
 *   **⌨️ Command Alias:** Launch the app directly from the terminal using the `qurancli` command.  
-*   **🌐 Translation & Transliteration:** Provides Urdu and English translations along with transliteration.  
+*   **🌐 Translation & Transliteration:** Provides Urdu, Turkish, and English translations along with transliteration.  
 *   **🎨 Redesigned app icon for a fresh look.**  
 *   **📂 `audiopath` command to view and open the audio cache folder.**  
 *   **🔖 Comprehensive bookmark management with notes and quick access to Ayatul Kursi.**  
@@ -75,7 +75,7 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
 
 <div align="center">
   <img src="https://github.com/anonfaded/QuranCLI/blob/main/demo/Reading-View.png" alt="Reading View" width="550">
-  <p><em>Reading View (Transliteration + en & ur Translations)</em></p>
+  <p><em>Reading View (Transliteration + en, ur & tr Translations)</em></p>
 </div>
 
 <br>
