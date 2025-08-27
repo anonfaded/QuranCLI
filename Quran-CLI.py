@@ -416,16 +416,23 @@ class QuranApp:
 
 
     def _display_surah_list(self):
-        """Display surah names in multiple columns."""
+        """Display surah names in multiple columns with consistent UI design."""
         self._clear_terminal()
         self._display_header()
+
         num_surahs = len(self.surah_names)
         columns = 5  # Adjust number of columns based on terminal width
         surahs_per_column = (num_surahs + columns - 1) // columns  # Ceiling division
 
-        print(Fore.GREEN + Style.BRIGHT + "Quran - List of Surahs:")
-        print(Fore.CYAN + "-" * 25)
+        box_width = 120
+        separator = "─" * box_width
 
+        # Display header with consistent formatting
+        print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📖 Quran - Complete Surah List")
+        print(Fore.RED + f"│ → {Fore.CYAN}Total Surahs{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}{num_surahs} Surahs")
+        print(Fore.RED + "├" + separator)
+
+        # Display surah list in columns
         for i in range(surahs_per_column):
             row_output = []
             for j in range(columns):
@@ -434,10 +441,11 @@ class QuranApp:
                     number = surah_number + 1
                     name = self.surah_names[number]
                     row_output.append(Fore.GREEN + f"{number:3d}. {Fore.WHITE}{name}".ljust(30))  # Adjust spacing
-            print("".join(row_output))
+            if row_output:  # Only print non-empty rows
+                print(Fore.RED + f"│ {Fore.WHITE}" + "".join(row_output))
 
-        print(Fore.CYAN + "-" * 25)
-        input(Fore.YELLOW + "\nPress Enter to return to the surah selection...")  # Pause
+        print(Fore.RED + "╰" + separator)
+        input(Fore.RED + "  ❯ " + Fore.YELLOW + "Press Enter to return to the surah selection..." + Style.RESET_ALL)
         #Clear it before re-prompting.
         self._clear_terminal()
         self._display_header()
