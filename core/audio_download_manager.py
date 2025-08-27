@@ -1,11 +1,8 @@
 # core/audio_download_manager.py
 import asyncio
 import concurrent.futures
-import json
-import os
 import shutil
 import sys
-import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -13,8 +10,6 @@ from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 
 import aiohttp
-import aiofiles
-from mutagen.mp3 import MP3
 import tqdm
 from colorama import Fore, Style
 
@@ -29,17 +24,7 @@ try:
 except ImportError:
     HAS_NOTIFICATIONS = False
 
-# --- Use relative import for utils ---
-try:
-    from .utils import get_app_path
-except ImportError:
-    from utils import get_app_path
-
-# --- Use relative import for quran_data_handler ---
-try:
-    from .quran_data_handler import QuranDataHandler
-except ImportError:
-    from quran_data_handler import QuranDataHandler
+# utils and data handler are accessed via instance references or local imports when needed
 
 @dataclass
 class DownloadTask:
@@ -48,7 +33,7 @@ class DownloadTask:
     reciter: str
     url: str
     filename: str
-    estimated_size_mb: float
+    estimated_size_mb: Optional[float]
     status: str = "pending"  # pending, downloading, completed, failed
 
 @dataclass
@@ -78,6 +63,12 @@ class AudioDownloadManager:
         # Notification setup
         self._setup_notifications()
 
+    def cancel_download(self):
+        """Cancel the current download operation"""
+        if self.is_downloading:
+            print(f"{Fore.YELLOW}Cancelling download...{Style.RESET_ALL}")
+            self.is_downloading = False
+
     def _setup_notifications(self):
         """Setup cross-platform notifications"""
         if not HAS_NOTIFICATIONS:
@@ -95,15 +86,46 @@ class AudioDownloadManager:
         """Send system notification"""
         if not HAS_NOTIFICATIONS:
             return
-
+        # Best-effort notification. Do not print debug messages; swallow errors to avoid UI tracebacks.
         try:
             if sys.platform == "win32":
-                self.notifier.show_toast(title, message, duration=5)
+                icon_path = None
+                try:
+                    from utils import get_app_path
+                    app_dir = Path(get_app_path())
+                    potential_icons = [
+                        app_dir / 'icon.ico',
+                        app_dir / 'qurancli.ico',
+                        app_dir / 'QuranCLI.ico',
+                        app_dir / 'core' / 'img' / 'icon.ico',
+                        app_dir / 'core' / 'img' / 'icon.png',
+                        app_dir / 'core' / 'img' / 'qurancli.png',
+                        app_dir / 'img' / 'icon.ico',
+                        app_dir / 'img' / 'icon.png',
+                    ]
+                    for icon_file in potential_icons:
+                        if icon_file.exists():
+                            icon_path = str(icon_file)
+                            break
+                except Exception:
+                    icon_path = None
+
+                try:
+                    if icon_path:
+                        self.notifier.show_toast(title, message, icon_path=icon_path, duration=5, threaded=True)
+                    else:
+                        self.notifier.show_toast(title, message, duration=5, threaded=True)
+                except Exception:
+                    # Silence notification errors (prevents Windows WPARAM TypeError surfacing)
+                    pass
             else:
-                n = notify2.Notification(title, message)
-                n.show()
-        except Exception as e:
-            print(f"{Fore.YELLOW}Warning: Could not send notification: {e}{Style.RESET_ALL}")
+                try:
+                    n = notify2.Notification(title, message)
+                    n.show()
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def get_available_reciters(self) -> Dict[str, str]:
         """Get available reciters from cache"""
@@ -113,9 +135,9 @@ class AudioDownloadManager:
         for surah_num in range(1, 3):  # Check first few surahs for reciter data
             cached_data = self.data_handler.cache.get_surah(surah_num)
             if cached_data and "audio" in cached_data:
-                for reciter_id, reciter_data in cached_data["audio"].items():
-                    if reciter_id not in reciters:
-                        reciters[reciter_id] = reciter_data.get("reciter", reciter_id)
+                for reciter_key, reciter_data in cached_data["audio"].items():
+                    if reciter_key not in reciters:
+                        reciters[reciter_key] = reciter_data.get("reciter", reciter_key)
 
         # Always include Muhammad Al Luhaidan as fallback
         if "luhaidan" not in reciters:
@@ -123,75 +145,87 @@ class AudioDownloadManager:
 
         return reciters
 
-    def estimate_download_size(self, surah_numbers: List[int], reciter: str) -> float:
-        """Estimate total download size in MB using real file size requests"""
-        async def get_file_size(session, url):
+    def estimate_download_size(self, surah_numbers: List[int], reciter: str) -> Optional[float]:
+        """Estimate total download size in MB using real file size requests.
+
+        Returns None if any file's size cannot be reliably determined (UI should show N/A).
+        Mirrors the player's URL resolution rules by reading per-surah audio entries from
+        the data handler and performing HEAD (then GET) requests to determine Content-Length.
+        """
+        async def get_size_for_url(session: aiohttp.ClientSession, url: str) -> Optional[float]:
             try:
-                async with session.head(url) as response:
-                    if response.status == 200:
-                        content_length = response.headers.get('Content-Length')
-                        if content_length:
-                            return int(content_length) / (1024 * 1024)  # Convert to MB
-                # Fallback to GET request if HEAD doesn't work
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        content = await response.read()
-                        return len(content) / (1024 * 1024)  # Convert to MB
+                # Prefer HEAD to avoid downloading full file
+                async with session.head(url, timeout=15) as resp:
+                    if resp.status == 200:
+                        cl = resp.headers.get('Content-Length') or resp.headers.get('content-length')
+                        if cl:
+                            return int(cl) / (1024 * 1024)
+                # HEAD didn't give us length; try GET (may be heavy but required for accuracy)
+                async with session.get(url, timeout=30) as resp2:
+                    if resp2.status == 200:
+                        data = await resp2.read()
+                        return len(data) / (1024 * 1024)
             except Exception:
-                pass
-            return 0.0
+                return None
+            return None
 
-        async def estimate_sizes():
-            total_size = 0.0
-            reciters = self.get_available_reciters()
-
-            if reciter not in reciters:
-                return self._estimate_fallback_size(surah_numbers)
-
-            base_url = f"https://server8.mp3quran.net/{reciter}/"
-
-            # Sample a few representative surahs to estimate average size
-            sample_surahs = []
-            if len(surah_numbers) <= 10:
-                # For small selections, get exact sizes
-                sample_surahs = surah_numbers
-            else:
-                # For large selections, sample a few representative surahs
-                sample_surahs = [1, 2, 50, 100, 114][:min(5, len(surah_numbers))]
+        async def estimate_all():
+            sizes = []
 
             async with aiohttp.ClientSession() as session:
-                tasks = []
-                for surah_num in sample_surahs:
-                    surah_str = f"{surah_num:03d}.mp3"
-                    url = base_url + surah_str
-                    tasks.append(get_file_size(session, url))
+                for surah_num in surah_numbers:
+                    surah_info = self.data_handler.get_surah_info(surah_num)
+                    url_candidates = []
 
-                # Execute requests concurrently
-                sizes = await asyncio.gather(*tasks, return_exceptions=True)
+                    # Prefer URL from cached surah audio info if available
+                    if surah_info and getattr(surah_info, 'audio', None):
+                        # surah_info.audio is expected to be a dict of reciter_id -> data
+                        if reciter in surah_info.audio and 'url' in surah_info.audio[reciter]:
+                            url_candidates.append(surah_info.audio[reciter]['url'])
 
-                valid_sizes = []
-                for size in sizes:
-                    if isinstance(size, float) and size > 0:
-                        valid_sizes.append(size)
+                    # Special-case: attempt known Luhaidan pattern if no cached URL
+                    if not url_candidates and reciter.lower().startswith('luhaid') or reciter == 'luhaidan':
+                        padded = str(surah_num).zfill(3)
+                        url_candidates.append(f"https://download.quranicaudio.com/quran/muhammad_alhaidan/{padded}.mp3")
+                        # GitHub fallback for specific surahs (player logic)
+                        if surah_num in {2, 6, 25, 112}:
+                            url_candidates.append(
+                                f"https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/muhammad_al_luhaidan/muhammad-al-luhaidan-{padded}.mp3"
+                            )
 
-                if valid_sizes:
-                    # Calculate average size from samples
-                    avg_size = sum(valid_sizes) / len(valid_sizes)
-                    total_size = avg_size * len(surah_numbers)
+                    # If still no candidates, try to find any reciter entry and map by display name
+                    if not url_candidates and surah_info and getattr(surah_info, 'audio', None):
+                        # pick first available url as best-effort source
+                        for k, v in surah_info.audio.items():
+                            if isinstance(v, dict) and 'url' in v:
+                                url_candidates.append(v['url'])
+                                break
 
-                    # Add 10% overhead for network/protocol overhead
-                    total_size *= 1.1
-                    return total_size
-                else:
-                    # If no valid sizes, use fallback
-                    return self._estimate_fallback_size(surah_numbers)
+                    # No URL candidates -> cannot determine size
+                    if not url_candidates:
+                        return None
+
+                    # Try candidates in order
+                    found_size = None
+                    for u in url_candidates:
+                        size_mb = await get_size_for_url(session, u)
+                        if size_mb is not None:
+                            found_size = size_mb
+                            break
+
+                    if found_size is None:
+                        return None
+
+                    sizes.append(found_size)
+
+            # All sizes determined
+            return sum(sizes)
 
         try:
-            return asyncio.run(estimate_sizes())
-        except Exception as e:
-            print(f"{Fore.YELLOW}Warning: Could not get real file sizes: {e}{Style.RESET_ALL}")
-            # Fallback to old estimation method
-            return self._estimate_fallback_size(surah_numbers)
+            return asyncio.run(estimate_all())
+        except Exception:
+            # On unexpected errors, return None to indicate unknown
+            return None
 
     def _estimate_fallback_size(self, surah_numbers: List[int]) -> float:
         """Fallback estimation when real size requests fail"""
@@ -222,39 +256,109 @@ class AudioDownloadManager:
             print(f"{Fore.RED}Error: Reciter '{reciter}' not found{Style.RESET_ALL}")
             return []
 
-        for surah_num in surah_numbers:
-            # Get surah info to build URL
+    # asyncio already imported at module level
+
+        async def resolve_task(surah_num: int) -> Optional[DownloadTask]:
             surah_info = self.data_handler.get_surah_info(surah_num)
-            if not surah_info or not surah_info.audio or reciter not in surah_info.audio:
+            url_candidates = []
+
+            if surah_info and getattr(surah_info, 'audio', None):
+                if reciter in surah_info.audio and 'url' in surah_info.audio[reciter]:
+                    audio_data = surah_info.audio[reciter]
+                    url_candidates.append((audio_data['url'], audio_data.get('reciter', reciter)))
+
+            # Luhaidan pattern fallback
+            if not url_candidates and (reciter.lower().startswith('luhaid') or reciter == 'luhaidan'):
+                padded = str(surah_num).zfill(3)
+                url_candidates.append((f"https://download.quranicaudio.com/quran/muhammad_alhaidan/{padded}.mp3", 'Muhammad Al Luhaidan'))
+                if surah_num in {2, 6, 25, 112}:
+                    url_candidates.append((
+                        f"https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/muhammad_al_luhaidan/muhammad-al-luhaidan-{padded}.mp3",
+                        'Muhammad Al Luhaidan'
+                    ))
+
+            # If still none, try first available audio entry
+            if not url_candidates and surah_info and getattr(surah_info, 'audio', None):
+                for k, v in surah_info.audio.items():
+                    if isinstance(v, dict) and 'url' in v:
+                        url_candidates.append((v['url'], v.get('reciter', k)))
+                        break
+
+            if not url_candidates:
                 print(f"{Fore.YELLOW}Warning: No audio data for Surah {surah_num}, reciter {reciter}{Style.RESET_ALL}")
-                continue
+                return None
 
-            audio_data = surah_info.audio[reciter]
-            url = audio_data["url"]
-            reciter_name = audio_data["reciter"]
+            # Attempt to get size for first reachable candidate
+            async with aiohttp.ClientSession() as session:
+                size_mb = None
+                chosen_url = None
+                chosen_reciter_name = None
+                for url, reciter_name in url_candidates:
+                    try:
+                        async with session.head(url, timeout=15) as resp:
+                            if resp.status == 200:
+                                cl = resp.headers.get('Content-Length') or resp.headers.get('content-length')
+                                if cl:
+                                    size_mb = int(cl) / (1024 * 1024)
+                                    chosen_url = url
+                                    chosen_reciter_name = reciter_name
+                                    break
+                        # Try GET if HEAD didn't yield length
+                        async with session.get(url, timeout=30) as resp2:
+                            if resp2.status == 200:
+                                data = await resp2.read()
+                                size_mb = len(data) / (1024 * 1024)
+                                chosen_url = url
+                                chosen_reciter_name = reciter_name
+                                break
+                    except Exception:
+                        continue
 
-            # Get filename
-            filename_path = self.audio_manager.get_audio_path(surah_num, reciter_name)
+            if not chosen_url:
+                # Could not resolve URL/size
+                filename_path = self.audio_manager.get_audio_path(surah_num, reciter)
+                if not filename_path:
+                    return None
+                return DownloadTask(
+                    surah_num=surah_num,
+                    reciter=reciter,
+                    url='',
+                    filename=str(filename_path),
+                    estimated_size_mb=None
+                )
+
+            filename_path = self.audio_manager.get_audio_path(surah_num, chosen_reciter_name or reciter)
             if not filename_path:
-                continue
+                return None
 
-            # Estimate size
-            estimated_size = 2.5 if surah_num <= 10 else (5.0 if surah_num <= 50 else 8.0)
-
-            task = DownloadTask(
+            return DownloadTask(
                 surah_num=surah_num,
-                reciter=reciter_name,
-                url=url,
+                reciter=chosen_reciter_name or reciter,
+                url=chosen_url,
                 filename=str(filename_path),
-                estimated_size_mb=estimated_size
+                estimated_size_mb=size_mb
             )
-            tasks.append(task)
+
+        async def build_all():
+            coros = [resolve_task(n) for n in surah_numbers]
+            results = await asyncio.gather(*coros)
+            return [r for r in results if r]
+
+        try:
+            tasks = asyncio.run(build_all())
+        except Exception:
+            tasks = []
 
         return tasks
 
     async def download_single_file(self, task: DownloadTask, progress_callback=None) -> bool:
         """Download a single audio file"""
         try:
+            # Check if download was cancelled before starting
+            if not self.is_downloading:
+                task.status = "cancelled"
+                return False
+
             task.status = "downloading"
 
             # Use existing download_audio method but with custom progress handling
@@ -282,7 +386,9 @@ class AudioDownloadManager:
     def download_progress_callback(self, task: DownloadTask):
         """Handle progress updates"""
         self.download_stats.completed_files += 1
-        self.download_stats.downloaded_size_mb += task.estimated_size_mb
+        # Some tasks may have unknown estimated sizes (None). Only add if available.
+        if task.estimated_size_mb is not None:
+            self.download_stats.downloaded_size_mb += task.estimated_size_mb
 
     def start_bulk_download(self, tasks: List[DownloadTask]) -> bool:
         """Start bulk download with progress tracking"""
@@ -291,13 +397,19 @@ class AudioDownloadManager:
             return False
 
         self.download_queue = tasks
+        # Sum only known sizes; if any is None, total_size_mb will be 0 and UI will show N/A later
+        known_sizes = [s.estimated_size_mb for s in tasks if s.estimated_size_mb is not None]
+        total_size = sum(known_sizes) if known_sizes else 0.0
         self.download_stats = DownloadStats(
             total_files=len(tasks),
-            total_size_mb=sum(task.estimated_size_mb for task in tasks)
+            total_size_mb=total_size
         )
 
         print(f"{Fore.CYAN}Starting download of {len(tasks)} audio files...")
-        print(f"{Fore.CYAN}Estimated total size: {self.download_stats.total_size_mb:.1f} MB{Style.RESET_ALL}")
+        if self.download_stats.total_size_mb > 0:
+            print(f"{Fore.CYAN}Estimated total size: {self.download_stats.total_size_mb:.1f} MB{Style.RESET_ALL}")
+        else:
+            print(f"{Fore.CYAN}Estimated total size: {Fore.YELLOW}N/A{Style.RESET_ALL}")
         print()
 
         start_time = time.time()
@@ -308,7 +420,8 @@ class AudioDownloadManager:
             with ThreadPoolExecutor(max_workers=self.max_concurrent_downloads) as executor:
                 # Create progress bar
                 with tqdm.tqdm(total=len(tasks), desc=f"{Fore.RED}Downloading",
-                              unit="files", colour='red', ncols=80) as pbar:
+                              unit="files", colour='red', ncols=80,
+                              disable=False) as pbar:
 
                     # Submit all download tasks
                     future_to_task = {
@@ -317,19 +430,38 @@ class AudioDownloadManager:
                     }
 
                     # Process completed tasks
-                    for future in concurrent.futures.as_completed(future_to_task):
-                        task = future_to_task[future]
-                        try:
-                            success = future.result()
-                            if success:
-                                self.completed_tasks.append(task)
-                            else:
-                                self.failed_tasks.append(task)
-                        except Exception as e:
-                            print(f"{Fore.RED}Download task failed: {e}{Style.RESET_ALL}")
-                            self.failed_tasks.append(task)
+                    try:
+                        for future in concurrent.futures.as_completed(future_to_task):
+                            # Check if user wants to cancel
+                            if not self.is_downloading:
+                                print(f"\n{Fore.YELLOW}Download cancelled.{Style.RESET_ALL}")
+                                # Cancel all pending futures
+                                for f in future_to_task:
+                                    if not f.done():
+                                        f.cancel()
+                                pbar.close()
+                                return False
 
-                        pbar.update(1)
+                            task = future_to_task[future]
+                            try:
+                                success = future.result()
+                                if success:
+                                    self.completed_tasks.append(task)
+                                else:
+                                    self.failed_tasks.append(task)
+                            except Exception as e:
+                                print(f"{Fore.RED}Download task failed: {e}{Style.RESET_ALL}")
+                                self.failed_tasks.append(task)
+
+                            pbar.update(1)
+                    except KeyboardInterrupt:
+                        print(f"\n{Fore.YELLOW}Download interrupted by user. Cancelling remaining tasks...{Style.RESET_ALL}")
+                        # Cancel all pending futures
+                        for future in future_to_task:
+                            if not future.done():
+                                future.cancel()
+                        pbar.close()
+                        return False
 
             # Calculate final statistics
             self.download_stats.elapsed_time = time.time() - start_time
@@ -363,15 +495,13 @@ class AudioDownloadManager:
         success_count = len(self.completed_tasks)
         fail_count = len(self.failed_tasks)
 
-        print(f"\n{Fore.GREEN}┌{'─'*50}┐")
-        print(f"│{'Download Complete!':^50}│")
-        print(f"└{'─'*50}┘{Style.RESET_ALL}")
-
-        print(f"{Fore.GREEN}│ ✓ Completed: {success_count} files{'':<25}│")
+        print(f"\n{Fore.GREEN}╭─ {Fore.CYAN}Download Complete!")
+        print(f"{Fore.GREEN}├─ {Fore.WHITE}✓ Completed: {Fore.CYAN}{success_count} files")
         if fail_count > 0:
-            print(f"{Fore.RED}│ ✗ Failed: {fail_count} files{'':<27}│")
-        print(f"{Fore.CYAN}│ ⏱️  Time: {self.download_stats.elapsed_time:.1f}s{'':<28}│")
-        print(f"{Fore.CYAN}│ 📦 Size: {self.download_stats.downloaded_size_mb:.1f} MB{'':<24}│{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}├─ {Fore.RED}✗ Failed: {Fore.CYAN}{fail_count} files")
+        print(f"{Fore.GREEN}├─ {Fore.CYAN}⏱️  Time: {Fore.WHITE}{self.download_stats.elapsed_time:.1f}s")
+        print(f"{Fore.GREEN}├─ {Fore.CYAN}📦 Size: {Fore.WHITE}{self.download_stats.downloaded_size_mb:.1f} MB")
+        print(f"{Fore.GREEN}╰" + "─" * 40)
 
         # Send notification
         if success_count > 0:
@@ -393,19 +523,10 @@ class AudioDownloadManager:
         try:
             if self.audio_manager.audio_dir:
                 path = Path(self.audio_manager.audio_dir)
-
-                if sys.platform == "win32":
-                    # Windows: use shutil.disk_usage
-                    total_bytes, used_bytes, free_bytes = shutil.disk_usage(path)
-                    total_mb = total_bytes / (1024 * 1024)
-                    available_mb = free_bytes / (1024 * 1024)
-                else:
-                    # Unix/Linux: use os.statvfs
-                    stat = os.statvfs(str(path))
-                    total_bytes = stat.f_blocks * stat.f_frsize
-                    available_bytes = stat.f_bavail * stat.f_frsize
-                    total_mb = total_bytes / (1024 * 1024)
-                    available_mb = available_bytes / (1024 * 1024)
+                # Use shutil.disk_usage for cross-platform support
+                total_bytes, used_bytes, free_bytes = shutil.disk_usage(str(path))
+                total_mb = total_bytes / (1024 * 1024)
+                available_mb = free_bytes / (1024 * 1024)
 
                 return total_mb, available_mb
             else:
@@ -449,7 +570,7 @@ class AudioDownloadManager:
             print(f"\n{Fore.CYAN}Step 1: Select Reciter{Style.RESET_ALL}")
             print(f"{Fore.RED}╭─ {Fore.GREEN}Available Reciters:")
 
-            for i, (reciter_id, reciter_name) in enumerate(reciters.items(), 1):
+            for i, (_, reciter_name) in enumerate(reciters.items(), 1):
                 print(f"{Fore.RED}├─ {Fore.CYAN}{i}{Fore.WHITE} : {reciter_name}")
 
             print(f"{Fore.RED}├─ {Fore.CYAN}back{Fore.WHITE} : Return to previous menu")
@@ -555,53 +676,106 @@ class AudioDownloadManager:
 
         return ' | '.join(names)
 
+    def _check_existing_downloads(self, surah_numbers: List[int], reciter: str) -> Tuple[List[int], List[int]]:
+        """Check which surahs are already downloaded and which need to be downloaded"""
+        existing_surahs = []
+        missing_surahs = []
+
+        # Get the actual reciter name from cache data (same way as prepare_download_queue)
+        reciters = self.get_available_reciters()
+        if reciter not in reciters:
+            return existing_surahs, surah_numbers  # All are missing if reciter not found
+
+        # Get the actual reciter name for file path generation
+        reciter_name = reciters[reciter]
+
+        for surah_num in surah_numbers:
+            file_path = self.audio_manager.get_audio_path(surah_num, reciter_name)
+            if file_path and file_path.exists():
+                existing_surahs.append(surah_num)
+            else:
+                missing_surahs.append(surah_num)
+
+        return existing_surahs, missing_surahs
+
     def _confirm_and_download(self, reciter: str, surah_numbers: List[int]) -> bool:
         """Step 3: Confirm download and start"""
-        # Calculate estimated size
-        estimated_size = self.estimate_download_size(surah_numbers, reciter)
+        # Check which surahs are already downloaded
+        existing_surahs, missing_surahs = self._check_existing_downloads(surah_numbers, reciter)
+
+        # Calculate estimated size only for missing surahs
+        if missing_surahs:
+            estimated_size = self.estimate_download_size(missing_surahs, reciter)
+        else:
+            estimated_size = 0
+
         total_files = len(surah_numbers)
+        new_files = len(missing_surahs)
+        existing_files = len(existing_surahs)
 
         # Check disk space
-        total_space, available_space = self.get_disk_space_info()
+        _, available_space = self.get_disk_space_info()
 
         print(f"\n{Fore.CYAN}Step 3: Confirm Download{Style.RESET_ALL}")
         print(f"{Fore.RED}╭─ {Fore.GREEN}Download Summary:")
         print(f"{Fore.RED}├─ {Fore.WHITE}Reciter: {Fore.CYAN}{reciter}")
-        print(f"{Fore.RED}├─ {Fore.WHITE}Surahs: {Fore.CYAN}{total_files} surah(s)")
+        print(f"{Fore.RED}├─ {Fore.WHITE}Total surahs: {Fore.CYAN}{total_files} surah(s)")
 
-        if len(surah_numbers) <= 5:
-            surah_display = self._get_surah_names_display(surah_numbers)
-            print(f"{Fore.RED}├─ {Fore.WHITE}Surah details: {Fore.CYAN}{surah_display}")
-        else:
-            print(f"{Fore.RED}├─ {Fore.WHITE}Surah range: {Fore.CYAN}{surah_numbers[0]}-{surah_numbers[-1]}")
+        if existing_files > 0:
+            print(f"{Fore.RED}├─ {Fore.GREEN}✓ Already downloaded: {Fore.CYAN}{existing_files} surah(s)")
+            if existing_files <= 3:
+                existing_display = self._get_surah_names_display(existing_surahs)
+                print(f"{Fore.RED}├─ {Fore.WHITE}  Existing: {Fore.GREEN}{existing_display}")
 
-        print(f"{Fore.RED}├─ {Fore.WHITE}Estimated size: {Fore.CYAN}{estimated_size:.1f} MB")
-
-        if available_space > 0:
-            if available_space < estimated_size:
-                print(f"{Fore.RED}├─ {Fore.YELLOW}⚠️  Warning: Only {available_space:.1f} MB available!")
+        if new_files > 0:
+            print(f"{Fore.RED}├─ {Fore.YELLOW}⬇ To download: {Fore.CYAN}{new_files} surah(s)")
+            if new_files <= 3:
+                missing_display = self._get_surah_names_display(missing_surahs)
+                print(f"{Fore.RED}├─ {Fore.WHITE}  New: {Fore.YELLOW}{missing_display}")
+            elif new_files <= 10:
+                print(f"{Fore.RED}├─ {Fore.WHITE}  New surahs: {Fore.YELLOW}{', '.join(map(str, missing_surahs))}")
             else:
-                print(f"{Fore.RED}├─ {Fore.GREEN}✓ Disk space: {available_space:.1f} MB available")
+                print(f"{Fore.RED}├─ {Fore.WHITE}  New range: {Fore.YELLOW}{missing_surahs[0]}-{missing_surahs[-1]}")
 
-        print(f"{Fore.RED}├─ {Fore.CYAN}y{Fore.WHITE} : Start download")
+            if estimated_size is None:
+                print(f"{Fore.RED}├─ {Fore.WHITE}Estimated size: {Fore.YELLOW}N/A")
+            else:
+                print(f"{Fore.RED}├─ {Fore.WHITE}Estimated size: {Fore.CYAN}{estimated_size:.1f} MB")
+
+                if available_space > 0:
+                    if available_space < estimated_size:
+                        print(f"{Fore.RED}├─ {Fore.YELLOW}⚠️  Warning: Only {available_space:.1f} MB available!")
+                    else:
+                        print(f"{Fore.RED}├─ {Fore.GREEN}✓ Disk space: {available_space:.1f} MB available")
+        else:
+            print(f"{Fore.RED}├─ {Fore.GREEN}✓ All surahs already downloaded!")
+
+        if new_files > 0:
+            print(f"{Fore.RED}├─ {Fore.CYAN}y{Fore.WHITE} : Start download ({new_files} files)")
         print(f"{Fore.RED}├─ {Fore.CYAN}n{Fore.WHITE} : Cancel")
         print(f"{Fore.RED}╰" + "─" * 40)
 
         # Helper text
-        print(Style.DIM + Fore.WHITE + "\nConfirm if you want to start the download.")
+        if new_files > 0:
+            print(Style.DIM + Fore.WHITE + "\nConfirm if you want to start the download.")
+        else:
+            print(Style.DIM + Fore.WHITE + "\nAll selected surahs are already downloaded.")
         print(" ")
 
         try:
             confirm = input(f"{Fore.RED}  ❯ {Fore.WHITE}").strip().lower()
 
-            if confirm == 'y':
-                # Prepare download queue
-                tasks = self.prepare_download_queue(surah_numbers, reciter)
+            if confirm == 'y' and new_files > 0:
+                # Prepare download queue only for missing surahs
+                tasks = self.prepare_download_queue(missing_surahs, reciter)
                 if tasks:
                     return self.start_bulk_download(tasks)
                 else:
                     print(f"{Fore.YELLOW}No valid files to download.{Style.RESET_ALL}")
                     return False
+            elif confirm == 'y' and new_files == 0:
+                print(f"{Fore.GREEN}All surahs already downloaded. Nothing to do.{Style.RESET_ALL}")
+                return True
             else:
                 print(f"{Fore.YELLOW}Download cancelled.{Style.RESET_ALL}")
                 return False
