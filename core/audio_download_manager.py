@@ -111,12 +111,15 @@ class AudioDownloadManager:
                     icon_path = None
 
                 try:
+                    # Avoid using threaded=True here. win10toast uses a background thread
+                    # which can emit exceptions in the process event loop (seen as WPARAM/LRESULT
+                    # TypeError messages). Use a blocking call to avoid that noisy output.
                     if icon_path:
-                        self.notifier.show_toast(title, message, icon_path=icon_path, duration=5, threaded=True)
+                        self.notifier.show_toast(title, message, icon_path=icon_path, duration=5, threaded=False)
                     else:
-                        self.notifier.show_toast(title, message, duration=5, threaded=True)
+                        self.notifier.show_toast(title, message, duration=5, threaded=False)
                 except Exception:
-                    # Silence notification errors (prevents Windows WPARAM TypeError surfacing)
+                    # Silence notification errors to prevent UI tracebacks or unexpected text
                     pass
             else:
                 try:
@@ -165,7 +168,11 @@ class AudioDownloadManager:
                     if resp2.status == 200:
                         data = await resp2.read()
                         return len(data) / (1024 * 1024)
+            except (aiohttp.ClientError, asyncio.TimeoutError):
+                # Network-related issues -> unknown size
+                return None
             except Exception:
+                # Other unexpected issues -> unknown size
                 return None
             return None
 
@@ -196,7 +203,7 @@ class AudioDownloadManager:
                     # If still no candidates, try to find any reciter entry and map by display name
                     if not url_candidates and surah_info and getattr(surah_info, 'audio', None):
                         # pick first available url as best-effort source
-                        for k, v in surah_info.audio.items():
+                        for v in surah_info.audio.values():
                             if isinstance(v, dict) and 'url' in v:
                                 url_candidates.append(v['url'])
                                 break
@@ -223,8 +230,7 @@ class AudioDownloadManager:
 
         try:
             return asyncio.run(estimate_all())
-        except Exception:
-            # On unexpected errors, return None to indicate unknown
+        except (RuntimeError, KeyboardInterrupt):
             return None
 
     def _estimate_fallback_size(self, surah_numbers: List[int]) -> float:
@@ -283,50 +289,70 @@ class AudioDownloadManager:
                     if isinstance(v, dict) and 'url' in v:
                         url_candidates.append((v['url'], v.get('reciter', k)))
                         break
+                if not url_candidates and surah_info and getattr(surah_info, 'audio', None):
+                    for v in surah_info.audio.values():
+                        if isinstance(v, dict) and 'url' in v:
+                            url_candidates.append((v['url'], v.get('reciter', None)))
+                            break
 
             if not url_candidates:
                 print(f"{Fore.YELLOW}Warning: No audio data for Surah {surah_num}, reciter {reciter}{Style.RESET_ALL}")
                 return None
 
-            # Attempt to get size for first reachable candidate
-            async with aiohttp.ClientSession() as session:
-                size_mb = None
-                chosen_url = None
-                chosen_reciter_name = None
-                for url, reciter_name in url_candidates:
+            # Choose the first candidate URL as the intended download source (player uses the
+            # first available audio entry). Probe for Content-Length as a best-effort but
+            # do not reject the URL if probing fails — the downstream downloader has its
+            # own fallback and retry logic.
+            chosen_url, chosen_reciter_name = url_candidates[0]
+            # Mirror AudioManager special-case: for Muhammad Al Luhaidan certain surahs
+            # (2,6,25,112) should use the GitHub raw URL. Ensure the resolver picks the
+            # same URL the player will actually use so the wizard doesn't 404.
+            try:
+                luhaidan_names = {'muhammad al luhaidan', 'luhaidan'}
+                if (chosen_reciter_name and chosen_reciter_name.lower() in luhaidan_names) or reciter.lower().startswith('luhaid'):
+                    special = {2, 6, 25, 112}
+                    if surah_num in special:
+                        padded = str(surah_num).zfill(3)
+                        chosen_url = f"https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/muhammad_al_luhaidan/muhammad-al-luhaidan-{padded}.mp3"
+            except Exception:
+                # Best-effort: ignore errors and keep original chosen_url
+                pass
+            size_mb = None
+            try:
+                async with aiohttp.ClientSession() as session:
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0',
+                        'Accept': '*/*',
+                        'Accept-Encoding': 'identity',
+                        'Connection': 'keep-alive',
+                        'Referer': chosen_url
+                    }
+                    if 'download.quranicaudio.com' in chosen_url:
+                        headers['Host'] = 'download.quranicaudio.com'
+                    if 'raw.githubusercontent.com' in chosen_url:
+                        headers['Host'] = 'raw.githubusercontent.com'
+
+                    # Try HEAD then GET for size; ignore network failures and proceed with unknown size
                     try:
-                        async with session.head(url, timeout=15) as resp:
-                            if resp.status == 200:
-                                cl = resp.headers.get('Content-Length') or resp.headers.get('content-length')
+                        async with session.head(chosen_url, timeout=12, headers=headers) as resp_head:
+                            if resp_head.status in (200, 206):
+                                cl = resp_head.headers.get('Content-Length') or resp_head.headers.get('content-length')
                                 if cl:
                                     size_mb = int(cl) / (1024 * 1024)
-                                    chosen_url = url
-                                    chosen_reciter_name = reciter_name
-                                    break
-                        # Try GET if HEAD didn't yield length
-                        async with session.get(url, timeout=30) as resp2:
-                            if resp2.status == 200:
-                                data = await resp2.read()
-                                size_mb = len(data) / (1024 * 1024)
-                                chosen_url = url
-                                chosen_reciter_name = reciter_name
-                                break
-                    except Exception:
-                        continue
-
-            if not chosen_url:
-                # Could not resolve URL/size
-                filename_path = self.audio_manager.get_audio_path(surah_num, reciter)
-                if not filename_path:
-                    return None
-                return DownloadTask(
-                    surah_num=surah_num,
-                    reciter=reciter,
-                    url='',
-                    filename=str(filename_path),
-                    estimated_size_mb=None
-                )
-
+                    except (aiohttp.ClientError, asyncio.TimeoutError):
+                        try:
+                            async with session.get(chosen_url, timeout=20, headers=headers) as resp_get:
+                                if resp_get.status in (200, 206):
+                                    cl2 = resp_get.headers.get('Content-Length') or resp_get.headers.get('content-length')
+                                    if cl2:
+                                        size_mb = int(cl2) / (1024 * 1024)
+                        except (aiohttp.ClientError, asyncio.TimeoutError):
+                            # give up on probing size for this URL
+                            pass
+            except (aiohttp.ClientError, asyncio.TimeoutError):
+                size_mb = None
+            except Exception:
+                size_mb = None
             filename_path = self.audio_manager.get_audio_path(surah_num, chosen_reciter_name or reciter)
             if not filename_path:
                 return None
@@ -361,22 +387,78 @@ class AudioDownloadManager:
 
             task.status = "downloading"
 
-            # Use existing download_audio method but with custom progress handling
-            file_path = await self.audio_manager.download_audio(
-                url=task.url,
-                surah_num=task.surah_num,
-                reciter=task.reciter,
-                max_retries=3
-            )
+            # Try primary URL first (if present)
+            attempts = []
+            if task.url:
+                attempts.append((task.url, task.reciter))
 
-            if file_path and file_path.exists():
-                task.status = "completed"
-                if progress_callback:
-                    progress_callback(task)
-                return True
-            else:
-                task.status = "failed"
-                return False
+            # If reciter looks like Luhaidan key, add canonical quranicaudio + github fallback
+            if task.reciter and ('luhaid' in task.reciter.lower() or task.reciter.lower() == 'luhaidan'):
+                padded = str(task.surah_num).zfill(3)
+                qurl = f"https://download.quranicaudio.com/quran/muhammad_alhaidan/{padded}.mp3"
+                gh_url = f"https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/muhammad_al_luhaidan/muhammad-al-luhaidan-{padded}.mp3"
+                attempts.append((qurl, 'Muhammad Al Luhaidan'))
+                attempts.append((gh_url, 'Muhammad Al Luhaidan'))
+
+            # As a last resort, try to use any cached audio entry for this surah
+            if not attempts:
+                surah_info = self.data_handler.get_surah_info(task.surah_num)
+                if surah_info and getattr(surah_info, 'audio', None):
+                    for k, v in surah_info.audio.items():
+                        if isinstance(v, dict) and 'url' in v:
+                            attempts.append((v['url'], v.get('reciter', k)))
+                            break
+
+            file_path = None
+            for url, reciter_name in attempts:
+                # Quick reachability check before invoking the heavier downloader
+                try:
+                    headers = {'User-Agent': 'Mozilla/5.0', 'Accept': '*/*', 'Accept-Encoding': 'identity', 'Connection': 'keep-alive', 'Referer': url}
+                    if 'download.quranicaudio.com' in url:
+                        headers['Host'] = 'download.quranicaudio.com'
+                    if 'raw.githubusercontent.com' in url:
+                        headers['Host'] = 'raw.githubusercontent.com'
+                    async with aiohttp.ClientSession() as session:
+                        try:
+                            async with session.head(url, timeout=10, headers=headers) as resp:
+                                status = resp.status
+                                if status not in (200, 206):
+                                    # try GET as a fallback
+                                    async with session.get(url, timeout=20, headers=headers) as resp2:
+                                        if resp2.status not in (200, 206):
+                                            print(f"{Fore.YELLOW}Skipping unreachable URL {url} (status {resp2.status}){Style.RESET_ALL}")
+                                            continue
+                        except Exception:
+                            # HEAD failed, try GET
+                            async with session.get(url, timeout=20, headers=headers) as resp3:
+                                if resp3.status not in (200, 206):
+                                    print(f"{Fore.YELLOW}Skipping unreachable URL {url} (status {resp3.status}){Style.RESET_ALL}")
+                                    continue
+                except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                    print(f"{Fore.YELLOW}URL check failed for {url}: {e}{Style.RESET_ALL}")
+                    continue
+
+                try:
+                    file_path = await self.audio_manager.download_audio(
+                        url=url,
+                        surah_num=task.surah_num,
+                        reciter=reciter_name,
+                        max_retries=3
+                    )
+                except Exception as e:
+                    print(f"{Fore.YELLOW}Download attempt error for {url}: {e}{Style.RESET_ALL}")
+                    file_path = None
+
+                if file_path and file_path.exists():
+                    task.status = 'completed'
+                    task.url = url
+                    task.reciter = reciter_name
+                    if progress_callback:
+                        progress_callback(task)
+                    return True
+
+            task.status = 'failed'
+            return False
 
         except Exception as e:
             print(f"{Fore.RED}Error downloading Surah {task.surah_num}: {e}{Style.RESET_ALL}")
@@ -518,6 +600,23 @@ class AudioDownloadManager:
             if len(self.failed_tasks) > 5:
                 print(f"  ... and {len(self.failed_tasks) - 5} more")
 
+        # Offer a simple retry for failed tasks (one attempt)
+        if self.failed_tasks:
+            try:
+                retry = input(f"\n{Fore.CYAN}Retry failed downloads? (y/N): {Fore.WHITE}").strip().lower()
+                if retry == 'y':
+                    to_retry = [t for t in self.failed_tasks]
+                    self.failed_tasks = []
+                    self.download_queue = to_retry
+                    # reset stats for this retry
+                    for t in to_retry:
+                        t.status = 'pending'
+                    # Run retry and return immediately to avoid duplicate reporting
+                    self.start_bulk_download(to_retry)
+                    return
+            except KeyboardInterrupt:
+                pass
+
     def get_disk_space_info(self) -> Tuple[float, float]:
         """Get available disk space in MB (total, available)"""
         try:
@@ -603,10 +702,11 @@ class AudioDownloadManager:
         while True:
             print(f"\n{Fore.CYAN}Step 2: Select Surahs{Style.RESET_ALL}")
             print(f"{Fore.RED}╭─ {Fore.GREEN}Download Options:")
-            print(f"{Fore.RED}├─ {Fore.CYAN}all{Fore.WHITE} : Download all 114 surahs")
-            print(f"{Fore.RED}├─ {Fore.CYAN}specific{Fore.WHITE} : Download specific surahs (e.g., 1,2,3)")
-            print(f"{Fore.RED}├─ {Fore.CYAN}list{Fore.WHITE} : Show surah list")
-            print(f"{Fore.RED}├─ {Fore.CYAN}back{Fore.WHITE} : Return to previous menu")
+            # Provide short aliases using the project's slash-style (cmd/alias)
+            print(f"{Fore.RED}├─ {Fore.CYAN}all{Style.DIM}/a{Style.RESET_ALL}{Fore.WHITE}     : Download all 114 surahs")
+            print(f"{Fore.RED}├─ {Fore.CYAN}specific{Style.DIM}/s{Style.RESET_ALL}{Fore.WHITE} : Download specific surahs (e.g., 1,2,3)")
+            print(f"{Fore.RED}├─ {Fore.CYAN}list{Style.DIM}/l{Style.RESET_ALL}{Fore.WHITE}    : Show surah list")
+            print(f"{Fore.RED}├─ {Fore.CYAN}back{Style.DIM}/b{Style.RESET_ALL}{Fore.WHITE}    : Return to previous menu")
             print(f"{Fore.RED}╰" + "─" * 40)
 
             # Helper text
@@ -616,13 +716,13 @@ class AudioDownloadManager:
             try:
                 choice = input(f"{Fore.RED}  ❯ {Fore.WHITE}").strip().lower()
 
-                if choice == 'back':
+                if choice in ('back', 'b'):
                     return None
-                elif choice == 'all':
+                elif choice in ('all', 'a'):
                     return list(range(1, 115))
-                elif choice == 'specific':
+                elif choice in ('specific', 's'):
                     return self._get_specific_surahs()
-                elif choice == 'list':
+                elif choice in ('list', 'l'):
                     if self.app:
                         self.app._display_surah_list()
                     else:
@@ -705,6 +805,12 @@ class AudioDownloadManager:
 
         # Calculate estimated size only for missing surahs
         if missing_surahs:
+            # Let the user know we are probing remote files for accurate sizes
+            try:
+                print(f"\n{Fore.CYAN}Please wait while we fetch file sizes for {len(missing_surahs)} surah(s)...{Style.RESET_ALL}")
+            except Exception:
+                # Best-effort: don't crash if printing fails
+                pass
             estimated_size = self.estimate_download_size(missing_surahs, reciter)
         else:
             estimated_size = 0

@@ -123,9 +123,9 @@ class AudioManager:
         Cleans up any leftover .tmp file before starting a new download for a surah/reciter.
         Handles multiplatform (Windows/Linux) robustly.
         """
+        # Allow downloads even if pygame mixer failed to initialize
         if not self.mixer_initialized:
-            print(f"{Fore.RED}Audio system not initialized. Cannot download audio.")
-            return None
+            print(f"{Fore.YELLOW}Warning: Audio playback system not initialized; downloads will still proceed.{Style.RESET_ALL}")
         if not self.audio_dir:
             print(f"{Fore.RED}Audio directory not set. Cannot download audio.")
             return None
