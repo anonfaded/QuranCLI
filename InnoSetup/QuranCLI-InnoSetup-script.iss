@@ -2,9 +2,9 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "QuranCLI"
-#define MyAppVersion "1.3.0"
+#define MyAppVersion "1.4.0"
 #define MyAppPublisher "FadSec Lab"
-#define MyAppURL "https://www.fadedhood.com"
+#define MyAppURL "https://faded.dev"
 #define MyAppExeName "QuranCLI.exe"
 
 [Setup]
