@@ -844,60 +844,93 @@ class UI:
                 original_display_needs_restore = True
                 while True: # Reciter selection loop
                     self.clear_terminal()
-                    print(Style.BRIGHT + Fore.RED + "\nAudio Player - Select Reciter" + Style.RESET_ALL)
-                    # ... (display reciter options - keep as before) ...
-                    reciter_options = list(surah_info.audio.items())
-                    for i, (rid, info) in enumerate(reciter_options): print(f"{Fore.GREEN}{i+1}{Fore.WHITE} : {info['reciter']}")
+                    box_width = 60
+                    separator = "─" * box_width
 
-                    print(Fore.WHITE + "\nEnter number ('q' to cancel): ", end="", flush=True)
+                    # --- Consistent Header ---
+                    print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "🎵 Audio Player - Select Reciter")
+                    print(Fore.RED + f"│ → {Fore.CYAN}Surah{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}{surah_info.surah_name} ({surah_info.surah_number})")
+                    print(Fore.RED + "├" + separator)
+
+                    # --- Display reciter options with consistent formatting ---
+                    reciter_options = list(surah_info.audio.items())
+
+                    # Calculate max length for proper alignment
+                    def strip_ansi(s):
+                        import re
+                        ansi_escape = re.compile(r'\x1B[\[][0-?]*[ -/]*[@-~]')
+                        return ansi_escape.sub('', s)
+                    max_reciter_len = max(len(info['reciter']) for _, info in reciter_options) if reciter_options else 0
+
+                    print(Fore.RED + f"│ {Style.BRIGHT}{Fore.GREEN}Available Reciters{Style.RESET_ALL}:")
+
+                    for i, (rid, info) in enumerate(reciter_options):
+                        reciter_name = info['reciter']
+                        pad = " " * (max_reciter_len - len(reciter_name))
+                        print(Fore.RED + f"│ → {Fore.CYAN}{i+1}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}{reciter_name}{pad}")
+
+                    print(Fore.RED + "├" + separator)
+                    print(Fore.RED + f"│ {Style.BRIGHT}{Fore.GREEN}Choose an action{Style.RESET_ALL}:")
+
+                    actions = [
+                        ("1-5", "Select reciter by number"),
+                        ("q", "Cancel selection")
+                    ]
+
+                    max_action_len = max(len(action[0]) for action in actions)
+                    for action_num, desc in actions:
+                        pad = " " * (max_action_len - len(action_num))
+                        print(Fore.RED + f"│ → {Fore.CYAN}{action_num}{pad}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}{desc}{Style.RESET_ALL}")
+
+                    print(Fore.RED + "╰" + separator)
 
                     try:
-                         reciter_input = input().strip().lower()
-                         if reciter_input == 'q': break
+                        reciter_input = input(Fore.RED + "  ❯ " + Fore.CYAN + "Enter number ('q' to cancel): " + Fore.WHITE).strip().lower()
+                        if reciter_input == 'q': break
 
-                         if reciter_input.isdigit():
-                             choice_idx = int(reciter_input) - 1
-                             if 0 <= choice_idx < len(reciter_options):
-                                 # ... (get selected reciter info - keep as before) ...
-                                 selected_id, selected_info = reciter_options[choice_idx]
-                                 audio_url, reciter_name = selected_info["url"], selected_info["reciter"]
+                        if reciter_input.isdigit():
+                            choice_idx = int(reciter_input) - 1
+                            if 0 <= choice_idx < len(reciter_options):
+                                # ... (get selected reciter info - keep as before) ...
+                                selected_id, selected_info = reciter_options[choice_idx]
+                                audio_url, reciter_name = selected_info["url"], selected_info["reciter"]
 
-                                 print(f"\n{Fore.CYAN}Selected: {reciter_name}")
-                                 self.audio_manager.stop_audio(reset_state=True)
+                                print(f"\n{Fore.CYAN}Selected: {reciter_name}")
+                                self.audio_manager.stop_audio(reset_state=True)
 
-                                 # --- Run download and play ---
-                                 if is_ayatul_kursi:
-                                     # For Ayatul Kursi, use special reciter naming
-                                     reciter_prefix = f"AyatulKursi_{reciter_name}"
-                                     asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_prefix))
-                                     # Set the flag to remember we're playing Ayatul Kursi
-                                     self.audio_manager.last_was_ayatul_kursi = True
-                                 else:
-                                     # Regular surah audio
-                                     asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_name))
-                                     # Clear the flag when playing regular surah
-                                     self.audio_manager.last_was_ayatul_kursi = False
-                                     
-                                 # --- Directly redraw after async call ---
-                                 self._redraw_audio_ui(surah_info)
-                                 # --- End Direct Redraw ---
+                                # --- Run download and play ---
+                                if is_ayatul_kursi:
+                                    # For Ayatul Kursi, use special reciter naming
+                                    reciter_prefix = f"AyatulKursi_{reciter_name}"
+                                    asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_prefix))
+                                    # Set the flag to remember we're playing Ayatul Kursi
+                                    self.audio_manager.last_was_ayatul_kursi = True
+                                else:
+                                    # Regular surah audio
+                                    asyncio.run(self.handle_audio_playback(audio_url, surah_num, reciter_name))
+                                    # Clear the flag when playing regular surah
+                                    self.audio_manager.last_was_ayatul_kursi = False
+                                    
+                                # --- Directly redraw after async call ---
+                                self._redraw_audio_ui(surah_info)
+                                # --- End Direct Redraw ---
 
-                                 # Save preference - special handling for Ayatul Kursi
-                                 if is_ayatul_kursi:
-                                     # Create special Ayatul Kursi preference key
-                                     pref_key = "ayatul_kursi"
-                                     self.preferences[pref_key] = {"reciter_name": reciter_name, "reciter_url": audio_url}
-                                 else:
-                                     # Normal surah preference
-                                     self.preferences[str(surah_num)] = {"reciter_name": reciter_name, "reciter_url": audio_url}
-                                     
-                                 self.save_preferences()
-                                 print(Fore.GREEN + " Preference saved.") # Add space
-                                 original_display_needs_restore = False
-                                 time.sleep(1.0) # Shorter pause
-                                 break # Exit selection loop successfully
-                             else: print(Fore.RED + "\nInvalid number.")
-                         else: print(Fore.RED + "\nInvalid input.")
+                                # Save preference - special handling for Ayatul Kursi
+                                if is_ayatul_kursi:
+                                    # Create special Ayatul Kursi preference key
+                                    pref_key = "ayatul_kursi"
+                                    self.preferences[pref_key] = {"reciter_name": reciter_name, "reciter_url": audio_url}
+                                else:
+                                    # Normal surah preference
+                                    self.preferences[str(surah_num)] = {"reciter_name": reciter_name, "reciter_url": audio_url}
+                                    
+                                self.save_preferences()
+                                print(Fore.GREEN + " Preference saved.") # Add space
+                                original_display_needs_restore = False
+                                time.sleep(1.0) # Shorter pause
+                                break # Exit selection loop successfully
+                            else: print(Fore.RED + "\nInvalid number.")
+                        else: print(Fore.RED + "\nInvalid input.")
 
                     except ValueError: print(Fore.RED + "\nInvalid number input.")
                     except KeyboardInterrupt: print(Fore.YELLOW + "\nSelection cancelled."); break
@@ -1225,13 +1258,48 @@ class UI:
                         try:
                             while True: # Loop for reciter number input
                                 self.clear_terminal() # Clear before showing options
-                                print(Style.BRIGHT + Fore.RED + "\nAudio Player - Select Reciter" + Style.RESET_ALL)
+                                box_width = 60
+                                separator = "─" * box_width
+
+                                # --- Consistent Header ---
+                                print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "🎵 Audio Player - Select Reciter")
+                                print(Fore.RED + f"│ → {Fore.CYAN}Surah{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}{surah_info.surah_name} ({surah_info.surah_number})")
+                                print(Fore.RED + "├" + separator)
+
+                                # --- Display reciter options with consistent formatting ---
                                 reciter_options = list(surah_info.audio.items())
-                                for i, (rid, info) in enumerate(reciter_options): print(f"{Fore.GREEN}{i+1}{Fore.WHITE} : {info['reciter']}")
-                                print(Fore.WHITE + "\nEnter number ('q' to cancel): ", end="", flush=True) # Prompt
+
+                                # Calculate max length for proper alignment
+                                def strip_ansi(s):
+                                    import re
+                                    ansi_escape = re.compile(r'\x1B[\[][0-?]*[ -/]*[@-~]')
+                                    return ansi_escape.sub('', s)
+                                max_reciter_len = max(len(info['reciter']) for _, info in reciter_options) if reciter_options else 0
+
+                                print(Fore.RED + f"│ {Style.BRIGHT}{Fore.GREEN}Available Reciters{Style.RESET_ALL}:")
+
+                                for i, (rid, info) in enumerate(reciter_options):
+                                    reciter_name = info['reciter']
+                                    pad = " " * (max_reciter_len - len(reciter_name))
+                                    print(Fore.RED + f"│ → {Fore.CYAN}{i+1}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}{reciter_name}{pad}")
+
+                                print(Fore.RED + "├" + separator)
+                                print(Fore.RED + f"│ {Style.BRIGHT}{Fore.GREEN}Choose an action{Style.RESET_ALL}:")
+
+                                actions = [
+                                    ("1-5", "Select reciter by number"),
+                                    ("q", "Cancel selection")
+                                ]
+
+                                max_action_len = max(len(action[0]) for action in actions)
+                                for action_num, desc in actions:
+                                    pad = " " * (max_action_len - len(action_num))
+                                    print(Fore.RED + f"│ → {Fore.CYAN}{action_num}{pad}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}{desc}{Style.RESET_ALL}")
+
+                                print(Fore.RED + "╰" + separator)
 
                                 # *** Use standard input() now ***
-                                reciter_input = input().strip().lower() # This will now echo
+                                reciter_input = input(Fore.RED + "  ❯ " + Fore.CYAN + "Enter number ('q' to cancel): " + Fore.WHITE).strip().lower() # This will now echo
 
                                 if reciter_input == 'q': break # Exit inner loop
                                 if reciter_input.isdigit():
