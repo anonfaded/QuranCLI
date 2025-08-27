@@ -1581,8 +1581,9 @@ class QuranApp:
         Offer to open it in the system file explorer (Windows/Linux robustly).
         """
         self._clear_terminal()
+        self._display_header()
+
         audio_cache_dir = self.audio_manager.audio_dir
-        print(f"{Fore.GREEN}Audio cache directory:{Fore.WHITE} {audio_cache_dir}\n")
 
         # Count files and calculate total size
         file_count = 0
@@ -1600,11 +1601,34 @@ class QuranApp:
             print(f"{Fore.RED}Error reading audio cache directory: {e}\n")
 
         total_size_mb = total_size / (1024 * 1024)
-        print(f"{Fore.CYAN}Audio files: {file_count}   Total size: {total_size_mb:.2f} MB\n")
-        print(f"{Fore.YELLOW}This is where downloaded audio files are stored.\n")
+
+        # Prepare display items with consistent formatting
+        display_items = [
+            (f"{Fore.CYAN}Directory{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}{audio_cache_dir}"),
+            (f"{Fore.CYAN}Audio Files{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}{file_count} files"),
+            (f"{Fore.CYAN}Total Size{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}{total_size_mb:.2f} MB"),
+            (f"{Fore.YELLOW}Note{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Downloaded audio files are stored here"),
+        ]
+
+        # Calculate max length for alignment
+        def strip_ansi(s):
+            import re
+            ansi_escape = re.compile(r'\x1B[\[][0-?]*[ -/]*[@-~]')
+            return ansi_escape.sub('', s)
+        max_label_len = max(len(strip_ansi(label)) for label, _ in display_items)
+
+        box_width = 60
+        separator = "─" * box_width
+
+        # Display header
+        print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "🎵 Audio Cache Information")
+        for label, value in display_items:
+            pad = " " * (max_label_len - len(strip_ansi(label)))
+            print(Fore.RED + f"│ → {label}{pad} : {value}{Style.RESET_ALL}")
+        print(Fore.RED + "╰" + separator)
 
         try:
-            open_choice = input(f"{Fore.CYAN}Open this folder in your file explorer? (y/n): {Fore.WHITE}").strip().lower()
+            open_choice = input(Fore.RED + "  ❯ " + Fore.CYAN + "Open this folder in your file explorer? (y/n): " + Fore.WHITE).strip().lower()
             if open_choice in ['y', 'yes']:
                 if sys.platform == "win32":
                     os.startfile(str(audio_cache_dir))
