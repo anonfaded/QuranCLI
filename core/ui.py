@@ -213,7 +213,7 @@ class UI:
             max_action_len = max(len(action[0]) for action in actions)
             for action, desc in actions:
                 pad = " " * (max_action_len - len(action))
-                print(Fore.RED + f"│   • {Fore.CYAN}{action}{pad} {Style.DIM}: {desc}{Style.RESET_ALL}")
+                print(Fore.RED + f"│   • {Fore.CYAN}{action}{pad}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}{desc}{Style.RESET_ALL}")
 
             print(Fore.RED + "╰" + separator)
 
@@ -1719,8 +1719,13 @@ class UI:
             # --- Management Console Loop (Show generated content info) ---
             while True:
                 self.clear_terminal()
-                print(Fore.RED + Style.BRIGHT + "Subtitle Management Console:")
-                print(Fore.MAGENTA + f"      Subtitle generated for Surah {surah_info.surah_name} ({start_ayah}-{end_ayah})")
+                box_width = 80
+                separator = "─" * box_width
+
+                # --- Consistent Header ---
+                print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "🎬 Subtitle Management Console")
+                print(Fore.RED + f"│ → {Fore.CYAN}Surah{Style.NORMAL} : {Style.NORMAL}{Fore.WHITE}{surah_info.surah_name} ({start_ayah}-{end_ayah})")
+
                 # --- Display generated content format ---
                 # Construct current_config_str from subtitle_config
                 subtitle_config = self.preferences.get("subtitle_config", {})
@@ -1735,33 +1740,44 @@ class UI:
                     current_config_parts.append("English")
                 current_config_str = " + ".join(current_config_parts)
 
-                print(f"{Fore.CYAN}      Content Included: {Fore.GREEN}{current_config_str}")
-                # --- End Display ---
-                print(Fore.GREEN + f"\nFile saved in Documents folder:")
-                print(Fore.CYAN + f"      {filepath}")
+                print(Fore.RED + f"│ → {Fore.CYAN}Content{Style.NORMAL} : {Style.NORMAL}{Fore.WHITE}{current_config_str}")
+                print(Fore.RED + f"│ → {Fore.CYAN}File Path{Style.NORMAL} : {Style.NORMAL}{Fore.WHITE}{filepath}")
+                print(Fore.RED + "├" + separator)
 
-                # Web server info (remains same)
+                # Web server info with consistent formatting
                 if server_running:
-                    print(Fore.GREEN + f"\nShare link on your network:")
-                    print(f"      🚀✨ " + Back.MAGENTA + Fore.WHITE + f" http://{ip_address}:{PORT} " + Style.RESET_ALL + " ✨🚀      ")
-                    # ... (rest of web server info and capcut hint) ...
-                    print(Fore.WHITE + Style.DIM + "\n   Open this link in your browser or on your phone (same Wi-Fi)...")
-                    print(Fore.CYAN + Style.BRIGHT + "\n📌 CapCut Tip:" + Fore.WHITE + Style.DIM + " Download SRT -> Open CapCut -> Captions -> Import Captions.")
+                    print(Fore.RED + f"│ {Style.BRIGHT}{Fore.GREEN}Network Sharing{Style.NORMAL}:")
+                    print(Fore.RED + f"│ → {Fore.CYAN}Local URL{Style.NORMAL} : {Style.NORMAL}{Back.MAGENTA}{Fore.WHITE} 🚀✨ http://{ip_address}:{PORT} ✨🚀 {Style.NORMAL}")
+                    print(Fore.RED + f"│ → {Fore.YELLOW}Note{Style.NORMAL} : {Style.NORMAL}{Fore.WHITE}Open link in browser/phone (same Wi-Fi)")
+                    print(Fore.RED + f"│ → {Fore.CYAN}CapCut Tip{Style.NORMAL} : {Style.NORMAL}{Fore.WHITE}Download SRT → Captions → Import Captions")
                 else:
-                    print(Fore.YELLOW + "\nWeb sharing disabled/failed.")
+                    print(Fore.RED + f"│ {Style.BRIGHT}{Fore.YELLOW}Network Sharing{Style.NORMAL}: {Style.NORMAL}{Fore.WHITE}Disabled/Failed")
 
-                # Commands (remains same)
-                box_width = 26
-                separator = "─" * box_width
-                print("\n" + Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📜 Available Commands")
-                print(Fore.RED + f"│ • {Fore.CYAN}open{Fore.WHITE} : Open folder containing subtitle")
-                print(Fore.RED + f"│ • {Fore.CYAN}back{Fore.WHITE} : Return to Main Menu")
+                print(Fore.RED + "├" + separator)
+
+                # --- Redesigned Commands ---
+                print(Fore.RED + f"│ {Style.BRIGHT}{Fore.GREEN}Available Commands{Style.NORMAL}:")
+
+                commands = [
+                    ("open", "Open folder containing subtitle"),
+                    ("back", "Return to Main Menu")
+                ]
+
+                # Calculate max length for proper alignment
+                def strip_ansi(s):
+                    import re
+                    ansi_escape = re.compile(r'\x1B[\[][0-?]*[ -/]*[@-~]')
+                    return ansi_escape.sub('', s)
+                max_cmd_len = max(len(cmd) for cmd, _ in commands)
+
+                for cmd, desc in commands:
+                    pad = " " * (max_cmd_len - len(cmd))
+                    print(Fore.RED + f"│ → {Fore.CYAN}{cmd}{pad}{Style.NORMAL} : {Style.NORMAL}{Fore.WHITE}{desc}{Style.NORMAL}")
+
                 print(Fore.RED + "╰" + separator)
-                print(Style.DIM + Fore.WHITE + "\nType command and press Enter.")
-                print(" ")
 
                 try:
-                    user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+                    user_input = input(Fore.RED + "  ❯ " + Fore.CYAN + "Enter command: " + Fore.WHITE).strip().lower()
                 except KeyboardInterrupt:
                     print(Fore.YELLOW + "\n\n⚠️ Please type 'back' and press Enter to return safely.")
                     continue
