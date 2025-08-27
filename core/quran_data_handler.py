@@ -58,11 +58,19 @@ class QuranDataHandler:
 
         # --- ADDED arabic_reversed flag and related logic ---
         self.arabic_reversed = False
+        self.translation_enabled = True  # Master toggle for all translations
 
     def toggle_arabic_reversal(self):
         """Toggles the arabic_reversed flag."""
         self.arabic_reversed = not self.arabic_reversed
         print(f"{Fore.YELLOW}Arabic display reversal toggled: {'ON' if self.arabic_reversed else 'OFF'}{Style.RESET_ALL}") # Optional feedback
+        import time
+        time.sleep(0.7) # Brief pause to see feedback
+
+    def toggle_translation(self):
+        """Toggles the translation display flag."""
+        self.translation_enabled = not self.translation_enabled
+        print(f"{Fore.YELLOW}Translation display toggled: {'ON' if self.translation_enabled else 'OFF'}{Style.RESET_ALL}") # Optional feedback
         import time
         time.sleep(0.7) # Brief pause to see feedback
     

@@ -292,58 +292,128 @@ class QuranApp:
     def _display_header(self):
         # Pass the currently loaded theme color to the UI method
         self.ui.display_header(QURAN_CLI_ASCII, theme_color=self.theme_color)
-        
-    def _handle_theme_selection(self):
-        """Handles the UI interaction for selecting a theme."""
-        self._clear_terminal()
-        self._display_header() # Show header in current theme before selection
-        print(Fore.GREEN + Style.BRIGHT + "🎨 Select Theme Color for ASCII Art:")
-        print(Fore.RED + "  1. Red (Default)")
-        print(Fore.WHITE + "  2. White")
-        print(Fore.GREEN + "  3. Green")
-        print(Fore.BLUE + "  4. Blue")        # Added
-        print(Fore.YELLOW + "  5. Yellow")      # Added
-        print(Fore.MAGENTA + "  6. Magenta")    # Added
-        print(Fore.CYAN + "  7. Cyan")        # Added
-        print(Fore.YELLOW + "\n  q. Cancel")
 
+    def _wait_for_key(self, message: str = "Press Enter to continue..."):
+        """Wait for user to press Enter"""
+        input(Fore.YELLOW + message + Style.RESET_ALL)
+
+    def _clear_audio_cache(self):
+        """Clear all audio files from the cache directory"""
         try:
-            choice = input(Fore.BLUE + "\nEnter choice: " + Fore.WHITE).strip().lower()
-            new_theme = None
-            if choice == '1':
-                new_theme = 'red'
-            elif choice == '2':
-                new_theme = 'white'
-            elif choice == '3':
-                new_theme = 'green'
-            elif choice == '4':          # Added
-                new_theme = 'blue'
-            elif choice == '5':          # Added
-                new_theme = 'yellow'
-            elif choice == '6':          # Added
-                new_theme = 'magenta'
-            elif choice == '7':          # Added
-                new_theme = 'cyan'
-            elif choice == 'q':
-                print(Fore.YELLOW + "Theme selection cancelled.")
-                sleep(1)
-                return # Go back without changing
+            if not self.audio_manager.audio_dir or not self.audio_manager.audio_dir.exists():
+                print(f"{Fore.YELLOW}Audio cache directory not found.{Style.RESET_ALL}")
+                return
 
-            if new_theme:
-                self.preferences['theme_color'] = new_theme
-                self.theme_color = new_theme # Update the instance variable immediately
-                self._save_preferences()
-                print(Fore.GREEN + f"\n✅ Theme set to {new_theme.capitalize()}.")
-                sleep(1.5)
+            # Count files before deletion
+            audio_files = list(self.audio_manager.audio_dir.glob("*.mp3"))
+            if not audio_files:
+                print(f"{Fore.YELLOW}No audio files found in cache.{Style.RESET_ALL}")
+                return
+
+            # Show what files will be deleted
+            print(f"{Fore.YELLOW}Found {len(audio_files)} audio files in cache:{Style.RESET_ALL}")
+            for i, file_path in enumerate(audio_files[:5], 1):  # Show first 5 files
+                print(f"{Fore.CYAN}  • {file_path.name}{Style.RESET_ALL}")
+            if len(audio_files) > 5:
+                print(f"{Fore.CYAN}  • ... and {len(audio_files) - 5} more files{Style.RESET_ALL}")
+
+            # Confirm deletion
+            print(f"\n{Fore.YELLOW}Are you sure you want to delete all {len(audio_files)} audio files? (y/N): {Style.RESET_ALL}")
+            confirm = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+
+            if confirm in ['y', 'yes']:
+                deleted_count = 0
+                for file_path in audio_files:
+                    try:
+                        file_path.unlink()
+                        deleted_count += 1
+                    except Exception as e:
+                        print(f"{Fore.RED}Error deleting {file_path.name}: {e}{Style.RESET_ALL}")
+
+                print(f"{Fore.GREEN}✓ Deleted {deleted_count} audio files from cache.{Style.RESET_ALL}")
             else:
-                print(Fore.RED + "Invalid choice.")
-                sleep(1)
-        except KeyboardInterrupt:
-            print(Fore.YELLOW + "\nTheme selection cancelled.")
-            sleep(1)
+                print(f"{Fore.YELLOW}Audio cache clearing cancelled.{Style.RESET_ALL}")
+
         except Exception as e:
-            print(Fore.RED + f"Error setting theme: {e}")
-            sleep(1)
+            print(f"{Fore.RED}Error clearing audio cache: {e}{Style.RESET_ALL}")
+
+    def _show_audio_cache_path(self):
+        """Show the audio cache directory path and give option to open it"""
+        try:
+            if not self.audio_manager.audio_dir:
+                print(f"{Fore.YELLOW}Audio cache directory not set.{Style.RESET_ALL}")
+                return
+
+            cache_path = str(self.audio_manager.audio_dir)
+            print(f"{Fore.CYAN}Audio cache location: {cache_path}{Style.RESET_ALL}")
+
+            # Ask if user wants to open it
+            open_choice = input(f"{Fore.YELLOW}Open folder in file explorer? (y/N): {Style.RESET_ALL}").strip().lower()
+            if open_choice in ['y', 'yes']:
+                # Try to open the directory
+                try:
+                    if sys.platform == "win32":
+                        os.startfile(cache_path)
+                        print(f"{Fore.GREEN}✓ Opened audio cache folder in Windows Explorer.{Style.RESET_ALL}")
+                    else:
+                        # For Linux/macOS, try to open with default file manager
+                        import subprocess
+                        subprocess.run(["xdg-open", cache_path], check=False)
+                        print(f"{Fore.GREEN}✓ Opened audio cache folder in file manager.{Style.RESET_ALL}")
+                except Exception as e:
+                    print(f"{Fore.YELLOW}Could not open folder automatically: {e}{Style.RESET_ALL}")
+            else:
+                print(f"{Fore.CYAN}You can manually navigate to: {cache_path}{Style.RESET_ALL}")
+
+            # Wait for user to press enter
+            input(f"{Fore.RED}  ❯ {Fore.YELLOW}Press Enter to continue...{Style.RESET_ALL}")
+
+        except Exception as e:
+            print(f"{Fore.RED}Error showing audio cache path: {e}{Style.RESET_ALL}")
+
+    def _handle_theme_selection(self):
+        """Handle theme color selection for ASCII art"""
+        while True:
+            self._clear_terminal()
+            self._display_header()
+
+            print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "🎨 Theme Selection")
+            print(Fore.RED + "│ " + Style.NORMAL + Fore.WHITE + "Choose a color for the QuranCLI ASCII art:")
+            print(Fore.RED + "├─ " + Fore.CYAN + "1. " + Fore.RED + "Red " + Style.DIM + "(Default)")
+            print(Fore.RED + "├─ " + Fore.CYAN + "2. " + Fore.WHITE + "White")
+            print(Fore.RED + "├─ " + Fore.CYAN + "3. " + Fore.GREEN + "Green")
+            print(Fore.RED + "├─ " + Fore.CYAN + "4. " + Fore.BLUE + "Blue")
+            print(Fore.RED + "├─ " + Fore.CYAN + "5. " + Fore.YELLOW + "Yellow")
+            print(Fore.RED + "├─ " + Fore.CYAN + "6. " + Fore.MAGENTA + "Magenta")
+            print(Fore.RED + "├─ " + Fore.CYAN + "7. " + Fore.CYAN + "Cyan")
+            print(Fore.RED + "├─ " + Fore.RED + "q. " + Style.NORMAL + Fore.WHITE + "Back to main menu")
+            print(Fore.RED + "╰──────────────────────────────────────")
+
+            choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+
+            color_map = {
+                '1': 'red',
+                '2': 'white',
+                '3': 'green',
+                '4': 'blue',
+                '5': 'yellow',
+                '6': 'magenta',
+                '7': 'cyan'
+            }
+
+            if choice in ['q', 'quit', 'back', 'b']:
+                break
+            elif choice in color_map:
+                new_color = color_map[choice]
+                self.theme_color = new_color
+                self.preferences['theme_color'] = new_color
+                self._save_preferences()
+                print(Fore.GREEN + f"Theme changed to {new_color}! Press Enter to continue.")
+                input()
+                break
+            else:
+                print(Fore.YELLOW + "Invalid choice. Please try again.")
+                input(Fore.YELLOW + "Press Enter to continue...")
 
     def run(self):
         while True:
@@ -598,12 +668,9 @@ class QuranApp:
             (f"{Fore.CYAN}list{Style.DIM}/ls{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Display list of Surahs"),
             (f"{Fore.CYAN}sub{Style.DIM}/sub{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Create subtitles for Ayahs"),
             (f"{Fore.CYAN}bookmarks{Style.DIM}/bm{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Manage bookmarks"),
-            (f"{Fore.CYAN}settings{Style.DIM}/st{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Translation Display Settings"),
-            (f"{Fore.CYAN}backup{Style.DIM}/bk{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Backup/restore all app settings"),
-            (f"{Fore.CYAN}clearaudio{Style.DIM}/clr{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Clear audio cache"),
-            (f"{Fore.CYAN}audiopath{Style.DIM}/ap{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Show and open audio cache folder"),
+            (f"{Fore.CYAN}settings{Style.DIM}/st{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}App settings & configuration"),
+            (f"{Fore.CYAN}audio{Style.DIM}/au{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Audio management & downloads"),
             (f"{Fore.CYAN}info{Style.DIM}/i{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Show help and information"),
-            (f"{Fore.CYAN}theme{Style.DIM}/th{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Change ASCII art color"),
             (f"{Fore.RED}readme{Style.DIM}/rd{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}View Notes by the developer & Updates"),
             (f"{Fore.CYAN}quit{Style.DIM}/q{Style.NORMAL}{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Exit the application"),
         ]
@@ -662,25 +729,19 @@ class QuranApp:
                     self._bookmark_menu()
                     continue
                 elif user_input in ['settings', 'st']:
-                    self._reading_settings_menu()
+                    from core.settings_manager import SettingsManager
+                    settings_manager = SettingsManager(self)
+                    settings_manager.show_settings_menu()
                     continue
-                elif user_input in ['bk', 'backup']:
-                    self.backup_restore_menu()
+                elif user_input in ['audio', 'au']:
+                    from core.settings_manager import SettingsManager
+                    settings_manager = SettingsManager(self)
+                    settings_manager._show_audio_settings()
                     continue
-                elif user_input in ['clearaudio', 'clr']:
-                    self._clear_audio_cache()
-                    continue
-                elif user_input in ['audiopath', 'ap']:
-                    self._show_audio_cache_path()
-                    continue
-                elif user_input in ['info', 'i']:
-                    self._display_info()
-                    continue
-                elif user_input in ['readme', 'rd']:
-                    self._display_readme_page()
-                    continue
-                elif user_input in ['theme', 'th']:
-                    self._handle_theme_selection()
+                elif user_input in ['audio', 'au']:
+                    from core.settings_manager import SettingsManager
+                    settings_manager = SettingsManager(self)
+                    settings_manager._show_audio_settings()
                     continue
                 elif user_input.isdigit():
                     number = int(user_input)
@@ -727,22 +788,7 @@ class QuranApp:
 
 
 
-    def backup_restore_menu(self):
-        """
-        Show only the backup/restore menu (for use from main menu).
-        This does not enter the full bookmark manager.
-        Multiplatform, robust, and user-friendly.
-        """
-        downloads_dir = str(Path.home() / "Downloads")
-        default_filename = "QuranCLI-Settings.json"
-        default_path = os.path.join(downloads_dir, default_filename)
 
-        def open_file_picker(save=False, default_path=None):
-            """
-            Open a file picker dialog for import/export.
-            Returns selected path or None.
-            Tries to use a dark theme if available (Linux/Windows).
-            """
             try:
                 import tkinter as tk
                 from tkinter import filedialog
@@ -869,28 +915,6 @@ class QuranApp:
                     break
                 print(Fore.YELLOW + "Importing will overwrite your current preferences and bookmarks. Continue? (y/n)")
                 confirm = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
-                if confirm == 'y':
-                    try:
-                        with open(src, "r", encoding="utf-8") as f:
-                            data = f.read()
-                        json.loads(data)  # Validate JSON
-                        with open(self.preferences_file, "w", encoding="utf-8") as f:
-                            f.write(data)
-                        print(Fore.GREEN + "Preferences imported successfully.")
-                        self.preferences = self._load_preferences()
-                    except Exception as e:
-                        print(Fore.RED + f"Import failed: {e}")
-                else:
-                    print(Fore.YELLOW + "Import cancelled.")
-                input(Fore.YELLOW + "Press Enter to continue...")
-                break
-        # Return to main menu after backup/restore
-        return
-
-
-
-
-# -------------- Fix Start for this method(_bookmark_menu)-----------
     def _bookmark_menu(self):
         """
         Interactive bookmark management menu for QuranCLI.
@@ -1503,7 +1527,186 @@ class QuranApp:
                 except KeyboardInterrupt:
                     print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
                     return None #Returning none as keyboard interupt.
-            
+
+    def backup_restore_menu(self):
+        """Display backup/restore menu for app settings"""
+        downloads_dir = str(Path.home() / "Downloads")
+        default_filename = "QuranCLI-Settings.json"
+        default_path = os.path.join(downloads_dir, default_filename)
+
+        def open_file_picker(save=False, default_path=None):
+            """
+            Open a file picker dialog for import/export.
+            Returns selected path or None.
+            Tries to use a dark theme if available (Linux/Windows).
+            """
+            try:
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes('-topmost', True)
+                try:
+                    root.tk.call("tk", "scaling", 1.2)
+                    root.option_add("*background", "#222222")
+                    root.option_add("*foreground", "#e0e0e0")
+                    root.option_add("*highlightBackground", "#222222")
+                    root.option_add("*highlightColor", "#e0e0e0")
+                except Exception:
+                    pass
+                file_path = None
+                if save:
+                    file_path = filedialog.asksaveasfilename(
+                        initialdir=os.path.dirname(default_path) if default_path else None,
+                        initialfile=os.path.basename(default_path) if default_path else None,
+                        title="Select location to save preferences",
+                        defaultextension=".json",
+                        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+                    )
+                else:
+                    file_path = filedialog.askopenfilename(
+                        initialdir=os.path.dirname(default_path) if default_path else None,
+                        title="Select preferences file to import",
+                        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+                    )
+                root.destroy()
+                return file_path if file_path else None
+            except Exception as e:
+                print(Fore.RED + f"File picker error: {e}")
+                return None
+
+        def confirm_path(path, action):
+            """Ask user to confirm the chosen path before proceeding."""
+            print(Fore.YELLOW + f"\nYou chose: {Fore.CYAN}{path}{Fore.YELLOW} for {action}.")
+            confirm = input(Fore.YELLOW + "Proceed? (y/n): " + Fore.WHITE).strip().lower()
+            return confirm == 'y'
+
+        def find_json_files_in_downloads():
+            """Return a list of .json files in the user's Downloads directory."""
+            try:
+                files = [str(f) for f in Path(downloads_dir).glob("*.json") if f.is_file()]
+                return files
+            except Exception as e:
+                print(Fore.RED + f"Error searching Downloads: {e}")
+                return []
+
+        while True:
+            try:
+                self._clear_terminal()
+                self._display_header()
+
+                box_width = 60
+                print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "Backup/Restore Options")
+                print(Fore.RED + f"│ → {Fore.CYAN}export{Style.DIM}/e{Style.NORMAL}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Backup/export your settings")
+                print(Fore.RED + f"│ → {Fore.CYAN}import{Style.DIM}/i{Style.NORMAL}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Restore/import settings from a backup")
+                print(Fore.RED + f"│ → {Fore.RED}back{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Return to previous menu")
+                print(Fore.RED + "╰" + ("─" * (box_width-2)))
+
+                action = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+
+                if action in ['back', 'b', 'q']:
+                    return
+
+                if action in ['export', 'e']:
+                    print(Fore.YELLOW + f"\nPress Enter to save backup to {Fore.CYAN}{default_path}{Fore.YELLOW},")
+                    print(Fore.YELLOW + "or type 'picker' to open a file picker dialog, or enter a custom path, or 'b' to cancel.")
+                    while True:
+                        dest = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                        if dest.lower() == 'b':
+                            break
+                        if dest.lower() == 'picker':
+                            dest = open_file_picker(save=True, default_path=default_path)
+                            if not dest:
+                                print(Fore.YELLOW + "No file selected. Cancelled.")
+                                input(Fore.YELLOW + "Press Enter to continue...")
+                                break
+                        if not dest:
+                            dest = default_path
+                        if not confirm_path(dest, "backup/export"):
+                            print(Fore.YELLOW + "Cancelled by user.")
+                            input(Fore.YELLOW + "Press Enter to continue...")
+                            break
+                        try:
+                            if self.preferences_file:
+                                shutil.copy2(self.preferences_file, dest)
+                                print(Fore.GREEN + f"Preferences exported to {Fore.CYAN}{dest}{Fore.GREEN}")
+                            else:
+                                print(Fore.RED + "Error: No preferences file path found.")
+                        except Exception as e:
+                            print(Fore.RED + f"Export failed: {e}")
+                        input(Fore.YELLOW + "Press Enter to continue...")
+                        break
+                elif action in ['import', 'i']:
+                    print(Fore.YELLOW + f"\nPlace your backup file in {Fore.CYAN}{downloads_dir}{Fore.YELLOW} and press Enter to auto-import,")
+                    print(Fore.YELLOW + "or type 'picker' to open a file picker dialog, or enter a custom path, or 'b' to cancel.")
+                    while True:
+                        src = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                        if src.lower() == 'b':
+                            break
+                        if src.lower() == 'picker':
+                            src = open_file_picker(save=False, default_path=default_path)
+                            if not src:
+                                print(Fore.YELLOW + "No file selected. Cancelled.")
+                                input(Fore.YELLOW + "Press Enter to continue...")
+                                break
+                        if not src:
+                            # If no input, search for .json files in Downloads
+                            json_files = find_json_files_in_downloads()
+                            if not json_files:
+                                print(Fore.RED + "No .json files found in Downloads.")
+                                input(Fore.YELLOW + "Press Enter to continue...")
+                                break
+                            if len(json_files) == 1:
+                                src = json_files[0]
+                                print(Fore.YELLOW + f"Found backup: {Fore.CYAN}{src}")
+                            else:
+                                print(Fore.YELLOW + "Multiple .json files found in Downloads:")
+                                for idx, f in enumerate(json_files, 1):
+                                    print(f"{Fore.CYAN}{idx}. {f}")
+                                while True:
+                                    sel = input(Fore.YELLOW + "Select a file by number or 'b' to cancel: " + Fore.WHITE).strip()
+                                    if sel.lower() == 'b':
+                                        src = None
+                                        break
+                                    if sel.isdigit() and 1 <= int(sel) <= len(json_files):
+                                        src = json_files[int(sel)-1]
+                                        break
+                                if not src:
+                                    break
+                        if not os.path.isfile(src):
+                            print(Fore.RED + "File not found.")
+                            input(Fore.YELLOW + "Press Enter to continue...")
+                            break
+                        if not confirm_path(src, "import/restore"):
+                            print(Fore.YELLOW + "Cancelled by user.")
+                            input(Fore.YELLOW + "Press Enter to continue...")
+                            break
+                        print(Fore.YELLOW + "Importing will overwrite your current preferences and bookmarks. Continue? (y/n)")
+                        confirm = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+                        if confirm == 'y':
+                            try:
+                                with open(src, "r", encoding="utf-8") as f:
+                                    data = f.read()
+                                json.loads(data)  # Validate JSON
+                                if self.preferences_file:
+                                    with open(self.preferences_file, "w", encoding="utf-8") as f:
+                                        f.write(data)
+                                    print(Fore.GREEN + "Preferences imported successfully.")
+                                    self.preferences = self._load_preferences()
+                                else:
+                                    print(Fore.RED + "Error: No preferences file path found.")
+                            except Exception as e:
+                                print(Fore.RED + f"Import failed: {e}")
+                        else:
+                            print(Fore.YELLOW + "Import cancelled.")
+                        input(Fore.YELLOW + "Press Enter to continue...")
+                        break
+                else:
+                    print(f"{Fore.YELLOW}Invalid option. Please try again.{Style.RESET_ALL}")
+                    self._wait_for_key()
+            except KeyboardInterrupt:
+                return
+
     def _get_ayah_range(self, total_ayah: int) -> tuple:
         """
         Prompt the user for an ayah range, or accept 'all' to select the full surah.
@@ -1542,124 +1745,6 @@ class QuranApp:
             except KeyboardInterrupt: # Add this to handle control + c during input
                 print(Fore.YELLOW + "\n\n" + Fore.RED + "⚠ Interrupted! Returning to surah selection.")
                 return False  # Treat as 'no' and return to surah selection.
-
-    def _clear_audio_cache(self):
-        """Clears the audio cache directory."""
-        audio_cache_dir = self.audio_manager.audio_dir
-        try:
-            total_size = 0
-            for dirpath, dirnames, filenames in os.walk(audio_cache_dir):
-                for f in filenames:
-                    fp = os.path.join(dirpath, f)
-                    total_size += os.path.getsize(fp)
-
-            total_size_mb = total_size / (1024 * 1024)  # Convert to MB
-            
-            if total_size_mb > 0: #If there are files proceed
-                # Confirm deletion
-                if self.ui.ask_yes_no(f"{Fore.YELLOW}Are you sure you want to clear the audio cache ({total_size_mb:.2f} MB)? (y/n): {Fore.WHITE}"):
-                    for filename in os.listdir(audio_cache_dir):
-                        file_path = os.path.join(audio_cache_dir, filename)
-                        try:
-                            if os.path.isfile(file_path) or os.path.islink(file_path):
-                                os.unlink(file_path)
-                            elif os.path.isdir(file_path):
-                                shutil.rmtree(file_path)
-                        except Exception as e:
-                            print(Fore.RED + f'Failed to delete {file_path}. Reason: {e}')
-                    print(Fore.GREEN + "Audio cache cleared successfully.")
-                    input(Fore.GREEN + "Press Enter to continue...")  # Pause
-                else:
-                    print(Fore.CYAN + "Audio cache clearing cancelled.")
-                    input(Fore.GREEN + "Press Enter to continue...")  # Pause
-            else:
-                print(Fore.CYAN + "No audio files found in cache. They will be available after downloading")
-                input(Fore.GREEN + "Press Enter to continue...")  # Pause
-        except FileNotFoundError:
-            print(Fore.YELLOW + "Audio cache directory not found.")
-            input(Fore.GREEN + "Press Enter to continue...")  # Pause
-        except OSError as e:
-            print(Fore.RED + f"Error while clearing audio cache: {e}")
-            input(Fore.GREEN + "Press Enter to continue...")  # Pause
-
-    # -------------- Fix Start for this method(_show_audio_cache_path)-----------
-    def _show_audio_cache_path(self):
-        """
-        Print the audio cache directory path, number of audio files, and total size.
-        Offer to open it in the system file explorer (Windows/Linux robustly).
-        """
-        self._clear_terminal()
-        self._display_header()
-
-        audio_cache_dir = self.audio_manager.audio_dir
-
-        # Count files and calculate total size
-        file_count = 0
-        total_size = 0
-        from pathlib import Path
-        try:
-            for f in Path(audio_cache_dir).glob("**/*"):
-                if f.is_file():
-                    file_count += 1
-                    try:
-                        total_size += f.stat().st_size
-                    except Exception as e:
-                        print(f"{Fore.YELLOW}Warning: Could not get size for {f}: {e}")
-        except Exception as e:
-            print(f"{Fore.RED}Error reading audio cache directory: {e}\n")
-
-        total_size_mb = total_size / (1024 * 1024)
-
-        # Prepare display items with consistent formatting
-        display_items = [
-            (f"{Fore.CYAN}Directory{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}{audio_cache_dir}"),
-            (f"{Fore.CYAN}Audio Files{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}{file_count} files"),
-            (f"{Fore.CYAN}Total Size{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}{total_size_mb:.2f} MB"),
-            (f"{Fore.YELLOW}Note{Style.RESET_ALL}", f"{Style.NORMAL}{Fore.WHITE}Downloaded audio files are stored here"),
-        ]
-
-        # Calculate max length for alignment
-        def strip_ansi(s):
-            import re
-            ansi_escape = re.compile(r'\x1B[\[][0-?]*[ -/]*[@-~]')
-            return ansi_escape.sub('', s)
-        max_label_len = max(len(strip_ansi(label)) for label, _ in display_items)
-
-        box_width = 60
-        separator = "─" * box_width
-
-        # Display header
-        print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "🎵 Audio Cache Information")
-        for label, value in display_items:
-            pad = " " * (max_label_len - len(strip_ansi(label)))
-            print(Fore.RED + f"│ → {label}{pad} : {value}{Style.RESET_ALL}")
-        print(Fore.RED + "╰" + separator)
-
-        try:
-            open_choice = input(Fore.RED + "  ❯ " + Fore.CYAN + "Open this folder in your file explorer? (y/n): " + Fore.WHITE).strip().lower()
-            if open_choice in ['y', 'yes']:
-                if sys.platform == "win32":
-                    os.startfile(str(audio_cache_dir))
-                elif sys.platform == "darwin":
-                    subprocess.run(['open', str(audio_cache_dir)], check=False)
-                else:
-                    try:
-                        subprocess.run(['xdg-open', str(audio_cache_dir)], check=False)
-                    except Exception:
-                        for fm in ['nautilus', 'thunar', 'dolphin', 'pcmanfm']:
-                            if shutil.which(fm):
-                                subprocess.run([fm, str(audio_cache_dir)], check=False)
-                                break
-                        else:
-                            print(f"{Fore.RED}Could not open folder: No suitable file manager found.\n")
-                print(f"{Fore.GREEN}Opened folder in file explorer.\n")
-            else:
-                print(f"{Fore.YELLOW}Folder not opened. You can browse to the above path manually.\n")
-        except Exception as e:
-            print(f"{Fore.RED}Error opening folder: {e}\n")
-        print()
-        input(f"{Fore.GREEN}Press Enter to continue...")
-    # -------------- Fix Ended for this method(_show_audio_cache_path)-----------
 
     # -------------- Fix Start for this method(set_bookmark)-----------
     def set_bookmark(self, surah_number: int, ayah_number: int, note: str = ""):
