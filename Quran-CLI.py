@@ -520,6 +520,55 @@ class QuranApp:
         self._clear_terminal()
         self._display_header()
 
+    def _bookmark_menu(self):
+        """Simple bookmark manager using self.preferences['bookmarks']"""
+        bookmarks = self.preferences.get('bookmarks', {})
+        while True:
+            self._clear_terminal()
+            self._display_header()
+            print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "🔖 Bookmark Manager")
+            if bookmarks:
+                print(Fore.RED + "├─ " + Fore.CYAN + "Saved Bookmarks:")
+                for k, v in bookmarks.items():
+                    print(Fore.RED + f"│   • {Fore.CYAN}{k}{Fore.WHITE} : {v}")
+            else:
+                print(Fore.RED + "├─ " + Fore.YELLOW + "No bookmarks saved.")
+            print(Fore.RED + "├─ " + Fore.CYAN + "add" + Style.DIM + "/a" + Style.RESET_ALL + " : Add a bookmark (format: surah,ayah,note)")
+            print(Fore.RED + "├─ " + Fore.CYAN + "remove" + Style.DIM + "/rm" + Style.RESET_ALL + " : Remove a bookmark by surah number")
+            print(Fore.RED + "├─ " + Fore.CYAN + "back" + Style.DIM + "/b" + Style.RESET_ALL + " : Return to main menu")
+            print(Fore.RED + "╰" + "─" * 40)
+            choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
+            if choice in ['back', 'b']:
+                break
+            if choice in ['add', 'a']:
+                val = input(Fore.YELLOW + "Enter bookmark as surah,ayah,note (e.g., 2,255,My note): " + Fore.WHITE).strip()
+                parts = [p.strip() for p in val.split(',')]
+                if len(parts) >= 2:
+                    surah = parts[0]
+                    ayah = parts[1]
+                    note = parts[2] if len(parts) > 2 else ""
+                    bookmarks[str(surah)] = f"Ayah {ayah} {note}".strip()
+                    self.preferences['bookmarks'] = bookmarks
+                    self._save_preferences()
+                    print(Fore.GREEN + "Bookmark saved.")
+                    input(Fore.YELLOW + "Press Enter to continue...")
+                else:
+                    print(Fore.YELLOW + "Invalid input. Use surah,ayah,note.")
+                    input(Fore.YELLOW + "Press Enter to continue...")
+            elif choice in ['remove', 'rm']:
+                key = input(Fore.YELLOW + "Enter surah number to remove: " + Fore.WHITE).strip()
+                if key in bookmarks:
+                    del bookmarks[key]
+                    self.preferences['bookmarks'] = bookmarks
+                    self._save_preferences()
+                    print(Fore.GREEN + "Bookmark removed.")
+                else:
+                    print(Fore.YELLOW + "Bookmark not found.")
+                input(Fore.YELLOW + "Press Enter to continue...")
+            else:
+                print(Fore.YELLOW + "Unknown command in bookmarks menu.")
+                input(Fore.YELLOW + "Press Enter to continue...")
+
 
 
 # -------------- Fix Start for this method(_display_info)-----------
@@ -728,6 +777,19 @@ class QuranApp:
                 elif user_input in ['bm', 'bookmarks']:
                     self._bookmark_menu()
                     continue
+                elif user_input in ['info', 'i']:
+                    # Show information/help screen
+                    try:
+                        self._display_info()
+                    except Exception as e:
+                        print(Fore.RED + f"Error displaying info: {e}")
+                    continue
+                elif user_input in ['readme', 'rd']:
+                    try:
+                        self._display_readme_page()
+                    except Exception as e:
+                        print(Fore.RED + f"Error displaying readme: {e}")
+                    continue
                 elif user_input in ['settings', 'st']:
                     from core.settings_manager import SettingsManager
                     settings_manager = SettingsManager(self)
@@ -754,11 +816,18 @@ class QuranApp:
                 close_matches = difflib.get_close_matches(user_input, self.surah_names.values(), n=5, cutoff=0.5)
                 if close_matches:
                     print("\n")
-                    print(Fore.RED + "╭─" + Style.BRIGHT + Fore.MAGENTA + "🤔 Did you mean one of these?")
+                    # Friendly suggestion header (previous UX used emoji; fallback safely)
+                    try:
+                        print(Fore.RED + "╭─" + Fore.MAGENTA + "🤔 Did you mean one of these?" + Style.RESET_ALL)
+                    except Exception:
+                        print(Fore.RED + "╭─ Did you mean one of these?" + Style.RESET_ALL)
+
                     for idx, match in enumerate(close_matches, 1):
                         surah_number = [num for num, name in self.surah_names.items() if name == match][0]
                         print(f"{Fore.RED}├ {Fore.GREEN}{idx}. {Fore.CYAN}{match} {Style.DIM}{Fore.WHITE}(Surah {surah_number})")
+
                     print(Fore.RED + "╰" + separator + '\n')
+
                     while True:
                         try:
                             print(Fore.GREEN + "Select a number from the list, or 'r' to retry:")
@@ -777,51 +846,97 @@ class QuranApp:
                         except KeyboardInterrupt:
                             print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to surah selection.")
                             break
-            except ValueError:
-                print(Fore.RED + "Invalid input. Enter a number between 1-114, a Surah name, 'list', 'sub', or 'quit'")
             except KeyboardInterrupt:
+                # If user sends KeyboardInterrupt while selecting surah, return to main menu
                 print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
-                break
-    # -------------- Fix Ended for this method(_get_surah_number)-----------
+                return None
+                # -------------- Fix Ended for this method(_get_surah_number)-----------
 
+    def _get_surah_number_for_subtitle(self) -> Optional[int]:
+        """Helper for the 'sub' command: prompt for a surah using the same fuzzy logic.
 
+        This delegates to the main _get_surah_number logic where possible but ensures
+        a clean return type and avoids duplicating the full menu rendering.
+        """
+        # Prompt the user similarly to _get_surah_number but keep interaction minimal
+        while True:
+            try:
+                self._clear_terminal()
+                self._display_header()
+                print(Fore.CYAN + "Subtitle creation - Select Surah by name or number" + Style.RESET_ALL)
+                print(Style.DIM + Fore.WHITE + "Type a surah name (e.g., 'Rahman') or number (1-114), or 'b' to go back.")
+                user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
+                if not user_input:
+                    continue
+                if user_input.lower() in ['b', 'back']:
+                    return None
+                if user_input.isdigit():
+                    num = int(user_input)
+                    if 1 <= num <= 114:
+                        return num
+                    else:
+                        print(Fore.YELLOW + "Invalid surah number. Please try again.")
+                        continue
 
+                # Try fuzzy matching using the same cutoff as main menu
+                import difflib
+                close_matches = difflib.get_close_matches(user_input, self.surah_names.values(), n=5, cutoff=0.5)
+                if not close_matches:
+                    print(Fore.YELLOW + "No close matches found. Try a different query or use a number.")
+                    sleep(1.0)
+                    continue
 
+                # Show matches and let user pick
+                try:
+                    print(Fore.RED + "╭─" + Fore.MAGENTA + "🤔 Did you mean one of these?" + Style.RESET_ALL)
+                except Exception:
+                    print(Fore.RED + "╭─ Did you mean one of these?" + Style.RESET_ALL)
 
+                for idx, match in enumerate(close_matches, 1):
+                    surah_number = [num for num, name in self.surah_names.items() if name == match][0]
+                    print(f"{Fore.RED}├ {Fore.GREEN}{idx}. {Fore.CYAN}{match} {Style.DIM}{Fore.WHITE}(Surah {surah_number})")
+                print(Fore.RED + "╰" + ("─" * 38))
 
+                while True:
+                    choice = input(Fore.GREEN + "Select a number from the list, or 'r' to retry: " + Fore.WHITE).strip()
+                    if choice.lower() == 'r':
+                        break
+                    if choice.isdigit():
+                        ci = int(choice) - 1
+                        if 0 <= ci < len(close_matches):
+                            selected = close_matches[ci]
+                            return [num for num, name in self.surah_names.items() if name == selected][0]
+                        else:
+                            print(Fore.YELLOW + "Invalid selection. Try again.")
+                    else:
+                        print(Fore.YELLOW + "Invalid input. Enter a number or 'r'.")
+
+            except KeyboardInterrupt:
+                return None
+
+        def open_file_picker(save: bool = False, default_path: str | None = None) -> str | None:
+            """Open a simple file picker using tkinter when available.
+            Returns the selected file path or None if cancelled or unavailable.
+            This helper swallows exceptions and prints a friendly message instead of
+            raising, which keeps the TUI clean on systems without tkinter.
+            """
             try:
                 import tkinter as tk
                 from tkinter import filedialog
                 root = tk.Tk()
                 root.withdraw()
-                root.attributes('-topmost', True)
-                try:
-                    root.tk.call("tk", "scaling", 1.2)
-                    root.option_add("*background", "#222222")
-                    root.option_add("*foreground", "#e0e0e0")
-                    root.option_add("*highlightBackground", "#222222")
-                    root.option_add("*highlightColor", "#e0e0e0")
-                except Exception:
-                    pass
-                file_path = None
                 if save:
-                    file_path = filedialog.asksaveasfilename(
-                        initialdir=os.path.dirname(default_path) if default_path else None,
-                        initialfile=os.path.basename(default_path) if default_path else None,
-                        title="Select location to save preferences",
-                        defaultextension=".json",
-                        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-                    )
+                    initialfile = os.path.basename(default_path) if default_path else "qurancli-backup.json"
+                    initialdir = os.path.dirname(default_path) if default_path and os.path.isdir(os.path.dirname(default_path)) else str(Path.home() / "Downloads")
+                    file_path = filedialog.asksaveasfilename(defaultextension=".json", initialfile=initialfile, initialdir=initialdir, filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
                 else:
-                    file_path = filedialog.askopenfilename(
-                        initialdir=os.path.dirname(default_path) if default_path else None,
-                        title="Select preferences file to import",
-                        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-                    )
+                    initialdir = os.path.dirname(default_path) if default_path and os.path.isdir(os.path.dirname(default_path)) else str(Path.home() / "Downloads")
+                    file_path = filedialog.askopenfilename(initialdir=initialdir, filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
                 root.destroy()
-                return file_path if file_path else None
+                return file_path or None
             except Exception as e:
-                print(Fore.RED + f"File picker error: {e}")
+                # Keep user-visible message concise (avoid tracebacks in main UI)
+                print(Fore.YELLOW + f"File picker error: {e}")
                 return None
 
         def confirm_path(path, action):
@@ -829,6 +944,10 @@ class QuranApp:
             print(Fore.YELLOW + f"\nYou chose: {Fore.CYAN}{path}{Fore.YELLOW} for {action}.")
             confirm = input(Fore.YELLOW + "Proceed? (y/n): " + Fore.WHITE).strip().lower()
             return confirm == 'y'
+
+        # Safe defaults for paths used by the backup/restore menu.
+        downloads_dir = str(Path.home() / "Downloads")
+        default_path = os.path.join(downloads_dir, "qurancli-backup.json")
 
         def find_json_files_in_downloads():
             """Return a list of .json files in the user's Downloads directory."""
@@ -915,797 +1034,28 @@ class QuranApp:
                     break
                 print(Fore.YELLOW + "Importing will overwrite your current preferences and bookmarks. Continue? (y/n)")
                 confirm = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
-    def _bookmark_menu(self):
-        """
-        Interactive bookmark management menu for QuranCLI.
-        - Multiplatform, robust, and user-friendly.
-        - Preferences file is always named 'QuranCLI-Settings.json'.
-        - Backup/restore supports a dark-themed file picker (where possible) and default to Downloads.
-        - Clear, aligned, and color-coded options.
-        - Proper error handling and debug prints.
-        """
-        import sys
-        import shutil
-        from pathlib import Path
-        import tkinter as tk
-        from tkinter import filedialog
-
-        def get_surah_number_from_input(user_input):
-            """Fuzzy match surah name/number, return surah number or None."""
-            import difflib
-            if user_input.isdigit() and 1 <= int(user_input) <= 114:
-                return int(user_input)
-            matches = difflib.get_close_matches(user_input, self.surah_names.values(), n=5, cutoff=0.5)
-            if matches:
-                print(Fore.RED + "╭─" + Style.BRIGHT + Fore.MAGENTA + "🤔 Did you mean one of these?")
-                for idx, match in enumerate(matches, 1):
-                    surah_number = [num for num, name in self.surah_names.items() if name == match][0]
-                    print(f"{Fore.RED}│ {Fore.GREEN}{idx}. {Fore.CYAN}{match} {Style.DIM}{Fore.WHITE}(Surah {surah_number})")
-                print(Fore.RED + "╰" + ("─" * 38))
-                while True:
-                    print(Fore.GREEN + "Select a number from the list, or 'b' to go back:")
-                    user_choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
-                    if user_choice.lower() == 'b':
-                        return None
-                    if user_choice.isdigit():
-                        choice_idx = int(user_choice) - 1
-                        if 0 <= choice_idx < len(matches):
-                            selected_surah = matches[choice_idx]
-                            return [num for num, name in self.surah_names.items() if name == selected_surah][0]
-                    print(Fore.RED + "Invalid choice. Please select a number or 'b' to go back.")
-            return None
-
-        def input_note_with_limit(max_len):
-            """Input note with max length, no live counter (terminal refresh not supported)."""
-            print(Fore.CYAN + f"Enter a note for this bookmark (optional, max {max_len} chars, press Enter to skip):")
-            print(Fore.LIGHTBLACK_EX + "e.g. 'Favorite ayah', 'For memorization', 'Check tafsir', etc.")
-            note = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()[:max_len]
-            return note
-
-        def get_ayah_text(surah_num, ayah_num):
-            """Get the ayah text for display in bookmark list."""
-            try:
-                ayahs = self.data_handler.get_ayahs(int(surah_num), int(ayah_num), int(ayah_num))
-                if ayahs and hasattr(ayahs[0], "content"):
-                    return ayahs[0].content
-            except Exception as e:
-                print(f"[DEBUG] Error fetching ayah text: {e}")
-            return ""
-
-        def open_preferences_folder():
-            """Open the folder containing the preferences file in the system file explorer."""
-            pref_path = self.preferences_file
-            if not pref_path:
-                print(Fore.RED + "Preferences file path not found.")
+                if confirm == 'y':
+                    try:
+                        with open(src, "r", encoding="utf-8") as f:
+                            data = f.read()
+                        json.loads(data)  # Validate JSON
+                        if self.preferences_file:
+                            with open(self.preferences_file, "w", encoding="utf-8") as f:
+                                f.write(data)
+                            print(Fore.GREEN + "Preferences imported successfully.")
+                            self.preferences = self._load_preferences()
+                        else:
+                            print(Fore.RED + "Error: No preferences file path found.")
+                    except Exception as e:
+                        print(Fore.RED + f"Import failed: {e}")
+                else:
+                    print(Fore.YELLOW + "Import cancelled.")
                 input(Fore.YELLOW + "Press Enter to continue...")
-                return
-            folder = os.path.dirname(pref_path)
-            print(Fore.GREEN + f"Preferences file location: {pref_path}")
-            print(Fore.YELLOW + "Opening preferences folder in your file explorer...")
-            try:
-                if sys.platform == "win32":
-                    os.startfile(folder)
-                elif sys.platform == "darwin":
-                    subprocess.run(['open', folder], check=False)
-                else:
-                    try:
-                        subprocess.run(['xdg-open', folder], check=False)
-                    except Exception:
-                        for fm in ['nautilus', 'thunar', 'dolphin', 'pcmanfm']:
-                            if shutil.which(fm):
-                                subprocess.run([fm, folder], check=False)
-                                break
-                        else:
-                            print(Fore.RED + "Could not open folder: No suitable file manager found.")
-                print(Fore.GREEN + "Opened folder in file explorer.")
-            except Exception as e:
-                print(Fore.RED + f"Error opening folder: {e}")
-            input(Fore.YELLOW + "Press Enter to continue...")
-
-        def open_file_picker(save=False, default_path=None):
-            """
-            Open a file picker dialog for import/export.
-            Returns selected path or None.
-            Tries to use a dark theme if available (Linux/Windows).
-            """
-            try:
-                root = tk.Tk()
-                root.withdraw()
-                root.attributes('-topmost', True)
-                try:
-                    root.tk.call("tk", "scaling", 1.2)
-                    root.option_add("*background", "#222222")
-                    root.option_add("*foreground", "#e0e0e0")
-                    root.option_add("*highlightBackground", "#222222")
-                    root.option_add("*highlightColor", "#e0e0e0")
-                except Exception:
-                    pass
-                file_path = None
-                if save:
-                    file_path = filedialog.asksaveasfilename(
-                        initialdir=os.path.dirname(default_path) if default_path else None,
-                        initialfile=os.path.basename(default_path) if default_path else None,
-                        title="Select location to save preferences",
-                        defaultextension=".json",
-                        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-                    )
-                else:
-                    file_path = filedialog.askopenfilename(
-                        initialdir=os.path.dirname(default_path) if default_path else None,
-                        title="Select preferences file to import",
-                        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-                    )
-                root.destroy()
-                return file_path if file_path else None
-            except Exception as e:
-                print(Fore.RED + f"File picker error: {e}")
-                return None
-
-        def confirm_path(path, action):
-            """Ask user to confirm the chosen path before proceeding."""
-            print(Fore.YELLOW + f"\nYou chose: {Fore.CYAN}{path}{Fore.YELLOW} for {action}.")
-            confirm = input(Fore.YELLOW + "Proceed? (y/n): " + Fore.WHITE).strip().lower()
-            return confirm == 'y'
-
-        def find_json_files_in_downloads():
-            """Return a list of .json files in the user's Downloads directory."""
-            downloads_dir = str(Path.home() / "Downloads")
-            try:
-                files = [str(f) for f in Path(downloads_dir).glob("*.json") if f.is_file()]
-                return files
-            except Exception as e:
-                print(Fore.RED + f"Error searching Downloads: {e}")
-                return []
-
-        info_text = (
-            f"{Fore.GREEN}Bookmarks let you save (pin) any ayah in any surah, with an optional note (max 300 chars).\n"
-            f"You can search by surah number or name, and have multiple bookmarks per surah.\n"
-            f"Features: jump to bookmarks, add/edit/delete, quick Ayatul Kursi bookmarking command, open settings folder, backup/restore, and toggle Arabic reversal.\n"
-            f"Tip: Use 'reverse' to toggle Arabic display if it appears inverted or not correct, 'openprefs' to open settings folder, 'backup' to backup/restore.\n"
-            f"Quick Ayatul Kursi: Type 'ayatul-kursi' to instantly bookmark Ayah 255 of Surah 2 (Al-Baqarah).\n"
-        )
-        
-        options = [
-            ("1", "Jump to a bookmark", "jump", Fore.CYAN),
-            ("2", "Add a bookmark", "add", Fore.CYAN),
-            ("3", "Edit/Delete a bookmark", "edit", Fore.CYAN),
-            ("reverse", "Toggle Arabic reversal", "rev", Fore.CYAN),
-            ("openprefs", "Open preferences/settings folder", "op", Fore.CYAN),
-            ("backup", "Backup/restore all app settings", "bk", Fore.CYAN),
-            ("ayatul-kursi", "Quick bookmark Ayatul Kursi", "ak", Fore.CYAN),
-            ("info", "Show bookmark manager info/help", "i", Fore.CYAN),
-            ("4", "Back to main menu", "back", Fore.RED + Style.BRIGHT),
-        ]
-        def strip_ansi(s):
-            import re
-            ansi_escape = re.compile(r'\x1B[\[][0-?]*[ -/]*[@-~]')
-            return ansi_escape.sub('', s)
-        max_cmd_len = max(len(cmd) + (len(short) + 3 if short else 0) for cmd, _, short, _ in options)
-
-        while True:
-            try:
-                self._clear_terminal()
-                box_width = 60
-                separator = "─" * box_width
-                print(Fore.RED + Style.BRIGHT + "\n📑 Bookmark Manager".ljust(box_width))
-                print(Fore.RED + separator)
-                print(Fore.GREEN + Style.BRIGHT + "\nSaved Bookmarks".center(box_width))
-                print(Fore.RED + separator)
-                bookmarks = self.list_bookmarks()
-                grouped = {}
-                for surah, data in bookmarks.items():
-                    # Ensure each surah's bookmarks are a list of dicts
-                    if isinstance(data, list):
-                        bookmarks_list = [b for b in data if isinstance(b, dict)]
-                        # Only add surah if it has valid bookmarks
-                        if bookmarks_list:
-                            grouped[surah] = bookmarks_list
-                    elif isinstance(data, dict):
-                        grouped[surah] = [data]
-                    else:
-                        grouped[surah] = []
-                    
-                    # Remove any surah that ended up with an empty list
-                    if surah in grouped and not grouped[surah]:
-                        del grouped[surah]
-                        
-                if grouped:
-                    for surah in sorted(grouped, key=lambda x: int(x)):
-                        surah_name = self.surah_names.get(int(surah), f"Surah {surah}")
-                        print(Fore.CYAN + f"Surah {surah} ({surah_name}):")
-                        for idx, entry in enumerate(grouped[surah], 1):
-                            ayah = entry.get("ayah", '?')
-                            ayah_text = get_ayah_text(surah, ayah)
-                            note = entry.get("note", "")
-                            date_added = entry.get("date_added", "")
-                            
-                            note_disp = (Fore.MAGENTA + f"Note: {note}" if note else Fore.LIGHTBLACK_EX + "No note")
-                            date_disp = (Fore.YELLOW + f"Added: {date_added}" if date_added else "")
-                            
-                            print(f"  {Fore.GREEN}{idx}. Ayah {ayah} {Fore.LIGHTBLACK_EX}- {ayah_text}")
-                            print(f"     {note_disp}")
-                            if date_added:
-                                print(f"     {date_disp}")
-                        print(Fore.RED + ("─" * box_width))
-                else:
-                    print(Fore.LIGHTBLACK_EX + "  No bookmarks saved yet.")
-                    print(Fore.RED + ("─" * box_width))
-                print(Fore.CYAN + "\nOptions:")
-                print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "Bookmark Actions")
-                for cmd, desc, short, color in options:
-                    if short:
-                        cmd_str = f"{color}{cmd}{Style.DIM}/{short}{Style.NORMAL}{Style.RESET_ALL}"
-                    else:
-                        cmd_str = f"{color}{cmd}{Style.RESET_ALL}"
-                    pad = " " * (max_cmd_len - len(cmd) - (len(short) + 1 if short else 0))
-                    print(Fore.RED + f"│ → {cmd_str}{pad} : {Style.NORMAL}{Fore.WHITE}{desc}{Style.RESET_ALL}")
-                print(Fore.RED + "╰" + ("─" * (box_width-2)))
-                choice = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
-
-                # Map short commands to long
-                cmd_map = {
-                    "jump": "1", "add": "2", "edit": "3", "rev": "reverse", "op": "openprefs",
-                    "bk": "backup", "ak": "ayatul-kursi", "back": "4", "i": "info"
-                }
-                for _, _, short, _ in options:
-                    if choice == short:
-                        choice = cmd_map[short]
-
-                if choice == 'reverse':
-                    self.data_handler.toggle_arabic_reversal()
-                    print(Fore.GREEN + "Arabic reversal toggled.")
-                    input(Fore.YELLOW + "Press Enter to continue...")
-                    continue
-                if choice == 'info':
-                    self._clear_terminal()
-                    print(Fore.RED + Style.BRIGHT + "\n📑 Bookmark Manager Info\n" + ("─" * 60))
-                    print(info_text)
-                    print("─" * 60)
-                    input(Fore.YELLOW + "Press Enter to return to the bookmark manager...")
-                    continue
-                if choice == 'openprefs':
-                    open_preferences_folder()
-                    continue
-                if choice == 'backup':
-                    downloads_dir = str(Path.home() / "Downloads")
-                    default_filename = "QuranCLI-Settings.json"
-                    default_path = os.path.join(downloads_dir, default_filename)
-                    print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "Backup/Restore Options")
-                    print(Fore.RED + f"│ → {Fore.CYAN}export{Style.DIM}/e{Style.NORMAL}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Backup/export your settings")
-                    print(Fore.RED + f"│ → {Fore.CYAN}import{Style.DIM}/i{Style.NORMAL}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Restore/import settings from a backup")
-                    print(Fore.RED + f"│ → {Fore.RED}b{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Cancel and go back")
-                    print(Fore.RED + "╰" + ("─" * (box_width-2)))
-                    action = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
-                    if action in ['export', 'e']:
-                        print(Fore.YELLOW + f"\nPress Enter to save backup to {Fore.CYAN}{default_path}{Fore.YELLOW},")
-                        print(Fore.YELLOW + "or type 'picker' to open a file picker dialog, or enter a custom path, or 'b' to cancel.")
-                        while True:
-                            dest = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
-                            if dest.lower() == 'b':
-                                break
-                            if dest.lower() == 'picker':
-                                dest = open_file_picker(save=True, default_path=default_path)
-                                if not dest:
-                                    print(Fore.YELLOW + "No file selected. Cancelled.")
-                                    input(Fore.YELLOW + "Press Enter to continue...")
-                                    break
-                            if not dest:
-                                dest = default_path
-                            if not confirm_path(dest, "backup/export"):
-                                print(Fore.YELLOW + "Cancelled by user.")
-                                input(Fore.YELLOW + "Press Enter to continue...")
-                                break
-                            try:
-                                if self.preferences_file:
-                                    shutil.copy2(self.preferences_file, dest)
-                                    print(Fore.GREEN + f"Preferences exported to {Fore.CYAN}{dest}{Fore.GREEN}")
-                                else:
-                                    print(Fore.RED + "Error: No preferences file path found.")
-                            except Exception as e:
-                                print(Fore.RED + f"Export failed: {e}")
-                            input(Fore.YELLOW + "Press Enter to continue...")
-                            break
-                    elif action in ['import', 'i']:
-                        print(Fore.YELLOW + f"\nPlace your backup file in {Fore.CYAN}{downloads_dir}{Fore.YELLOW} and press Enter to auto-import,")
-                        print(Fore.YELLOW + "or type 'picker' to open a file picker dialog, or enter a custom path, or 'b' to cancel.")
-                        while True:
-                            src = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
-                            if src.lower() == 'b':
-                                break
-                            if src.lower() == 'picker':
-                                src = open_file_picker(save=False, default_path=default_path)
-                                if not src:
-                                    print(Fore.YELLOW + "No file selected. Cancelled.")
-                                    input(Fore.YELLOW + "Press Enter to continue...")
-                                    break
-                            if not src:
-                                # If no input, search for .json files in Downloads
-                                json_files = find_json_files_in_downloads()
-                                if not json_files:
-                                    print(Fore.RED + "No .json files found in Downloads."); input(Fore.YELLOW + "Press Enter to continue..."); break
-                                if len(json_files) == 1:
-                                    src = json_files[0]
-                                    print(Fore.YELLOW + f"Found backup: {Fore.CYAN}{src}")
-                                else:
-                                    print(Fore.YELLOW + "Multiple .json files found in Downloads:")
-                                    for idx, f in enumerate(json_files, 1):
-                                        print(f"{Fore.CYAN}{idx}. {f}")
-                                    while True:
-                                        sel = input(Fore.YELLOW + "Select a file by number or 'b' to cancel: " + Fore.WHITE).strip()
-                                        if sel.lower() == 'b':
-                                            src = None
-                                            break
-                                        if sel.isdigit() and 1 <= int(sel) <= len(json_files):
-                                            src = json_files[int(sel)-1]
-                                            break
-                                    if not src:
-                                        break
-                            if not os.path.isfile(src):
-                                print(Fore.RED + "File not found."); input(Fore.YELLOW + "Press Enter to continue..."); break
-                            if not confirm_path(src, "import/restore"):
-                                print(Fore.YELLOW + "Cancelled by user.")
-                                input(Fore.YELLOW + "Press Enter to continue...")
-                                break
-                            print(Fore.YELLOW + "Importing will overwrite your current preferences and bookmarks. Continue? (y/n)")
-                            confirm = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
-                            if confirm == 'y':
-                                try:
-                                    with open(src, "r", encoding="utf-8") as f:
-                                        data = f.read()
-                                    json.loads(data)  # Validate JSON
-                                    if self.preferences_file:
-                                        with open(self.preferences_file, "w", encoding="utf-8") as f:
-                                            f.write(data)
-                                        print(Fore.GREEN + "Preferences imported successfully.")
-                                        self.preferences = self._load_preferences()
-                                    else:
-                                        print(Fore.RED + "Error: No preferences file path found.")
-                                except Exception as e:
-                                    print(Fore.RED + f"Import failed: {e}")
-                            else:
-                                print(Fore.YELLOW + "Import cancelled.")
-                            input(Fore.YELLOW + "Press Enter to continue...")
-                            break
-                    else:
-                        continue
-                    continue
-                if choice == 'ayatul-kursi':
-                    print(Fore.GREEN + "Quick-adding Ayatul Kursi bookmark (Surah 2, Ayah 255)")
-                    surah_key = "2" 
-                    ayah_num = 255
-                    note = "Ayatul Kursi (The Throne Verse)"
-                    if "bookmarks" not in self.preferences:
-                        self.preferences["bookmarks"] = {}
-                    if surah_key not in self.preferences["bookmarks"]:
-                        self.preferences["bookmarks"][surah_key] = []
-                    
-                    # Check if bookmark already exists
-                    already_exists = False
-                    for b in self.preferences["bookmarks"][surah_key]:
-                        if isinstance(b, dict) and b.get("ayah") == ayah_num:
-                            already_exists = True
-                            break
-                            
-                    if already_exists:
-                        print(Fore.YELLOW + "Ayatul Kursi already bookmarked.")
-                        input(Fore.YELLOW + "Press Enter to continue...")
-                        continue
-                    
-                    # Add current date and time in the desired format
-                    current_datetime = datetime.now()
-                    date_str = current_datetime.strftime("%A, %d %b %Y %I:%M %p")
-                    
-                    # Remove debug prints
-                    try:
-                        # Create bookmark object
-                        new_bookmark = {
-                            "ayah": ayah_num,
-                            "note": note,
-                            "date_added": date_str
-                        }
-                        
-                        # Append to bookmarks and save
-                        self.preferences["bookmarks"][surah_key].append(new_bookmark)
-                        self._save_preferences()
-                        print(Fore.GREEN + "Ayatul Kursi bookmarked (Surah 2, Ayah 255).")
-                    except Exception as e:
-                        print(Fore.RED + f"Error adding bookmark: {e}")
-                        
-                    input(Fore.YELLOW + "Press Enter to continue...")
-                elif choice == '2':
-                    # Add bookmark
-                    print(Fore.CYAN + "Enter surah number or name to bookmark (or 'b' to go back):")
-                    print(Fore.LIGHTBLACK_EX + "Example: 23 or Al-Muminoon")
-                    surah_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
-                    if surah_input.lower() == 'b':
-                        continue
-                    surah_num = get_surah_number_from_input(surah_input)
-                    if not surah_num:
-                        print(Fore.RED + "Could not find surah. Try again."); input(Fore.YELLOW + "Press Enter to continue..."); continue
-                    surah_info = self.data_handler.get_surah_info(int(surah_num))
-                    if not surah_info:
-                        print(Fore.RED + "Invalid surah."); input(Fore.YELLOW + "Press Enter to continue..."); continue
-                    print(Fore.CYAN + f"Enter ayah number to bookmark in Surah {surah_num} (1-{surah_info.total_verses}, or 'b' to go back):")
-                    while True:
-                        ayah_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
-                        if ayah_input.lower() == 'b':
-                            break
-                        if ayah_input.isdigit() and 1 <= int(ayah_input) <= surah_info.total_verses:
-                            break
-                        print(Fore.RED + f"Invalid ayah number. Enter 1-{surah_info.total_verses} or 'b' to go back.")
-                    if ayah_input.lower() == 'b':
-                        continue
-                    note = input_note_with_limit(300)
-                    
-                    # Initialize bookmarks structure if needed
-                    if "bookmarks" not in self.preferences:
-                        self.preferences["bookmarks"] = {}
-                    surah_key = str(surah_num)
-                    if surah_key not in self.preferences["bookmarks"]:
-                        self.preferences["bookmarks"][surah_key] = []
-                    
-                    # Check if bookmark already exists - fixed the comparison logic
-                    already_exists = False
-                    ayah_num = int(ayah_input)
-                    for b in self.preferences["bookmarks"][surah_key]:
-                        if isinstance(b, dict) and b.get("ayah") == ayah_num:
-                            already_exists = True
-                            break
-                            
-                    if already_exists:
-                        print(Fore.YELLOW + "Bookmark for this ayah already exists.")
-                        input(Fore.YELLOW + "Press Enter to continue...")
-                        continue
-                    
-                    # Add current date and time in the desired format
-                    current_datetime = datetime.now()
-                    date_str = current_datetime.strftime("%A, %d %b %Y %I:%M %p")
-                    
-                    try:
-                        # Create bookmark object
-                        new_bookmark = {
-                            "ayah": ayah_num,
-                            "note": note,
-                            "date_added": date_str
-                        }
-                        
-                        # Append to bookmarks and save
-                        self.preferences["bookmarks"][surah_key].append(new_bookmark)
-                        self._save_preferences()
-                        print(Fore.GREEN + f"Bookmark set for Surah {surah_num}, Ayah {ayah_input}.")
-                    except Exception as e:
-                        print(Fore.RED + f"Error adding bookmark: {e}")
-                        
-                    input(Fore.YELLOW + "Press Enter to continue...")
-                elif choice == '3':
-                    # List all bookmarks with index and color same surahs
-                    all_bookmarks = []
-                    
-                    # Get all bookmarks that exist and are properly formatted
-                    if "bookmarks" in self.preferences:
-                        for surah in sorted(self.preferences["bookmarks"].keys(), key=lambda x: int(x)):
-                            if isinstance(self.preferences["bookmarks"][surah], list):
-                                for entry in self.preferences["bookmarks"][surah]:
-                                    if isinstance(entry, dict):
-                                        all_bookmarks.append((surah, entry))
-                                        
-                    if not all_bookmarks:
-                        print(Fore.YELLOW + "No bookmarks to edit or delete.")
-                        input(Fore.YELLOW + "Press Enter to continue...")
-                        continue
-                    print(Fore.CYAN + "\nSelect a bookmark to edit/delete:")
-                    # Assign a color to each surah for consistent coloring
-                    surah_color_map = {}
-                    surah_colors = [Fore.CYAN, Fore.GREEN, Fore.MAGENTA, Fore.YELLOW, Fore.BLUE, Fore.LIGHTCYAN_EX, Fore.LIGHTGREEN_EX, Fore.LIGHTMAGENTA_EX, Fore.LIGHTYELLOW_EX, Fore.LIGHTBLUE_EX]
-                    color_idx = 0
-                    for surah, _ in all_bookmarks:
-                        if surah not in surah_color_map:
-                            surah_color_map[surah] = surah_colors[color_idx % len(surah_colors)]
-                            color_idx += 1
-                    for idx, (surah, entry) in enumerate(all_bookmarks, 1):
-                        surah_name = self.surah_names.get(int(surah), f"Surah {surah}")
-                        ayah = entry.get("ayah", '?')
-                        note = entry.get("note", "")
-                        date_added = entry.get("date_added", "")
-                        color = surah_color_map[surah]
-                        
-                        bookmark_info = f"Surah {surah} ({surah_name}), Ayah {ayah}"
-                        if date_added:
-                            bookmark_info += f" {Fore.LIGHTBLACK_EX}- Added: {date_added}"
-                        if note:
-                            bookmark_info += f" {Fore.LIGHTBLACK_EX}- {note}"
-                            
-                        print(f"{color}{idx}. {bookmark_info}{Style.RESET_ALL}")
-                    print(Fore.YELLOW + "Enter the number of the bookmark to edit/delete, or 'b' to cancel.")
-                    sel = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
-                    if sel.lower() == 'b':
-                        continue
-                    if sel.isdigit() and 1 <= int(sel) <= len(all_bookmarks):
-                        surah, entry = all_bookmarks[int(sel) - 1]
-                        ayah = entry.get("ayah", 1)
-                        note = entry.get("note", "")
-                        date_added = entry.get("date_added", "")
-                        print(Fore.CYAN + f"Selected Surah {surah}, Ayah {ayah}.")
-                        print(Fore.YELLOW + "Enter 'e' to edit note, 'd' to delete, or 'b' to cancel.")
-                        action = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
-                        if action == 'e':
-                            new_note = input_note_with_limit(300)
-                            # Update note in preferences
-                            surah_key = str(surah)
-                            for b in self.preferences["bookmarks"][surah_key]:
-                                if isinstance(b, dict) and b.get("ayah") == ayah:
-                                    b["note"] = new_note
-                                    b["date_added"] = datetime.now().strftime("%A, %d %b %Y %I:%M %p")  # Update date when modifying bookmark
-                                    self._save_preferences()
-                                    print(Fore.GREEN + "Note updated.")
-                                    break
-                            input(Fore.YELLOW + "Press Enter to continue...")
-                        elif action == 'd':
-                            # Ask for confirmation before deletion
-                            confirm = input(Fore.RED + "Are you sure you want to delete this bookmark? (y/n): " + Fore.WHITE).strip().lower()
-                            if confirm != 'y':
-                                print(Fore.YELLOW + "Deletion cancelled.")
-                                input(Fore.YELLOW + "Press Enter to continue...")
-                                continue
-                            surah_key = str(surah)
-                            before = len(self.preferences["bookmarks"][surah_key])
-                            self.preferences["bookmarks"][surah_key] = [
-                                b for b in self.preferences["bookmarks"][surah_key]
-                                if not (isinstance(b, dict) and b.get("ayah") == ayah)
-                            ]
-                            after = len(self.preferences["bookmarks"][surah_key])
-                            self._save_preferences()
-                            if before != after:
-                                print(Fore.GREEN + "Bookmark deleted.")
-                            else:
-                                print(Fore.YELLOW + "Bookmark not found.")
-                            input(Fore.YELLOW + "Press Enter to continue...")
-                        elif action == 'b':
-                            continue
-                        else:
-                            print(Fore.RED + "Invalid action.")
-                            input(Fore.YELLOW + "Press Enter to continue...")
-                    else:
-                        print(Fore.RED + "Invalid selection.")
-                        input(Fore.YELLOW + "Press Enter to continue...")
-                    continue
-                elif choice == '4':
-                    break
-                else:
-                    print(Fore.RED + "Invalid choice. Please enter a valid option."); input(Fore.YELLOW + "Press Enter to continue...")
-            except KeyboardInterrupt:
-                print(Fore.YELLOW + "\nBookmark menu cancelled. Returning to main menu.")
                 break
-            except Exception as e:
-                print(Fore.RED + f"Error in bookmark menu: {e}")
-                # Add the following debug information
-                import traceback
-                print(Fore.YELLOW + "Debug information:")
-                print(Fore.YELLOW + f"Choice: {choice}")
-                print(Fore.YELLOW + f"Error type: {type(e).__name__}")
-                print(Fore.YELLOW + f"Full traceback: {traceback.format_exc()}")
-                input(Fore.YELLOW + "Press Enter to continue...")
-# -------------- Fix Ended for this method(_bookmark_menu)-----------
-
-    def _get_surah_number_for_subtitle(self) -> Optional[int]:
-            """Helper function to get surah number specifically for subtitle generation."""
-            while True:
-                try:
-                    self._clear_terminal()
-                    self._display_header()
-
-                    box_width = 26  # Adjust width if needed
-                    separator = "─" * box_width
-
-                    # Descriptive command list with colors
-                    print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "📜 Available Commands (Subtitle Creation)")
-                    print(Fore.RED + f"│ • {Fore.CYAN}1-114{Fore.WHITE} : Select Surah by number")
-                    print(Fore.RED + f"│ • {Fore.CYAN}q{Fore.WHITE} : Return to main menu")
-                    print(Fore.RED + "╰" + separator)
-                        
-                    # Helper Text
-                    print(Style.DIM + Fore.WHITE + "\nType any of the above commands and press Enter.")
-
-                    # Prompt user for input
-                    print(Fore.GREEN + "\nEnter Surah number:" + Style.DIM + Fore.WHITE)
-                    user_input = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
-
-                    if user_input in ['q', 'quit', 'exit']:
-                        return None  # User wants to quit
-
-                    if user_input.isdigit():
-                        number = int(user_input)
-                        if 1 <= number <= 114:
-                            return number
-                        else:
-                            print(Fore.RED + "Invalid Surah number. Please enter a number between 1 and 114 or 'q' to return")
-                    else:
-                        print(Fore.RED + "Invalid input. Please enter a number or 'q'")
-
-                except ValueError:
-                    print(Fore.RED + "Invalid input. Please enter a valid number.")
-                except KeyboardInterrupt:
-                    print(Fore.YELLOW + "\n\n⚠ Interrupted! Returning to main menu.")
-                    return None #Returning none as keyboard interupt.
-
-    def backup_restore_menu(self):
-        """Display backup/restore menu for app settings"""
-        downloads_dir = str(Path.home() / "Downloads")
-        default_filename = "QuranCLI-Settings.json"
-        default_path = os.path.join(downloads_dir, default_filename)
-
-        def open_file_picker(save=False, default_path=None):
-            """
-            Open a file picker dialog for import/export.
-            Returns selected path or None.
-            Tries to use a dark theme if available (Linux/Windows).
-            """
-            try:
-                import tkinter as tk
-                from tkinter import filedialog
-                root = tk.Tk()
-                root.withdraw()
-                root.attributes('-topmost', True)
-                try:
-                    root.tk.call("tk", "scaling", 1.2)
-                    root.option_add("*background", "#222222")
-                    root.option_add("*foreground", "#e0e0e0")
-                    root.option_add("*highlightBackground", "#222222")
-                    root.option_add("*highlightColor", "#e0e0e0")
-                except Exception:
-                    pass
-                file_path = None
-                if save:
-                    file_path = filedialog.asksaveasfilename(
-                        initialdir=os.path.dirname(default_path) if default_path else None,
-                        initialfile=os.path.basename(default_path) if default_path else None,
-                        title="Select location to save preferences",
-                        defaultextension=".json",
-                        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-                    )
-                else:
-                    file_path = filedialog.askopenfilename(
-                        initialdir=os.path.dirname(default_path) if default_path else None,
-                        title="Select preferences file to import",
-                        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-                    )
-                root.destroy()
-                return file_path if file_path else None
-            except Exception as e:
-                print(Fore.RED + f"File picker error: {e}")
-                return None
-
-        def confirm_path(path, action):
-            """Ask user to confirm the chosen path before proceeding."""
-            print(Fore.YELLOW + f"\nYou chose: {Fore.CYAN}{path}{Fore.YELLOW} for {action}.")
-            confirm = input(Fore.YELLOW + "Proceed? (y/n): " + Fore.WHITE).strip().lower()
-            return confirm == 'y'
-
-        def find_json_files_in_downloads():
-            """Return a list of .json files in the user's Downloads directory."""
-            try:
-                files = [str(f) for f in Path(downloads_dir).glob("*.json") if f.is_file()]
-                return files
-            except Exception as e:
-                print(Fore.RED + f"Error searching Downloads: {e}")
-                return []
-
-        while True:
-            try:
-                self._clear_terminal()
-                self._display_header()
-
-                box_width = 60
-                print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "Backup/Restore Options")
-                print(Fore.RED + f"│ → {Fore.CYAN}export{Style.DIM}/e{Style.NORMAL}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Backup/export your settings")
-                print(Fore.RED + f"│ → {Fore.CYAN}import{Style.DIM}/i{Style.NORMAL}{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Restore/import settings from a backup")
-                print(Fore.RED + f"│ → {Fore.RED}back{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}Return to previous menu")
-                print(Fore.RED + "╰" + ("─" * (box_width-2)))
-
-                action = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
-
-                if action in ['back', 'b', 'q']:
-                    return
-
-                if action in ['export', 'e']:
-                    print(Fore.YELLOW + f"\nPress Enter to save backup to {Fore.CYAN}{default_path}{Fore.YELLOW},")
-                    print(Fore.YELLOW + "or type 'picker' to open a file picker dialog, or enter a custom path, or 'b' to cancel.")
-                    while True:
-                        dest = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
-                        if dest.lower() == 'b':
-                            break
-                        if dest.lower() == 'picker':
-                            dest = open_file_picker(save=True, default_path=default_path)
-                            if not dest:
-                                print(Fore.YELLOW + "No file selected. Cancelled.")
-                                input(Fore.YELLOW + "Press Enter to continue...")
-                                break
-                        if not dest:
-                            dest = default_path
-                        if not confirm_path(dest, "backup/export"):
-                            print(Fore.YELLOW + "Cancelled by user.")
-                            input(Fore.YELLOW + "Press Enter to continue...")
-                            break
-                        try:
-                            if self.preferences_file:
-                                shutil.copy2(self.preferences_file, dest)
-                                print(Fore.GREEN + f"Preferences exported to {Fore.CYAN}{dest}{Fore.GREEN}")
-                            else:
-                                print(Fore.RED + "Error: No preferences file path found.")
-                        except Exception as e:
-                            print(Fore.RED + f"Export failed: {e}")
-                        input(Fore.YELLOW + "Press Enter to continue...")
-                        break
-                elif action in ['import', 'i']:
-                    print(Fore.YELLOW + f"\nPlace your backup file in {Fore.CYAN}{downloads_dir}{Fore.YELLOW} and press Enter to auto-import,")
-                    print(Fore.YELLOW + "or type 'picker' to open a file picker dialog, or enter a custom path, or 'b' to cancel.")
-                    while True:
-                        src = input(Fore.RED + "  ❯ " + Fore.WHITE).strip()
-                        if src.lower() == 'b':
-                            break
-                        if src.lower() == 'picker':
-                            src = open_file_picker(save=False, default_path=default_path)
-                            if not src:
-                                print(Fore.YELLOW + "No file selected. Cancelled.")
-                                input(Fore.YELLOW + "Press Enter to continue...")
-                                break
-                        if not src:
-                            # If no input, search for .json files in Downloads
-                            json_files = find_json_files_in_downloads()
-                            if not json_files:
-                                print(Fore.RED + "No .json files found in Downloads.")
-                                input(Fore.YELLOW + "Press Enter to continue...")
-                                break
-                            if len(json_files) == 1:
-                                src = json_files[0]
-                                print(Fore.YELLOW + f"Found backup: {Fore.CYAN}{src}")
-                            else:
-                                print(Fore.YELLOW + "Multiple .json files found in Downloads:")
-                                for idx, f in enumerate(json_files, 1):
-                                    print(f"{Fore.CYAN}{idx}. {f}")
-                                while True:
-                                    sel = input(Fore.YELLOW + "Select a file by number or 'b' to cancel: " + Fore.WHITE).strip()
-                                    if sel.lower() == 'b':
-                                        src = None
-                                        break
-                                    if sel.isdigit() and 1 <= int(sel) <= len(json_files):
-                                        src = json_files[int(sel)-1]
-                                        break
-                                if not src:
-                                    break
-                        if not os.path.isfile(src):
-                            print(Fore.RED + "File not found.")
-                            input(Fore.YELLOW + "Press Enter to continue...")
-                            break
-                        if not confirm_path(src, "import/restore"):
-                            print(Fore.YELLOW + "Cancelled by user.")
-                            input(Fore.YELLOW + "Press Enter to continue...")
-                            break
-                        print(Fore.YELLOW + "Importing will overwrite your current preferences and bookmarks. Continue? (y/n)")
-                        confirm = input(Fore.RED + "  ❯ " + Fore.WHITE).strip().lower()
-                        if confirm == 'y':
-                            try:
-                                with open(src, "r", encoding="utf-8") as f:
-                                    data = f.read()
-                                json.loads(data)  # Validate JSON
-                                if self.preferences_file:
-                                    with open(self.preferences_file, "w", encoding="utf-8") as f:
-                                        f.write(data)
-                                    print(Fore.GREEN + "Preferences imported successfully.")
-                                    self.preferences = self._load_preferences()
-                                else:
-                                    print(Fore.RED + "Error: No preferences file path found.")
-                            except Exception as e:
-                                print(Fore.RED + f"Import failed: {e}")
-                        else:
-                            print(Fore.YELLOW + "Import cancelled.")
-                        input(Fore.YELLOW + "Press Enter to continue...")
-                        break
-                else:
-                    print(f"{Fore.YELLOW}Invalid option. Please try again.{Style.RESET_ALL}")
-                    self._wait_for_key()
-            except KeyboardInterrupt:
-                return
+        else:
+            print(f"{Fore.YELLOW}Invalid option. Please try again.{Style.RESET_ALL}")
+            self._wait_for_key()
+# -------------- Fix Ended for this method(backup_restore_menu)-----------
 
     def _get_ayah_range(self, total_ayah: int) -> tuple:
         """
