@@ -1564,17 +1564,17 @@ class UI:
             # --- Redesigned Settings Confirmation Loop ---
             while True:
                 self.clear_terminal()
-                box_width = 55 # Adjust as needed
+                box_width = 60
                 separator = "─" * box_width
 
-                # --- REDESIGNED HEADER ---
+                # --- Consistent Header Format ---
                 print(Fore.RED + "╭─ " + Style.BRIGHT + Fore.GREEN + "🎬 Confirm Subtitle Content & Generate")
-                print(Fore.RED + f"│ {Fore.WHITE}Surah:{Fore.CYAN} {surah_info.surah_name} ({surah_info.surah_number})")
-                print(Fore.RED + f"│ {Fore.WHITE}Ayahs:{Fore.CYAN} {start_ayah}-{end_ayah}")
-                print(Fore.RED + "├" + separator) # Use full separator
+                print(Fore.RED + f"│ → {Fore.CYAN}Surah{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}{surah_info.surah_name} ({surah_info.surah_number})")
+                print(Fore.RED + f"│ → {Fore.CYAN}Ayahs{Style.RESET_ALL} : {Style.NORMAL}{Fore.WHITE}{start_ayah}-{end_ayah}")
+                print(Fore.RED + "├" + separator)
 
-                # --- Display Current Subtitle Settings Clearly ---
-                print(Fore.RED + f"│ {Fore.YELLOW}Current Content Configuration:")
+                # --- Display Current Subtitle Settings ---
+                print(Fore.RED + f"│ {Style.BRIGHT}{Fore.GREEN}Current Content Configuration{Style.RESET_ALL}:")
                 subtitle_config = self.preferences.get("subtitle_config", {})
 
                 # Define content parts with labels
@@ -1588,32 +1588,35 @@ class UI:
 
                 for label, enabled, color in content_parts_info:
                     status = Fore.GREEN + "✓ Included" if enabled else Fore.RED + "✗ Excluded"
-                    print(Fore.RED + f"│   • {color}{label.ljust(25)} {status}")
+                    print(Fore.RED + f"│   → {color}{label.ljust(20)} {status}")
 
-                print(Fore.RED + "├" + separator) # Use full separator
+                print(Fore.RED + "├" + separator)
 
-                # --- Redesigned Options with Numbers ---
+                # --- Redesigned Options with Consistent Format ---
                 print(Fore.RED + f"│ {Style.BRIGHT}{Fore.GREEN}Choose an action{Style.RESET_ALL}:")
 
-                # Calculate max length for proper alignment
+                # Define actions with consistent formatting
                 actions = [
                     ("1", "Generate SRT with current settings"),
                     ("2", "Change Content Settings"),
                     ("3", "Cancel (Back to Main Menu)")
                 ]
 
+                # Calculate max length for proper alignment
+                def strip_ansi(s):
+                    import re
+                    ansi_escape = re.compile(r'\x1B[\[][0-?]*[ -/]*[@-~]')
+                    return ansi_escape.sub('', s)
                 max_action_len = max(len(action[0]) for action in actions)
-                for action, desc in actions:
-                    pad = " " * (max_action_len - len(action))
-                    print(Fore.RED + f"│   • {Fore.CYAN}{action}{pad} {Style.DIM}: {desc}{Style.RESET_ALL}")
+
+                for action_num, desc in actions:
+                    pad = " " * (max_action_len - len(action_num))
+                    print(Fore.RED + f"│ → {Fore.CYAN}{action_num}{pad}{Style.NORMAL} : {Fore.WHITE}{desc}{Style.RESET_ALL}")
 
                 print(Fore.RED + "╰" + separator)
 
-                # --- Helper Text ---
-                print(Style.DIM + Fore.WHITE + "\nEnter your input.")
-
                 try:
-                    confirm_choice = input(f"\n{Fore.BLUE}Enter choice (1-3): {Fore.WHITE}").strip()
+                    confirm_choice = input(Fore.RED + "  ❯ " + Fore.CYAN + "Enter choice (1-3): " + Fore.WHITE).strip()
 
                     if confirm_choice == '1': # Generate
                         # Proceed to generate using current subtitle_config
