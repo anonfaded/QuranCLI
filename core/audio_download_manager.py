@@ -177,60 +177,116 @@ class AudioDownloadManager:
             return None
 
         async def estimate_all():
+            """Asynchronously probe each surah's candidate URLs and report a running progress bar.
+
+            Uses a single-line tqdm progress bar so the TUI doesn't flood with new lines and the
+            user sees live feedback while the network probes are happening.
+            """
             sizes = []
+            pbar = None
+            try:
+                async with aiohttp.ClientSession() as session:
+                    # Create a single-line progress bar for the whole operation
+                    try:
+                        pbar = tqdm.tqdm(total=len(surah_numbers), desc=f"Probing sizes", ncols=80, unit="surah", leave=False)
+                    except Exception:
+                        pbar = None
 
-            async with aiohttp.ClientSession() as session:
-                for surah_num in surah_numbers:
-                    surah_info = self.data_handler.get_surah_info(surah_num)
-                    url_candidates = []
+                    for surah_num in surah_numbers:
+                        surah_info = self.data_handler.get_surah_info(surah_num)
+                        url_candidates = []
 
-                    # Prefer URL from cached surah audio info if available
-                    if surah_info and getattr(surah_info, 'audio', None):
-                        # surah_info.audio is expected to be a dict of reciter_id -> data
-                        if reciter in surah_info.audio and 'url' in surah_info.audio[reciter]:
-                            url_candidates.append(surah_info.audio[reciter]['url'])
+                        # Prefer URL from cached surah audio info if available
+                        if surah_info and getattr(surah_info, 'audio', None):
+                            # surah_info.audio is expected to be a dict of reciter_id -> data
+                            if reciter in surah_info.audio and 'url' in surah_info.audio[reciter]:
+                                url_candidates.append(surah_info.audio[reciter]['url'])
 
-                    # Special-case: attempt known Luhaidan pattern if no cached URL
-                    if not url_candidates and reciter.lower().startswith('luhaid') or reciter == 'luhaidan':
-                        padded = str(surah_num).zfill(3)
-                        url_candidates.append(f"https://download.quranicaudio.com/quran/muhammad_alhaidan/{padded}.mp3")
-                        # GitHub fallback for specific surahs (player logic)
-                        if surah_num in {2, 6, 25, 112}:
-                            url_candidates.append(
-                                f"https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/muhammad_al_luhaidan/muhammad-al-luhaidan-{padded}.mp3"
-                            )
+                        # Special-case: attempt known Luhaidan pattern if no cached URL
+                        if not url_candidates and (reciter.lower().startswith('luhaid') or reciter == 'luhaidan'):
+                            padded = str(surah_num).zfill(3)
+                            url_candidates.append(f"https://download.quranicaudio.com/quran/muhammad_alhaidan/{padded}.mp3")
+                            # GitHub fallback for specific surahs (player logic)
+                            if surah_num in {2, 6, 25, 112}:
+                                url_candidates.append(
+                                    f"https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/muhammad_al_luhaidan/muhammad-al-luhaidan-{padded}.mp3"
+                                )
 
-                    # If still no candidates, try to find any reciter entry and map by display name
-                    if not url_candidates and surah_info and getattr(surah_info, 'audio', None):
-                        # pick first available url as best-effort source
-                        for v in surah_info.audio.values():
-                            if isinstance(v, dict) and 'url' in v:
-                                url_candidates.append(v['url'])
+                        # If still no candidates, try to find any reciter entry and map by display name
+                        if not url_candidates and surah_info and getattr(surah_info, 'audio', None):
+                            # pick first available url as best-effort source
+                            for v in surah_info.audio.values():
+                                if isinstance(v, dict) and 'url' in v:
+                                    url_candidates.append(v['url'])
+                                    break
+
+                        # Mirror AudioManager special-case: for Muhammad Al Luhaidan certain surahs
+                        # (2,6,25,112) should use the GitHub raw URL. Ensure the estimator picks the
+                        # same URL the player will actually use so the wizard doesn't 404.
+                        try:
+                            luhaidan_names = {'muhammad al luhaidan', 'luhaidan'}
+                            if (reciter.lower() in luhaidan_names or reciter.lower().startswith('luhaid')) and surah_num in {2, 6, 25, 112}:
+                                padded = str(surah_num).zfill(3)
+                                url_candidates = [f"https://raw.githubusercontent.com/fadsec-lab/quran-audios/main/muhammad_al_luhaidan/muhammad-al-luhaidan-{padded}.mp3"]
+                        except Exception:
+                            # Best-effort: ignore errors and keep original url_candidates
+                            pass
+
+                        # No URL candidates -> mark unknown and continue
+                        if not url_candidates:
+                            if pbar:
+                                pbar.update(1)
+                            # Mark as unknown by appending None placeholder
+                            sizes.append(None)
+                            continue
+
+                        # Try candidates in order
+                        found_size = None
+                        for u in url_candidates:
+                            size_mb = await get_size_for_url(session, u)
+                            if size_mb is not None:
+                                found_size = size_mb
                                 break
 
-                    # No URL candidates -> cannot determine size
-                    if not url_candidates:
-                        return None
+                        if found_size is None:
+                            # mark unknown and continue probing remaining surahs
+                            sizes.append(None)
+                            if pbar:
+                                pbar.update(1)
+                            continue
 
-                    # Try candidates in order
-                    found_size = None
-                    for u in url_candidates:
-                        size_mb = await get_size_for_url(session, u)
-                        if size_mb is not None:
-                            found_size = size_mb
-                            break
+                        sizes.append(found_size)
+                        if pbar:
+                            pbar.update(1)
 
-                    if found_size is None:
-                        return None
+            finally:
+                if pbar:
+                    try:
+                        pbar.close()
+                    except Exception:
+                        pass
 
-                    sizes.append(found_size)
-
-            # All sizes determined
-            return sum(sizes)
+            # After probing all surahs: return sum of known sizes, or None if ALL are unknown
+            known_sizes = [s for s in sizes if s is not None]
+            if not known_sizes:
+                return None
+            return sum(known_sizes)
 
         try:
-            return asyncio.run(estimate_all())
-        except (RuntimeError, KeyboardInterrupt):
+            # Use a fresh event loop to avoid RuntimeError when an event loop
+            # may already be running in the caller's environment.
+            loop = asyncio.new_event_loop()
+            try:
+                return loop.run_until_complete(estimate_all())
+            finally:
+                try:
+                    loop.close()
+                except Exception:
+                    pass
+        except KeyboardInterrupt:
+            return None
+        except Exception:
+            # Any unexpected errors during the async probing should result in unknown size
             return None
 
     def _estimate_fallback_size(self, surah_numbers: List[int]) -> float:
@@ -809,9 +865,9 @@ class AudioDownloadManager:
         if missing_surahs:
             # Let the user know we are probing remote files for accurate sizes
             try:
-                print(f"\n{Fore.CYAN}Please wait while we fetch file sizes for {len(missing_surahs)} surah(s)...{Style.RESET_ALL}")
+                # Minimal single-line message; tqdm will render its own in-place progress
+                print(f"{Fore.CYAN}Probing remote files for {len(missing_surahs)} surah(s)...{Style.RESET_ALL}")
             except Exception:
-                # Best-effort: don't crash if printing fails
                 pass
             estimated_size = self.estimate_download_size(missing_surahs, reciter)
         else:

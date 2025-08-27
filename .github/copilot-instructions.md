@@ -40,3 +40,6 @@
 - Validate all **user inputs** and external system interactions.
 - Prefer **logging** over print statements for debugging and maintainability.
 - Ensure code is **scalable**, **testable**, and **maintainable** by design.
+
+**Note:** In the end of every chat, always run the application using:
+`C:/Python311/python.exe Quran-CLI.py`
