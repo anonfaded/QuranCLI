@@ -20,14 +20,6 @@
 - **Docstrings**: Add clear docstrings to all functions and classes explaining their purpose, parameters, and return values.
 - **Inline comments**: Use comments to explain complex or non-obvious logic.
 
-### 🛠️ Fixing / Updating Code
-- **Change format**: Wrap all code changes using the following format:
-  ```python
-  # -------------- Fix Start for this method(method_name)-----------
-  ...updated code...
-  # -------------- Fix Ended for this method(method_name)-----------
-  ```
-
 ### 🧠 Communication
 - **Ask when unsure**: If requirements are unclear or ambiguous, ask for clarification before proceeding.
 - **Concise responses**: Keep responses short and focused. Avoid unnecessary explanations or code unless requested.
