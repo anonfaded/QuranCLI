@@ -37,26 +37,28 @@ QuranCLI brings the Quran to your Windows command line with a rich set of featur
 
 ## 🌟 Key Features
 
-*   **📖 Read Anywhere:** Access all 114 Surahs with English translation (Simple & Uthmani Arabic scripts).  
-*   **🎧 Listen:** Stream audio recitations from various renowned reciters with full playback controls (play/pause/seek).  
-*   **🎬 Subtitle Generation:** Create `.srt` subtitle files (Arabic + English) for Ayah ranges – perfect for video editing!  
-*   **🌐 Subtitle Sharing:** **Built-in web server** to easily share generated subtitle files with other devices (phone, tablet, other PCs) on the same Wi-Fi network.  
-*   **💾 Smart Caching:** Works offline by caching Quran text and audio locally.  
-*   **🎨 Intuitive Interface:** Colorful, responsive, and easy-to-navigate terminal UI with custom `theme` command to customize colors.  
-*   **🔄 App Auto-Updates:** Notifies you of new app versions available on GitHub.  
-*   **📊 Stats:** See total download counts directly in the header.  
-*   **🖥️ Multi Platform:** Available on `Windows` and `Linux` platforms.  
-*   **⌨️ Command Alias:** Launch the app directly from the terminal using the `qurancli` command.  
-*   **🌐 Translation & Transliteration:** Provides Urdu, Turkish, and English translations along with transliteration.  
-*   **🎨 Redesigned app icon for a fresh look.**  
-*   **📂 `audiopath` command to view and open the audio cache folder.**  
-*   **🔖 Comprehensive bookmark management with notes and quick access to Ayatul Kursi.**  
-*   **💾 Backup and restore capabilities for app settings and data import/export.**  
-*   **🧩 Linux-style short commands such as `ls` for listing items.**  
-*   **🎵 Dedicated Ayatul Kursi audio player for focused listening.**  
-*   **🔁 Audio loop feature enabling continuous playback.**  
-*   **⏰ Sleep timer to auto-stop audio playback after a set time.**  
-*   **📖 `all` command for opening an entire Surah from the first input.**
+* **📖 Complete Quran Access:** Read all 114 Surahs with English translation (Simple & Uthmani Arabic scripts)
+* **🎧 Audio Recitations:** Stream high-quality audio from renowned reciters with full playback controls
+* **🎬 Subtitle Generation:** Create `.srt` subtitle files (Arabic + English) for video editing workflows
+* **🌐 Built-in Web Server:** Share generated subtitle files with devices on the same Wi-Fi network
+* **💾 Offline Mode:** Smart caching for Quran text and audio with local storage
+* **🎨 Customizable Interface:** Colorful, responsive terminal UI with theme customization
+* **🔄 Auto-Updates:** Automatic notifications for new app versions from GitHub
+* **📊 Download Statistics:** Real-time download counts displayed in the app header
+* **🖥️ Cross-Platform:** Native support for Windows and Linux operating systems
+* **⌨️ Command Line Integration:** Launch directly from terminal using the `qurancli` command
+* **🌐 Multi-Language Support:** Urdu, Turkish, and English translations with transliteration
+* **🔖 Advanced Bookmarks:** Comprehensive bookmark system with notes and quick Ayatul Kursi access
+* **💾 Data Management:** Backup and restore capabilities for settings and data
+* **🧩 Linux-Style Commands:** Short commands like `ls` for efficient navigation
+* **🎵 Focused Audio Player:** Dedicated Ayatul Kursi audio player for spiritual listening
+* **🔁 Audio Loop Mode:** Continuous playback feature for extended listening sessions
+* **⏰ Sleep Timer:** Auto-stop functionality after specified time duration
+* **📖 Bulk Reading:** `all` command for opening complete Surahs from any starting point
+* **📥 Audio Manager:** Comprehensive audio management system with `download`, `clear`, and `path` commands
+* **⚙️ Translation Settings:** Toggle Urdu, English, and Turkish translations in reader mode
+* **🔔 Smart Notifications:** Toast messages for download completion and error handling
+* **🗂️ Organized Settings:** Categorized configuration commands in dedicated settings screen
 
 
 ---
@@ -71,7 +73,7 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
   <p><em>Theme command in use</em></p>
 </div>
 
-<br> 
+<br>
 
 <div align="center">
   <img src="https://github.com/anonfaded/QuranCLI/blob/main/demo/Reading-View.png" alt="Reading View" width="550">

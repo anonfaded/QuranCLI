@@ -3,3 +3,6 @@ dist/QuranCLI opt/QuranCLI/
 core/img/qurancli.png usr/share/icons/hicolor/128x128/apps/
 core/img/qurancli.png usr/share/pixmaps/
 qurancli.desktop usr/share/applications/
+core/database/quran_tr.json opt/QuranCLI/core/database/
+core/database/quran_ur.json opt/QuranCLI/core/database/
+core/database/quran-translation-and-transliteration.json opt/QuranCLI/core/database/
