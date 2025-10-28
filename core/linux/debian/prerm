@@ -2,6 +2,6 @@
 set -e
 
 # Remove the symlink
-rm -f /usr/local/bin/qurancli
+rm -f /usr/bin/qurancli
 
 exit 0

@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 set -e
 
-# Create symlink in /usr/local/bin
-ln -sf /opt/QuranCLI/QuranCLI /usr/local/bin/qurancli
+# Create symlink in /usr/bin
+ln -sf /opt/QuranCLI/QuranCLI /usr/bin/qurancli
 
 # Update icon cache
 if [ -x /usr/bin/gtk-update-icon-cache ]; then

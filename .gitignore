@@ -18,3 +18,83 @@ download_cache.json
 QuranCLI-Setup.exe
 cache/quran_data.json
 QuranCLI-Settings.json
+
+# Additional ignores for build artifacts
+*.deb
+*.exe
+*.msi
+*.dmg
+*.pkg
+*.appimage
+*.snap
+*.flatpak
+*.rpm
+*.tar.gz
+*.zip
+# Windows installer files
+*.iss
+# Cache and temp files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# Temporary files
+*.tmp
+*.temp
+# Build directories
+build/
+dist/
+cache/
+# User settings (should not be committed)
+QuranCLI-Settings.json
+preferences.json
+# Audio cache
+audio_cache/
+# API cache
+api_cache.json
+download_cache.json
+
+# Debian build artifacts
+*.deb
+core/linux/debian/qurancli/
+core/linux/debian/files
+core/linux/debian/qurancli.substvars
+core/linux/debian/.debhelper/
+core/qurancli_*.buildinfo
+core/qurancli_*.changes
