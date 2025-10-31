@@ -20,9 +20,9 @@ if [ ! -f "QuranCLI.spec" ]; then
     exit 1
 fi
 
-# Check if PyInstaller is available
-if ! command -v pyinstaller &> /dev/null; then
-    echo "Error: PyInstaller not found. Please install it with: pip install pyinstaller"
+# Check if Python is available
+if ! command -v python3 &> /dev/null; then
+    echo "Error: Python not found. Please install python3 (3.9 or higher)."
     exit 1
 fi
 
@@ -39,7 +39,7 @@ if ! command -v dos2unix &> /dev/null; then
 fi
 
 echo "Step 1: Running PyInstaller..."
-pyinstaller QuranCLI.spec
+/home/faded/.local/bin/pyinstaller QuranCLI.spec
 
 echo ""
 echo "Step 2: Installing build dependencies..."
@@ -64,7 +64,7 @@ cd ../..
 
 echo ""
 echo "Step 5: Moving .deb file to root directory..."
-DEB_FILE=$(ls ../qurancli_*.deb | head -1)
+DEB_FILE=$(ls core/qurancli_*.deb | head -1)
 if [ -f "$DEB_FILE" ]; then
     mv "$DEB_FILE" .
     echo "✓ Moved $DEB_FILE to root directory"
