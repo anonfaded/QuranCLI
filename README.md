@@ -45,7 +45,7 @@ QuranCLI brings the Quran to your Windows command line with a rich set of featur
 * **🎨 Customizable Interface:** Colorful, responsive terminal UI with theme customization
 * **🔄 Auto-Updates:** Automatic notifications for new app versions from GitHub
 * **📊 Download Statistics:** Real-time download counts displayed in the app header
-* **🖥️ Cross-Platform:** Native support for Windows and Linux operating systems
+* **🖥️ Cross-Platform:** Native support for Windows, Linux, and macOS operating systems
 * **⌨️ Command Line Integration:** Launch directly from terminal using the `qurancli` command
 * **🌐 Multi-Language Support:** Urdu, Turkish, and English translations with transliteration
 * **🔖 Advanced Bookmarks:** Comprehensive bookmark system with notes and quick Ayatul Kursi access
@@ -170,12 +170,37 @@ https://github.com/user-attachments/assets/e771312d-cf9e-4b54-bb97-47b4a4c17a63
     qurancli
     ```
 
+### macOS (Build from Source)
+
+1. **Install Dependencies:**
+   - Ensure you have Python 3.9+ installed.
+   - Install SDL2 (required for audio functionality):
+     ```bash
+     brew install sdl2
+     ```
+
+2. **Clone the Repository:**
+    ```bash
+    git clone https://github.com/anonfaded/QuranCLI.git
+    cd QuranCLI
+    ```
+
+3. **Install Python Dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4. **Run QuranCLI:**
+    ```bash
+    python Quran-CLI.py
+    ```
+
 
 <details>
   <summary>🔧 Dev Only: Build from Source</summary>
 
 
-*   **Prerequisites:** Python 3.9+ and pip.
+*   **Prerequisites:** Python 3.9+ and pip. On macOS, also install SDL2: `brew install sdl2`.
 *   **Clone:**
     ```bash
     git clone https://github.com/anonfaded/QuranCLI.git
