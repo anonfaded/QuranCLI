@@ -1062,16 +1062,25 @@ class UI:
 
 # core/ui.py (inside class UI)
 
-    def _redraw_audio_ui(self, surah_info: SurahInfo):
+    def _redraw_audio_ui(self, surah_info: SurahInfo, full_clear: bool = True):
         """Helper function to clear terminal and redraw the audio UI."""
         try:
             # Get the latest display string
             display_string = self.get_audio_display(surah_info)
-            # --- ALWAYS CLEAR ---
-            self.clear_terminal()
-            # --- END ALWAYS CLEAR ---
+            if full_clear:
+                # --- ALWAYS CLEAR ---
+                self.clear_terminal()
+                # --- END ALWAYS CLEAR ---
+            else:
+                # In-place repaint for the per-tick progress update: a full
+                # clear blanks the screen every second, which reads as
+                # flicker. Home + repaint + clear-below never blanks it.
+                sys.stdout.write("\033[H")
             # Print the display string
             print(display_string, end='', flush=True)
+            if not full_clear:
+                sys.stdout.write("\033[J")
+                sys.stdout.flush()
             # Return the string that was printed, can be used for last_display
             return display_string
         except Exception as e:
@@ -1409,7 +1418,7 @@ class UI:
                     try:
                         current_display = self.get_audio_display(surah_info)
                         if current_display != last_display:
-                            last_display = self._redraw_audio_ui(surah_info) or last_display
+                            last_display = self._redraw_audio_ui(surah_info, full_clear=False) or last_display
                     except Exception: pass # Ignore minor update errors silently
 
                 # --- Check if audio finished ---
@@ -1420,7 +1429,7 @@ class UI:
                 self.audio_manager.current_position >= self.audio_manager.duration - 0.1):
                     current_state_str_check = self.get_audio_display(surah_info)
                     if last_display != current_state_str_check:
-                        last_display = self._redraw_audio_ui(surah_info) or last_display
+                        last_display = self._redraw_audio_ui(surah_info, full_clear=False) or last_display
 
                 # Main loop delay
                 time.sleep(0.05)
