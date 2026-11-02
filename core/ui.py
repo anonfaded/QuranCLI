@@ -1071,16 +1071,39 @@ class UI:
                 # --- ALWAYS CLEAR ---
                 self.clear_terminal()
                 # --- END ALWAYS CLEAR ---
+                print(display_string, end='', flush=True)
             else:
                 # In-place repaint for the per-tick progress update: a full
                 # clear blanks the screen every second, which reads as
                 # flicker. Home + repaint + clear-below never blanks it.
-                sys.stdout.write("\033[H")
-            # Print the display string
-            print(display_string, end='', flush=True)
-            if not full_clear:
-                sys.stdout.write("\033[J")
-                sys.stdout.flush()
+                # Fall back to a full clear when the frame does not fit the
+                # terminal: homing and printing an oversized frame scrolls
+                # the viewport and duplicates frames in scrollback.
+                try:
+                    size = os.get_terminal_size()
+                    columns, rows = size.columns, size.lines
+                except OSError:
+                    columns, rows = 80, 24
+                if columns <= 0:
+                    columns = 80
+                frame_rows = 0
+                for line in display_string.split('\n'):
+                    visible = len(re.sub(r'\x1b\[[0-9;]*m', '', line))
+                    frame_rows += max(1, -(-visible // columns))
+                if frame_rows > rows:
+                    self.clear_terminal()
+                    print(display_string, end='', flush=True)
+                else:
+                    # Clear to end of every line, including blank ones, so a
+                    # shorter new line fully replaces the previous frame.
+                    sys.stdout.write("\033[H")
+                    lines = display_string.split('\n')
+                    for index, line in enumerate(lines):
+                        sys.stdout.write(line + "\033[K")
+                        if index < len(lines) - 1:
+                            sys.stdout.write("\n")
+                    sys.stdout.write("\033[J")
+                    sys.stdout.flush()
             # Return the string that was printed, can be used for last_display
             return display_string
         except Exception as e:
